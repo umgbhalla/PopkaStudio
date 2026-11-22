@@ -16,7 +16,7 @@
 //
 // The buttons (FN_BOOT, FN_PWR): FN_SCREEN_OFF — the same move to fully dark, the panel off; a touch, a button or
 // picking it up — back. FN_AMBIENT — into Always On at once, as when idle (also with Always On off): the same button
-// again, a touch or picking it up — back. FN_LOCK — into Always On with the touch off. On round boards, a short BOOT
+// again, a touch or picking it up — back. FN_LOCK — dim and shrink toward the center with touch off. On round boards, a short BOOT
 // toggles the display while locked, a long BOOT unlocks, and FN_PALM_LOCK locks and turns off the panel. FN_HOME
 // returns to the home screen. PWR can't wake the round board from light sleep (its
 // chip's interrupt is not wired: boards/amoled175/hardware.md) — on battery its long press is read at the next wake-up (pick the
@@ -62,26 +62,21 @@ enum { FN_NOTHING, FN_SCREEN_OFF, FN_LOCK, FN_AMBIENT, FN_HOME };  // what a but
 #define PW_AWAKE 180        // the panel awake: HaloWatch's default brightness
 #define PW_AOD_SCALE 0.95f  // Always On and dark: everything 5 % smaller
 #define PW_LISTEN_S 3       // locked: awake this long after a wake-up, for the button's long press
-#define PW_LOCK_Y 15.0f     // the lock's middle: where the Weather screen and the gallery show the time at the top
 
 enum { PW_ACTIVE, PW_FADING, PW_AOD, PW_DARK };
 static int pw_mode = PW_ACTIVE;
 static bool pw_to_aod;        // where the fade goes: Always On or dark
 static bool pw_aod_way;       // the way the spring left zero: to Always On (the brightness's curve, the face at the end)
 static HaloSpring pw_amb;     // 0 — awake, 1 — Always On or dark
-static HaloSpringK K_PW_OUT, K_PW_IN, K_PW_LOCK;
+static HaloSpringK K_PW_OUT, K_PW_IN, K_PW_SHIFT;
 static int64_t pw_active_us;  // the last touch or motion
 static int64_t pw_listen_us;  // locked: stay up until then
 static uint32_t pw_motion;
 static int pw_sent = -1;      // the brightness last sent to the panel
-static HaloView pw_view;      // the whole interface's view on the way to Always On
 static bool pw_locked;
 static int pw_lock_btn;       // what locked: 0 — palm, 1 — BOOT or shade, 2 — PWR
 static uint32_t pw_lock_ms;   // locked then: a long press of that same press does not unlock
-static HaloSpring pw_lock;    // 0 — unlocked, 1 — locked: the lock at the top fades and grows in
-static uint32_t pw_shake_at;  // touched while locked then: the lock wiggles
-static float pw_mid_lock;
-static HaloItem pw_lock_ic;
+static HaloSpring pw_shift_amount = {1, 0, 1};  // 0 during lock and its wake-up, 1 for regular Always On
 static volatile bool pw_cmd_sleep, pw_cmd_wake;
 static volatile int pw_aod_on = FN_AOD, pw_idle_s = FN_AOD_IDLE, pw_aod_level = FN_AOD_BRIGHT, pw_aod_home = FN_AOD_HOME;
 static volatile int pw_aod_shift = FN_AOD_SHIFT;
@@ -138,7 +133,11 @@ static void pw_wake(uint8_t w) {  // the screen where it was: back along the sam
 }
 
 static void pw_lock_set(bool on, int btn) {
-  pw_locked = on, pw_lock_btn = btn, pw_lock.target = on, pw_lock_ms = halo_ms();
+  pw_locked = on, pw_lock_btn = btn, pw_lock_ms = halo_ms();
+  if (on) {
+    if (pw_amb.x == 0 || !pw_aod_way || !halo_display_is_on()) halo_spring_set(pw_shift_amount, 0);
+    else pw_shift_amount.target = 0;  // recenter smoothly if idle Always On had already shifted the face
+  }
   halo_touch_on(!on);
   LOG("%s\n", on ? "locked" : "unlocked");
 }
@@ -148,6 +147,7 @@ static void pw_locked_display(bool on) {
   pw_mode = on ? PW_AOD : PW_DARK;
   pw_to_aod = pw_aod_way = on;
   halo_spring_set(pw_amb, 1);
+  halo_spring_set(pw_shift_amount, 0);
   if (on) {
     halo_wake();
     face_still(true);
@@ -184,7 +184,7 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
     }
 #endif
     if (held && btn == pw_lock_btn && halo_ms() - pw_lock_ms > HALO_BOOT_LONG_MS + 300) pw_lock_set(false, 0), pw_wake(0);
-    else if (!held) pw_shake_at = halo_ms() | 1, pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+    else if (!held) pw_listen_us = now + PW_LISTEN_S * 1000000ll;
     return;
   }
   if (held) return;
@@ -256,7 +256,7 @@ static void power_tick(float dt) {
     else pw_wake(4), w = 0;
   }
   const uint8_t pwr = halo_pwr_event();
-  if (halo_finger_blocked() && pw_locked) pw_shake_at = halo_ms() | 1, pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+  if (halo_finger_blocked() && pw_locked) pw_listen_us = now + PW_LISTEN_S * 1000000ll;
   if (boot || boot_held) pw_button(1, pw_boot, boot_held, now);
   if (pwr) pw_button(2, pw_pwr, pwr & HALO_PWR_LONG, now);
   switch (pw_mode) {
@@ -300,7 +300,8 @@ static void power_tick(float dt) {
   pw_cmd_sleep = false;  // sent while already asleep — it must not put the board back to sleep right after it wakes
   fc_calm = pw_mode == PW_AOD || (pw_mode == PW_FADING && pw_to_aod);  // the animations: still from the move's start
   halo_spring_run(pw_amb, pw_amb.target > 0.5f ? K_PW_IN : K_PW_OUT, dt);
-  halo_spring_run(pw_lock, K_PW_LOCK, dt);
+  if (!pw_locked && pw_amb.x == 0) halo_spring_set(pw_shift_amount, 1);
+  else halo_spring_run(pw_shift_amount, K_PW_SHIFT, dt);
   const int level = pw_level(pw_awake_level);
   if (level != pw_sent) halo_brightness(level), pw_sent = level;
 }
@@ -311,34 +312,17 @@ static void power_tick(float dt) {
 static void power_view() {
   static const int8_t SX[8] = {0, 5, 7, 5, 0, -5, -7, -5}, SY[8] = {-7, -5, 0, 5, 7, 5, 0, -5};
   static int spot;
-  if (fc_min >= 0 && (pw_mode == PW_AOD || pw_amb.x == 0)) spot = fc_min & 7;
-  const float k = pw_amb.x, m = pw_aod_way && pw_aod_shift ? k : 0;  // (the shift: only with Burn-in shift on)
-  pw_view = {SX[spot] * m, SY[spot] * m, 1 + (PW_AOD_SCALE - 1) * k, 1, false};
-  halo_nav_ambient(k, pw_view, pw_aod_way);
-}
-
-// The lock over everything (laid out after halo_nav_update, drawn after halo_nav_draw), along with it into Always On:
-// grows from 0.7 and fades in over the second half of the lock spring; touched while locked — a short wiggle (10 Hz,
-// 0.45 s, dying away) — HaloWatch's lock icon (display.h), the gallery's icon font at 18 px
-static void power_lock_layout() {
-  const float a = halo_clamp01(pw_lock.x * 2 - 1), t = pw_shake_at ? (halo_ms() - pw_shake_at) / 1000.0f : 9;
-  const float shake = t < 0.45f ? 5 * sinf(t * 2 * HALO_PI * 10) * (1 - t / 0.45f) : 0, s = 0.75f * (0.7f + 0.3f * a);
-  gl_text_mid(pw_lock_ic, gl_ic24, "", pw_mid_lock, CX + shake, PW_LOCK_Y, s, 0xC6C6C6, a > 0.01f ? a : 0,
-              &halo_black);
-  pw_lock_ic.on_black = true;
-  if (shake != 0) halo_subpixel = true;
-  halo_view_commit(pw_lock_ic, pw_view);
-}
-
-static void power_lock_draw() {
-  halo_item_draw(pw_lock_ic);
+  if (fc_min >= 0 && (pw_amb.x == 0 || (pw_mode == PW_AOD && !pw_locked))) spot = fc_min & 7;
+  const float k = pw_amb.x, m = pw_aod_way && pw_aod_shift ? k * pw_shift_amount.x : 0;
+  if (m > 0 && pw_shift_amount.x != pw_shift_amount.target) halo_subpixel = true;
+  const HaloView view = {SX[spot] * m, SY[spot] * m, 1 + (PW_AOD_SCALE - 1) * k, 1, false};
+  halo_nav_ambient(k, view, pw_aod_way);
 }
 
 static void power_build() {  // after halo_begin: the motion sensor is on its I2C bus
   K_PW_IN = halo_spring(0.8f, 1);   // to Always On — calm: ~0.5 s most of the way
   K_PW_OUT = halo_spring(0.5f, 1);  // awake — quicker: ~0.3 s
-  K_PW_LOCK = halo_spring(0.4f, 1);
-  pw_mid_lock = halo_text_mid(gl_ic24, "");
+  K_PW_SHIFT = halo_spring(0.3f, 1);
 #if FN_WAKE_RAISE || FN_STEPS || defined(__EMSCRIPTEN__)
   halo_motion_begin(150);  // (Raise off and no Steps — the motion sensor stays off)
 #endif

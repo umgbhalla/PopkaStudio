@@ -73,7 +73,6 @@ static void update(float dt) {
   if (shade_owns_finger) halo_finger = finger;
   shade_layout(0, face_scr[0], shade_index(face_scr[0]), HaloView());
 #endif
-  power_lock_layout();   // the lock at the top — over everything
 }
 
 static void draw() {  // both cores, each its part of a band
@@ -82,7 +81,6 @@ static void draw() {  // both cores, each its part of a band
 #else
   halo_nav_draw();
 #endif
-  power_lock_draw();
 }
 
 void setup() {
