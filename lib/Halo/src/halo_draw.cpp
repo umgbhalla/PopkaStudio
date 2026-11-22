@@ -835,17 +835,48 @@ int halo_text_width(const HaloFont &f, const char *s, int spacing) {
   return w > 0 ? w - spacing : 0;
 }
 
-void HALO_HOT halo_text(const HaloFont &f, const char *s, float x, float y, uint32_t rgb, float alpha, int align,
-                        float scale, int spacing, int32_t bg) {
-  if (alpha <= 0 || y + f.line * scale + 2 < hb.y || y - 2 >= hb.y + hb.rows) return;
-  // Буквы строки — один раз: и для ширины, и для рисования (раньше — два поиска каждой буквы в каждой пачке)
-  const HaloMask *gs[64];
-  int n = 0, width = 0;
-  for (const char *p = s; *p && n < 64;) {
+// The ellipsis: three dots, as wide as this font's — what a cut line ends with
+static inline float ell_r(const HaloFont &f) {
+  return fmaxf(1.2f, f.size * 0.06f);
+}
+static inline int ell_w(const HaloFont &f) {
+  return (int)(ell_r(f) * 2 * 3 + ell_r(f) * 2.2f * 2 + f.size * 0.08f + 0.5f);
+}
+// The letters of s that fit in fit px (all of them if fit <= 0 or they do); cut — an ellipsis follows
+static int fit_glyphs(const HaloFont &f, const char *s, int spacing, float fit, const HaloMask **gs, int max, int &width,
+                      bool &cut) {
+  int n = 0;
+  width = 0, cut = false;
+  for (const char *p = s; *p && n < max;) {
     const HaloMask *g = glyph(f, utf8_next(p));
     if (g) gs[n++] = g, width += g->adv + spacing;
   }
-  const float tw = (n ? width - spacing : 0) * scale;
+  if (fit <= 0 || width - spacing <= fit) return n;
+  cut = true;
+  const int ew = ell_w(f);
+  while (n > 0 && width - spacing + ew > fit) width -= gs[--n]->adv + spacing;
+  while (n > 0 && gs[n - 1]->w <= 1 && gs[n - 1]->h <= 1) width -= gs[--n]->adv + spacing;  // (no space before the dots)
+  width += ew + spacing;
+  return n;
+}
+
+int halo_text_fit_width(const HaloFont &f, const char *s, int spacing, float fit) {
+  const HaloMask *gs[64];
+  int width;
+  bool cut;
+  const int n = fit_glyphs(f, s, spacing, fit, gs, 64, width, cut);
+  return n || cut ? width - spacing : 0;
+}
+
+void HALO_HOT halo_text(const HaloFont &f, const char *s, float x, float y, uint32_t rgb, float alpha, int align,
+                        float scale, int spacing, int32_t bg, float fit) {
+  if (alpha <= 0 || y + f.line * scale + 2 < hb.y || y - 2 >= hb.y + hb.rows) return;
+  // Буквы строки — один раз: и для ширины, и для рисования (раньше — два поиска каждой буквы в каждой пачке)
+  const HaloMask *gs[64];
+  int width;
+  bool cut;
+  const int n = fit_glyphs(f, s, spacing, fit > 0 ? fit / scale : 0, gs, 64, width, cut);
+  const float tw = (n || cut ? width - spacing : 0) * scale;
   if (align == 1) x -= tw / 2;
   else if (align == 2) x -= tw;
   if (!halo_hits(x - 2, y - 2, x + tw + 2, y + f.line * scale + 2)) return;
@@ -864,6 +895,11 @@ void HALO_HOT halo_text(const HaloFont &f, const char *s, float x, float y, uint
       if (halo_hits(gx - 1, gy - 1, gx + g->w * scale + 1, gy + g->h * scale + 1)) mask_scaled(*g, gx, gy, scale, P);
     }
     pen += g->adv + spacing;
+  }
+  if (cut) {  // the ellipsis: three dots on the baseline, the text's color
+    const float r = ell_r(f) * scale, step = r * 4.2f, bx = x + (pen + f.size * 0.08f) * scale + r;
+    const float by = y + f.ascent * scale - r;
+    for (int i = 0; i < 3; i++) halo_circle(bx + i * step, by, r, rgb, alpha);
   }
 }
 

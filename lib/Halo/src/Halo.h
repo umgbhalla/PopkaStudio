@@ -299,8 +299,12 @@ uint32_t halo_utf8_next(const char *&s);                       // следующ
 int halo_text_width(const HaloFont &f, const char *s, int spacing = 0);
 // Текст: (x, y) — левый верх строки; align: 0 — от x, 1 — по центру x, 2 — до x. scale ≠ 1 — с масштабом.
 // bg ≥ 0 — под текстом сплошной цвет bg (0xRRGGBB): края букв — готовыми цветами, без смешивания (в разы быстрее)
+// fit > 0 — no wider than fit px: what does not fit is cut at a letter and ends in an ellipsis (three dots of the text's
+// color — fonts are subsets, a "…" is rarely in them), as Wear OS truncates titles and lines rather than shrink them
 void halo_text(const HaloFont &f, const char *s, float x, float y, uint32_t rgb, float alpha = 1, int align = 0,
-               float scale = 1, int spacing = 0, int32_t bg = -1);
+               float scale = 1, int spacing = 0, int32_t bg = -1, float fit = 0);
+// The width the text takes with fit (as halo_text draws it), px at scale 1
+int halo_text_fit_width(const HaloFont &f, const char *s, int spacing, float fit);
 void halo_mask(const HaloMask &m, float x, float y, uint32_t rgb, float alpha = 1, float scale = 1, int32_t bg = -1);
 // Цвет, готовый к рисованию (halo_paint), — для halo_mask_rows: свой у каждой строки (градиент). blk — 16 уровней
 // маски поверх чёрного: на чёрном пикселе — запись готового цвета, а не смешивание (то же значение)
@@ -429,6 +433,7 @@ struct HaloItem {
   const HaloFont *font = nullptr;
   const char *text = nullptr;    // строка скетча: изменилось содержимое — элемент заметит
   int8_t align = 1, spacing = 0;
+  float fit = 0;                 // текст: не шире fit px при масштабе 1 (0 — как есть), лишнее — многоточием (halo_text)
   const HaloMask *mask = nullptr;
   const HaloImage *image = nullptr;
   // Пиксель-арт (HI_PIXELS): картинка pixels, её кадр frame; scale — пикселей на клетку, поворот — a0 (радианы по

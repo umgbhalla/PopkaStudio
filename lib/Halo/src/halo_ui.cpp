@@ -312,7 +312,7 @@ static void bounds(const HaloItem &it, float b[4]) {
   float hw = 0, hh = 0, cx = it.x, cy = it.y;
   switch (it.kind) {
     case HI_TEXT: {
-      const float tw = (it.font && it.text ? halo_text_width(*it.font, it.text, it.spacing) : 0) * s;
+      const float tw = (it.font && it.text ? halo_text_fit_width(*it.font, it.text, it.spacing, it.fit) : 0) * s;
       hw = tw / 2 + 2, hh = (it.font ? it.font->line : 0) * s / 2 + 2;
       cx = it.align == 0 ? it.x + tw / 2 : it.align == 2 ? it.x - tw / 2 : it.x;
       break;
@@ -451,7 +451,7 @@ void halo_item_commit(HaloItem &it) {
     h = mix(h, it.kind), h = mix(h, qf(it.x, 16)), h = mix(h, qf(it.y, 16)), h = mix(h, qf(it.scale, 2048));
     h = mix(h, qf(it.alpha, 512)), h = mix(h, it.color), h = mix(h, it.color2), h = mix(h, it.align);
     h = mix(h, qf(it.w, 16)), h = mix(h, qf(it.h, 16)), h = mix(h, qf(it.r, 16)), h = mix(h, qf(it.v, 4096));
-    h = mix(h, qf(it.a0, 4096)), h = mix(h, qf(it.a1, 4096)), h = mix(h, it.on_black);
+    h = mix(h, qf(it.a0, 4096)), h = mix(h, qf(it.a1, 4096)), h = mix(h, it.on_black), h = mix(h, qf(it.fit, 16));
     h = mix(h, (uint32_t)(uintptr_t)it.on);
     h = mix(h, (uint32_t)(uintptr_t)it.font), h = mix(h, (uint32_t)(uintptr_t)it.mask);
     // Маска, сделанная на ходу (halo_text_arc): новая — новые пиксели по новому адресу
@@ -559,7 +559,8 @@ static void item_draw(const HaloItem &it, int32_t bg) {
   switch (it.kind) {
     case HI_TEXT:
       if (it.font && it.text)
-        halo_text(*it.font, it.text, it.x, it.y - it.font->line * s / 2, it.color, it.alpha, it.align, s, it.spacing, bg);
+        halo_text(*it.font, it.text, it.x, it.y - it.font->line * s / 2, it.color, it.alpha, it.align, s, it.spacing, bg,
+                  it.fit * s);
       break;
     case HI_MASK:
       if (it.mask) halo_mask(*it.mask, it.x - it.mask->w * s / 2, it.y - it.mask->h * s / 2, it.color, it.alpha, s, bg);

@@ -306,6 +306,8 @@ static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       gl_text_mid(it[2], gl_ic24, gl_str(L.icon), gl_mid_icon, ix, iy, s, 0x1B1B1F, ac, &dc);
       gl_text_base(it[3], gl_t24, gl_str(L.text), x0 + 104 * s, y0 + 46 * s, s, GL_TEXT, ac, &bg);
       gl_text_base(it[4], gl_t20, gl_str(L.sub), x0 + 104 * s, y0 + 80 * s, s, GL_DIM, ac, &bg);
+      // (Wear OS: a title or a line too long for the card is cut with an ellipsis, not run past the card's end)
+      it[3].fit = it[4].fit = GL_ITEM_W - 104 - 28;
       for (int j = 0; j < 5; j++) halo_view_commit(it[j], v);
       R.ax = CX, R.ay = y0 + h / 2;
       break;
