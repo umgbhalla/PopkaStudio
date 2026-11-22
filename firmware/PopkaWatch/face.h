@@ -299,7 +299,10 @@ static const int8_t FACE_LIST[1] = {0};
 static int8_t face_ids[FACE_MAX] = {0};
 static int face_n = 1, fc_face;  // the faces (screens), the one shown (an index of face_ids)
 static HaloSpring fs_off;        // the switch now: -1..1 faces from the shown one (+ — toward the next)
-static HaloSpringK K_FSWITCH;
+static HaloSpringK K_FS_IN, K_FS_BACK;  // landing on the neighbor, back to the shown one: lib/Halo's open and close
+                                        // (K_OVER_IN, K_OVER_OUT — the same feel as the swipes up and down)
+#define FS_SMALL 0.82f  // a face aside: this much of its size
+#define FS_STEP 0.92f   // the faces' centers this much of the screen apart (the neighbor peeks in sooner)
 static bool fs_drag;
 static float fs_x0, fs_g0;
 static char fs_owner;            // (halo_finger_claim's: the swipe is the face switch's)
@@ -621,7 +624,7 @@ static void face_switch_save() {
 }
 // The faces from layers.h (the screens there — checked), the one kept in flash
 static void face_switch_build() {
-  K_FSWITCH = halo_spring(HALO_M3_PAGER);
+  K_FS_IN = halo_spring(0.45f, 0.9f), K_FS_BACK = halo_spring(0.38f, 1);
   face_n = 0;
   for (int i = 0; i < FACE_N && face_n < FACE_MAX; i++)
     if (FACE_LIST[i] >= 0 && FACE_LIST[i] < face_scr_n) face_ids[face_n++] = FACE_LIST[i];
@@ -669,7 +672,7 @@ static void face_switch_tick(float dt) {
     fs_off.target = to;
   }
   if (fs_off.x == fs_off.target && fs_off.v == 0 && fs_off.target == 0) return;
-  halo_spring_run(fs_off, K_FSWITCH, dt);
+  halo_spring_run(fs_off, fs_off.target != 0 ? K_FS_IN : K_FS_BACK, dt);
   if (fs_off.target != 0 && fs_off.x == fs_off.target) {  // there: the neighbor is the face now
     fc_face += (int)fs_off.target;
     halo_spring_set(fs_off, 0);
@@ -1037,13 +1040,18 @@ static void face_layout(const HaloView &v) {
   gone.a = 0;
   for (int i = 0; i < face_n; i++)
     if (fs_laid[i] && i != fc_face && !(two && i == o_i)) screen_layout(face_ids[i], gone), fs_laid[i] = false;
+  // No fade: the face being moved aside shrinks toward FS_SMALL as it goes, the one coming in starts at FS_SMALL and
+  // grows to its full size as it arrives (as Apple's face switcher). Both a step FS_STEP of the screen apart
+  const float p = fminf(1, fabsf(fs_off.x));
   HaloView vc = v;
-  vc.x += -fs_off.x * W * v.s;
+  vc.x += -fs_off.x * FS_STEP * W * v.s;
+  vc.s = v.s * (1 - (1 - FS_SMALL) * p);
   screen_layout(cur, vc);
   fs_laid[fc_face] = true;
   if (two) {
     HaloView vo = v;
-    vo.x += ((fs_off.x > 0 ? 1 : -1) - fs_off.x) * W * v.s;
+    vo.x += ((fs_off.x > 0 ? 1 : -1) - fs_off.x) * FS_STEP * W * v.s;
+    vo.s = v.s * (FS_SMALL + (1 - FS_SMALL) * p);
     screen_layout(face_ids[o_i], vo);
     fs_laid[o_i] = true;
   }

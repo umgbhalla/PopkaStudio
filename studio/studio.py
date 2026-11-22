@@ -788,6 +788,15 @@ def clean_screens(project):
 FACE_MAX = 8  # face.h: the watch faces a firmware switches between (the home and the saved ones)
 
 
+WX_APP_PARTS = ("city", "wxicon", "wxtemp", "wxhilo", "hourly", "feels")  # the Weather screen's (wxscreen.h)
+
+
+def shows_weather(layer):
+    """A face's layer that shows the weather: the pill, a curved weather line, a weather widget."""
+    kind = layer["type"]
+    return kind == "weather" or (kind == "curve" and layer.get("what") == "weather") or kind in WXW
+
+
 def face_swipe(project):
     """Swipe to switch watch faces ("faceSwipe", on by default): the board gets the project's saved faces too."""
     return project.get("faceSwipe", True) is not False
@@ -1635,6 +1644,10 @@ def write_sketch(project, folder, meta=None):
     screens = own + extra
     index = {scr["id"]: i for i, scr in enumerate(screens)}
     main = main_index(project, own)
+    face_set = {0, *range(len(own), len(screens))}  # (the watch faces: the home and the saved ones — their layers link)
+    # The Weather app: what a face's weather opens when it links nowhere (a tap on the pill shows the weather, as on
+    # HaloWatch) — the first screen with the Weather screen's parts
+    wx_id = next((scr["id"] for k, scr in enumerate(own) if k and k != main and any(layer["type"] in WX_APP_PARTS for layer in scr["layers"])), None)
     os.makedirs(os.path.join(folder, "assets"), exist_ok=True)
     if os.path.abspath(folder) != os.path.abspath(FIRMWARE):
         for name in ("PopkaWatch.ino", "face.h", "weather.h", "wxscreen.h", "gallery.h", "wxscreen_rect.h", "gallery_rect.h", "player_rect.h", "recorder_rect.h", "settings_rect.h", "device_rect.h", "game_dots_rect.h", "power.h", "steps.h", "stars.h",
@@ -1807,7 +1820,9 @@ def write_sketch(project, folder, meta=None):
             ic = icons[icon_set(layer, rect)] if icon_set(layer, rect) else "nullptr"
             # Links: from the watch face (halo_nav_face_open) and from the gallery's cards and button (halo_nav_open);
             # neither opens the face, the gallery or (a card) its own screen
-            tap = layer["tap"] if i == 0 or kind in TAPS or kind in RADIO_LINKED or kind == "display" else None
+            tap = layer["tap"] if i in face_set or kind in TAPS or kind in RADIO_LINKED or kind == "display" else None
+            if not tap and i in face_set and wx_id and shows_weather(layer):
+                tap = {"to": wx_id, "fx": "fade"}
             to = index.get(tap["to"], -1) if tap else -1
             if to in (0, main, i if i else -1):
                 to = -1
