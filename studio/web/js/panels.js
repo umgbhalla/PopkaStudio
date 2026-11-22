@@ -594,9 +594,9 @@ function savedFaceCard(stage, f) {
 // Swipe to switch: the saved faces go to the watch too; a swipe from the side edge of the face switches them (face.h)
 function faceSwipeRow(stage) {
   const on = faceSwipeOn(), n = 1 + savedFaces().filter((f) => home().face !== 'saved:' + f.id).length;
-  const words = !on ? 'Swipe to switch faces: off' : n > 1 ? `Swipe from the side edge: ${n} faces on the watch` : 'Swipe to switch faces: save a face to add one';
+  const words = !on ? 'Swipe to switch faces: off' : n > 1 ? `Swipe left or right on the face: ${n} faces on the watch (the gallery: swipe up)` : 'Swipe to switch faces: save a face to add one';
   return h('div', { class: 'face-swipe', style: 'grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 2px 2px 8px; font-size: 12px',
-    title: 'The watch gets the home and the saved faces: a swipe from the left or the right edge of the face switches them' },
+    title: 'The watch gets the home and the saved faces: a swipe left or right anywhere on the face switches them, and the one it lands on stays the default. The gallery opens with a swipe up from any face' },
   toggle(on, (v) => { setFaceSwipe(v); renderPalette(stage); }, 'Swipe to switch faces'), h('span', {}, words));
 }
 // Add: the watch face now saved as a new one — first its name (one is offered); Enter saves, Esc or a click away — not

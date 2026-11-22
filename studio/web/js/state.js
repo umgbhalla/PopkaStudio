@@ -284,7 +284,9 @@ export const TIME = { zone: 'New York', h24: false };
 // on it, back to the right from the left edge. On round boards, apps use left-edge back in either mode.
 // The firmware gets the swipe mode from layers.h (MAIN_SIDE).
 export const SWIPES = [['up', 'Up'], ['side', 'Left']];
-export const swipeOf = () => (state.project?.swipe === 'side' ? 'side' : 'up');
+// (several watch faces: sideways switches them — the gallery is a swipe up, whatever the project says: face.h)
+const manyFaces = () => state.project?.faceSwipe !== false && (state.project?.faces || []).some((f) => state.project.screens?.[0]?.face !== 'saved:' + f.id);
+export const swipeOf = () => (state.project?.swipe === 'side' && !manyFaces() ? 'side' : 'up');
 export const swipeSide = () => (swipeOf() === 'side' ? 1 : 0);
 export const swipeWords = () => (swipeOf() === 'side' ? 'a swipe to the left' : 'a swipe up');
 export function setSwipe(v) {

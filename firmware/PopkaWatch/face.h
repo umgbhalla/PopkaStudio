@@ -284,11 +284,13 @@ static int face_over = -1;  // the screen open over the face now
 #define NAV_LEVELS 5        // the gallery and up to 4 screens over it (lib/Halo: NAV_MAX)
 static int nav_scr[NAV_LEVELS] = {MAIN_SCREEN, -1, -1, -1, -1};  // the screen on each level (0 — the gallery); -1 — a stub
 
-// ---------- Several watch faces: a swipe from the side edge switches them (as Apple's "Swipe to switch") ----------
+// ---------- Several watch faces: a swipe sideways anywhere on the face switches them ----------
 // layers.h (the editor: the project's saved faces) lists the screens that are watch faces, in order: FACE_LIST, the
-// first is screen 0, the home. Without it — one face. On the face, a swipe from the left or the right edge drags the
-// neighbor in under the finger (left — the next one, right — the one before); let go past a third or flung — it comes,
-// else back. Past the first and the last — rubber. The face shown is kept in flash: the board starts on it.
+// first is screen 0, the home. Without it — one face. On the face, a swipe to the left or the right from anywhere drags
+// the neighbor in under the finger (left — the next one, right — the one before); let go past a third or flung — it
+// comes, else back. Past the first and the last — rubber. The face it lands on is the default from then on (kept in
+// flash: the board starts on it). With more than one face the gallery is a swipe up from anywhere on any face
+// (PopkaWatch.ino: the sideways way to it is off — sideways is the faces').
 #ifndef FACE_N
 #define FACE_N 1
 static const int8_t FACE_LIST[1] = {0};
@@ -645,7 +647,7 @@ static void face_switch_tick(float dt) {
       else fc_face = to, halo_spring_set(fs_off, 0), face_switch_save(), halo_damage_all();
     }
   }
-  if (face_n > 1 && f.drag_start && f.horiz && (f.edge == HALO_EDGE_LEFT || f.edge == HALO_EDGE_RIGHT) &&
+  if (face_n > 1 && f.drag_start && f.horiz &&
       halo_nav_on_face() && !halo_asleep() && halo_finger_claim(&fs_owner)) {
     fs_drag = true, fs_x0 = f.x, fs_g0 = fs_off.x;
     halo_heavy();  // the whole screen moves from this frame on

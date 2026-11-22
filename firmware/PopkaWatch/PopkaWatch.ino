@@ -93,7 +93,9 @@ void setup() {
   halo_nav_bottom_back(false);
 #endif
 #ifdef MAIN_SIDE
-  halo_nav_side(true);  // (layers.h: the project's swipes sideways — the gallery to the left, back from the left edge)
+  // (layers.h: the project's swipes sideways — the gallery to the left, back from the left edge; with several faces
+  // sideways switches them: the gallery is a swipe up then, face.h)
+  if (face_n <= 1) halo_nav_side(true);
 #endif
   halo_nav_face(FACE);  // the home: the board starts on it
   HaloConfig cfg;
