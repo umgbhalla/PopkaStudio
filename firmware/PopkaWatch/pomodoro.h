@@ -136,8 +136,10 @@ static void pm_next(bool counted) {
   if (pm_auto) pm_start();
   LOG("pomo: %s → %s%s, %d/%d done\n", PM_NAME[was], PM_NAME[pm_mode], counted ? "" : " (skipped)", pm_done, pm_after);
 }
+static int8_t pm_result = -1;  // the interval that just ran out (confirm.h shows it: ui_tick), -1 — none
 static void pm_ring_out() {  // the interval ran out
   pm_flash_ms = halo_ms() | 1;
+  pm_result = pm_mode;
   if (pm_sound) pm_ding_kind = pm_mode == PM_FOCUS ? 0 : 1, pm_ding_want = true;
   pm_next(true);
 }

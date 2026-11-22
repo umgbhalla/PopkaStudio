@@ -93,4 +93,71 @@ static void ui_confirm_open(const UiConfirm &c) {
 static void ui_confirm_title(const char *t) {
   cf_title = t;
 }
+
+// ---------- The result: a moment over the screen (M3 for Wear OS: a cookie badge, a label along the bottom edge) ------
+// ui_result(true, "Focus done", accent): over the screen for 1.6 s (a tap — at once), then back. The badge — a cookie:
+// a disc with eight bumps round it, in the accent — pops in on a spring with a little overshoot, a dark ✓ (or ✕) of the
+// accent's hue in it; the label runs along the bottom edge, as Wear OS's confirmations
+static bool ur_ok, ur_open;
+static const char *ur_label, *ur_arc_of;
+static uint32_t ur_accent, ur_until;
+static HaloSpring ur_pop;
+static HaloSpringK K_UR;
+static HaloItem ur_it[11];
+static HaloMask ur_arc;
+static float ur_ax, ur_ay, ur_mid;
+
+static void ur_update(float dt) {
+  halo_spring_run(ur_pop, K_UR, dt);
+  const HaloFinger &f = halo_finger;
+  if (f.tap && !f.owner) ur_until = halo_ms();
+  if (ur_open && (int32_t)(halo_ms() - ur_until) >= 0) ur_open = false, halo_nav_back();
+}
+static void ur_layout(const HaloView &v) {
+  const float s = ur_pop.x, cy = CY - 18;
+  const uint32_t on_acc = cf_mix(ur_accent, 0x000000, 0.8f);
+  for (int i = 0; i < 9; i++) {  // the cookie: the core, then its eight bumps
+    HaloItem &c = ur_it[i];
+    const float an = i * (HALO_PI / 4), r = i == 8 ? 58 : 24, d = i == 8 ? 0 : 52;
+    c.kind = HI_CIRCLE, c.x = CX + d * s * sinf(an), c.y = cy - d * s * cosf(an), c.r = r * s, c.scale = 1;
+    c.color = ur_accent, c.alpha = s > 0.05f ? 1 : 0, c.on_black = true, c.on = nullptr;
+  }
+  gl_text_mid(ur_it[9], gl_cf_ic, ur_ok ? UI_IC_CHECK : UI_IC_X, cf_mid_ic, CX, cy, 1.7f * s, on_acc, 1, &ur_it[8]);
+  if (ur_label != ur_arc_of) {  // (the label along the bottom edge: made into a mask when it changes)
+    ur_mid = halo_text_mid(gl_t24, ur_label);
+    halo_text_arc(ur_arc, gl_t24, ur_label, ur_mid, 186, HALO_PI, true, 1, &ur_ax, &ur_ay);
+    ur_arc_of = ur_label;
+  }
+  HaloItem &lb = ur_it[10];
+  lb.kind = HI_MASK, lb.mask = &ur_arc, lb.color = GL_TEXT, lb.on_black = true, lb.on = &halo_black, lb.scale = 1;
+  lb.x = ur_ax + ur_arc.w / 2.0f, lb.y = ur_ay + ur_arc.h / 2.0f, lb.alpha = ur_arc.bits ? halo_clamp01(s * 1.4f - 0.4f) : 0;
+  for (HaloItem &it : ur_it) halo_view_commit(it, v);
+}
+static void ur_draw() {
+  for (HaloItem &it : ur_it) halo_item_draw(it);
+}
+static void ui_result(bool ok, const char *label, uint32_t accent) {
+  static bool k;
+  if (!k) K_UR = halo_spring(HALO_M3X_DEFAULT), k = true;  // (expressive: a little overshoot)
+  ur_ok = ok, ur_label = label, ur_accent = accent, ur_until = halo_ms() + 1600, ur_open = true;
+  cf_mid_ic = halo_text_mid(gl_cf_ic, UI_IC_CHECK);
+  halo_spring_set(ur_pop, 0.6f), ur_pop.target = 1;
+  const int d = min(halo_nav_depth() + 1, NAV_LEVELS - 1);
+  nav_scr[d] = -1, nav_stub[d] = label;
+  halo_nav_open({nullptr, ur_update, ur_layout, ur_draw});
+}
+
+// Every frame (PopkaWatch.ino): what the apps asked to show
+static void ui_tick() {
+#if HAS_POMODORO
+  if (pm_result >= 0) {  // an interval ran out — say so, if Pomodoro is what is on screen
+    const int was = pm_result;
+    pm_result = -1;
+    if (halo_nav_depth() >= 1 && halo_nav_at_home() == false)
+      ui_result(true, was == PM_FOCUS ? "Focus done" : "Break over", was == PM_FOCUS ? 0xA4F9B5 : 0xFFB68A);
+  }
+#endif
+}
+#else
+static void ui_tick() {}
 #endif

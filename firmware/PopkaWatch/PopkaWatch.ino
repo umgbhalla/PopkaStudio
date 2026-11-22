@@ -57,6 +57,7 @@ static void update(float dt) {
   face_tick(dt);         // the time, the date and the layers' animations, on every screen
   power_view();          // the whole interface's view on the way to Always On (after face_tick: its minute is fresh)
   gallery_tick();        // a card tapped in the last frame: open its screen (face.h)
+  ui_tick();             // what the apps asked to show: a result over the screen (confirm.h)
 #if HAS_SHADE && defined(HALO_ROUND)
   const bool shade_was_visible = sh_px > 0;
 #endif
