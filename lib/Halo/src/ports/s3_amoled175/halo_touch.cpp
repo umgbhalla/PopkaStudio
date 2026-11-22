@@ -36,10 +36,24 @@ static bool palm_pending;
 static uint32_t pmu_at, batt_at;
 static HaloBattery batt;
 static portMUX_TYPE batt_mux = portMUX_INITIALIZER_UNLOCKED;
+static int charge_limit;
+static constexpr uint8_t CHARGER_CONTROL = 0x18, CELL_CHARGE = 0x02;
+
+void halo_charge_limit_set(int percent) {
+  __atomic_store_n(&charge_limit, constrain(percent, (int)HALO_CHARGE_MIN, (int)HALO_CHARGE_MAX), __ATOMIC_RELAXED);
+}
+
+int ht_charge_limit() {
+  return __atomic_load_n(&charge_limit, __ATOMIC_RELAXED);
+}
+
+static bool pmu_read(uint8_t reg, uint8_t &value) {
+  return i2c_master_transmit_receive(pmu, &reg, 1, &value, 1, 20) == ESP_OK;
+}
 
 static uint8_t pmu_reg(uint8_t r) {
   uint8_t v = 0;
-  i2c_master_transmit_receive(pmu, &r, 1, &v, 1, 20);
+  pmu_read(r, v);
   return v;
 }
 static uint16_t pmu_adc(uint8_t hi) {  // 6 бит из hi, 8 — из следующего
@@ -49,24 +63,65 @@ static uint16_t pmu_adc(uint8_t hi) {  // 6 бит из hi, 8 — из след�
 }
 
 static void pmu_set_bits(uint8_t r, uint8_t bits) {
-  const uint8_t w[2] = {r, (uint8_t)(pmu_reg(r) | bits)};
+  uint8_t v;
+  if (!pmu_read(r, v)) return;
+  const uint8_t w[2] = {r, (uint8_t)(v | bits)};
   i2c_master_transmit(pmu, w, 2, 20);
 }
 
-static void battery_poll() {
-  if (!pmu || (batt.ok && millis() - batt_at < 2000)) return;
+static bool charge_enabled(bool enabled, const HaloBattery &b, int limit) {
+  if (!b.present) return true;
+  if (b.percent < 0) return enabled;
+  if (b.percent <= limit - HALO_CHARGE_GAP) return true;
+  if (b.usb && b.percent >= limit) return false;
+  return enabled;
+}
+
+static void charge_poll(HaloBattery &b) {
+  const int limit = ht_charge_limit();
+  if (!limit) return;
+  static bool axp2101;
+  if (!axp2101) {
+    uint8_t id;
+    if (!pmu_read(0x03, id) || id != 0x4A) return;
+    axp2101 = true;
+  }
+  uint8_t ctrl;
+  if (!pmu_read(CHARGER_CONTROL, ctrl)) return;
+  const bool enabled = ctrl & CELL_CHARGE;
+  const bool want = charge_enabled(enabled, b, limit);
+  if (want != enabled) {
+    const uint8_t w[2] = {CHARGER_CONTROL, (uint8_t)(ctrl ^ CELL_CHARGE)};
+    if (i2c_master_transmit(pmu, w, 2, 20) != ESP_OK || !pmu_read(CHARGER_CONTROL, ctrl)) return;
+  }
+  b.charge_limited = b.usb && b.present && !(ctrl & CELL_CHARGE);
+}
+
+static void battery_poll(bool force = false) {
+  if (!pmu || (!force && batt.ok && millis() - batt_at < 2000)) return;
   batt_at = millis();
-  const uint8_t s1 = pmu_reg(0x00), s2 = pmu_reg(0x01);
-  HaloBattery b;
+  uint8_t s1, s2;
+  if (!pmu_read(0x00, s1) || !pmu_read(0x01, s2)) return;
+  HaloBattery b{};
   b.ok = true, b.present = s1 & 0x08, b.usb = (s1 & 0x20) && !(s2 & 0x08), b.charging = (s2 >> 5) == 1;
-  b.percent = b.present ? (int8_t)min(100, (int)pmu_reg(0xA4)) : -1;
+  uint8_t pct;
+  b.percent = b.present && pmu_read(0xA4, pct) && pct <= 100 ? pct : -1;
   b.mv = b.present ? (uint16_t)((pmu_reg(0x34) & 0x1F) << 8 | pmu_reg(0x35)) : 0;
   b.vbus_mv = b.usb ? pmu_adc(0x38) : 0;
   b.vsys_mv = pmu_adc(0x3A);
   b.temp10 = (int16_t)(220 + (7274 - (int)pmu_adc(0x3C)) / 2);  // (22 + (7274 − x) / 20) · 10
+  charge_poll(b);
   portENTER_CRITICAL(&batt_mux);
   batt = b;
   portEXIT_CRITICAL(&batt_mux);
+}
+
+bool ht_charge_usb() {
+  ht_bus_lock();
+  battery_poll(true);
+  const bool usb = batt.usb;
+  ht_bus_unlock();
+  return usb;
 }
 
 HaloBattery halo_battery() {
@@ -246,7 +301,7 @@ bool ht_begin() {
     const uint8_t w[2] = {0x41, (uint8_t)(en | 0x0C)}, c[2] = {0x49, 0x0F};
     i2c_master_transmit(pmu, w, 2, 20);
     i2c_master_transmit(pmu, c, 2, 20);
-    pmu_set_bits(0x30, 0x1D), pmu_set_bits(0x68, 0x01), pmu_set_bits(0x18, 0x08);  // АЦП: батарея, USB, система,
+    pmu_set_bits(0x30, 0x1D), pmu_set_bits(0x68, 0x01), pmu_set_bits(CHARGER_CONTROL, 0x08);  // АЦП: батарея, USB, система,
                                                                                     // температура; поиск батареи, топливомер
   } else {
     pmu = nullptr;
@@ -256,6 +311,8 @@ bool ht_begin() {
     LOG("battery: %s, %d%%, %u mV, usb %s (%u mV), %s; system %u mV, power chip %.1f C\n", b.present ? "present" : "none",
         b.percent, b.mv, b.usb ? "yes" : "no", b.vbus_mv, b.charging ? "charging" : "not charging", b.vsys_mv,
         b.temp10 / 10.0f);
+    if (const int limit = ht_charge_limit())
+      LOG("charge limit: %d%%, resume at %d%%, pause %s\n", limit, limit - HALO_CHARGE_GAP, b.charge_limited ? "active" : "inactive");
   });
   halo_command("pwr", [](const char *a) {  // pwr / pwr long — то же, что нажатие кнопки PWR
     __atomic_fetch_or(&pwr_ev, strstr(a, "long") ? HALO_PWR_LONG : HALO_PWR_CLICK, __ATOMIC_RELAXED);

@@ -283,6 +283,9 @@ uint8_t halo_pwr_event() {
 HaloBattery halo_battery() {
   return {true, true, true, false, 100, 4140, 5040, 4980, 384};  // on USB, full — as the board on the desk
 }
+#ifdef HALO_ROUND
+void halo_charge_limit_set(int) {}
+#endif
 HaloI2c halo_i2c(uint8_t) {
   return nullptr;
 }

@@ -52,6 +52,8 @@ what the watch shows, pixel for pixel — the same fonts, the same animations, t
 - **System** — Always On display, what the side buttons do (screen off, lock), waking up by touch, raising your
   wrist or a button, Wi-Fi (exact time and fresh weather), Bluetooth: one tile, a menu with how each is set, the
   switches and settings in the right card.
+  On round boards, Gallery → Battery has a USB charge limit from 80% to 95%. It defaults to 80% and resumes charging
+  10 percentage points below the selected limit.
 - **Only what you add gets in.** A layer you don't use isn't in the firmware at all — no code, no fonts, sensors off.
 
 ![The map of screens](docs/screenshots/map.png)

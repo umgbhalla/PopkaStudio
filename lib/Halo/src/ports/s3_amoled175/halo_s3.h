@@ -64,6 +64,8 @@ struct i2c_master_dev_t;
 i2c_master_dev_t *ht_i2c_device(uint8_t addr);
 // Шина занята: задача тача держит её на время своих обменов, сон — на время сна (не уснуть посреди обмена)
 void ht_bus_lock();
+int ht_charge_limit();
+bool ht_charge_usb();  // refresh after a light-sleep timer, without waking the UI
 void ht_bus_unlock();
 void ht_kick();  // прочитать отчёт тача сейчас (его прерывание могло быть выключено — сон)
 

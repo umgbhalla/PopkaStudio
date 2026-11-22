@@ -228,6 +228,36 @@ static void display_tick(float dt) {
 #endif
 
 // ---------- Battery ----------
+#if HAS_BATTERY || defined(HALO_ROUND)
+static Preferences bh_prefs;
+#endif
+#ifdef HALO_ROUND
+static int bc_selected = HALO_CHARGE_MIN;
+static int bc_saved, bc_applied, bc_seen;
+static uint32_t bc_changed_at;
+
+static int charge_limit_selected() {
+  return __atomic_load_n(&bc_selected, __ATOMIC_RELAXED);
+}
+
+static void charge_limit_load() {
+  bc_saved = bc_applied = bc_seen = constrain((int)bh_prefs.getUChar("limit", HALO_CHARGE_MIN),
+                                            (int)HALO_CHARGE_MIN, (int)HALO_CHARGE_MAX);
+  __atomic_store_n(&bc_selected, bc_saved, __ATOMIC_RELAXED);
+  halo_charge_limit_set(bc_applied);
+}
+
+static void charge_limit_save() {
+  const int limit = charge_limit_selected();
+  if (limit != bc_seen) bc_seen = limit, bc_changed_at = millis();
+  if (millis() - bc_changed_at < 600) return;
+  if (limit != bc_applied) halo_charge_limit_set(limit), bc_applied = limit;
+  if (limit != bc_saved) {
+    if (bh_prefs.putUChar("limit", limit)) bc_saved = limit;
+    else bc_changed_at = millis();
+  }
+}
+#endif
 // A round screen (the editor's mockup: variant 7's middle in variant 9's frame): the level as a thin line along the
 // bezel; along the arc at the top — what is going on and the time, at the bottom — for how long; in the middle — the
 // percent, how long it lasts (or till full) and what it cost since the plug.
@@ -246,7 +276,6 @@ struct BattPlug {      // ("battery"/"plug": PopkaStudio's own)
 };
 static BattHistory bh;
 static BattPlug bp;
-static Preferences bh_prefs;
 static bool bh_known, bh_was_usb;
 
 // Made-up states (the command batdemo [battery|charging|low|full|off]; the editor's page — battery): the chip's
@@ -384,6 +413,41 @@ static void bt_text(HaloItem &it, const HaloFont &f, const char *s, float mid, f
   it.on = &halo_black, it.x = x, it.y = y + (f.line / 2.0f - mid), it.scale = 1, it.alpha = alpha, it.spacing = 0;
   halo_view_commit(it, v);
 }
+#ifdef HALO_ROUND
+static constexpr float BC_W = 232, BC_Y = 358;
+static HaloItem bc_label, bc_min, bc_max, bc_track, bc_fill, bc_thumb;
+static char bc_text[24];
+
+static void battery_update() {
+  HaloFinger &f = halo_finger;
+  if (f.pressed && fabsf(f.x0 - CX) <= BC_W / 2 + 22 && fabsf(f.y0 - BC_Y) <= 22)
+    halo_finger_claim(&bc_thumb);
+  if (f.owner == &bc_thumb && (f.down || f.tap)) {
+    const float u = halo_clamp01((f.x - (CX - BC_W / 2)) / BC_W);
+    const int limit = HALO_CHARGE_MIN + lroundf(u * (HALO_CHARGE_MAX - HALO_CHARGE_MIN));
+    __atomic_store_n(&bc_selected, limit, __ATOMIC_RELAXED);
+  }
+}
+
+static void charge_limit_layout(const HaloView &v) {
+  const int limit = charge_limit_selected();
+  const float left = CX - BC_W / 2;
+  const float fill = BC_W * (limit - HALO_CHARGE_MIN) / (HALO_CHARGE_MAX - HALO_CHARGE_MIN);
+  snprintf(bc_text, sizeof(bc_text), "Charge limit %d%%", limit);
+  bt_text(bc_label, gl_t20, bc_text, bt_mid_t20, CX, 324, GL_TEXT, 1, v);
+  bt_text(bc_min, gl_t20, "80%", bt_mid_t20, left + 36, 380, GL_DIM, 1, v);
+  bt_text(bc_max, gl_t20, "95%", bt_mid_t20, left + BC_W - 36, 380, GL_DIM, 1, v);
+  bc_track.kind = HI_RRECT, bc_track.x = CX, bc_track.y = BC_Y, bc_track.w = BC_W;
+  bc_track.h = 8, bc_track.r = 4, bc_track.color = BT_TRACK;
+  bc_track.on_black = true, bc_track.alpha = 1, bc_track.scale = 1;
+  bc_fill.kind = HI_RRECT, bc_fill.x = left + fill / 2, bc_fill.y = BC_Y, bc_fill.w = fill;
+  bc_fill.h = 8, bc_fill.r = 4, bc_fill.color = BT_PRIMARY;
+  bc_fill.on_black = true, bc_fill.alpha = fill > 0 ? 1 : 0, bc_fill.scale = 1;
+  bc_thumb.kind = HI_CIRCLE, bc_thumb.x = left + fill, bc_thumb.y = BC_Y, bc_thumb.r = 12;
+  bc_thumb.color = BT_PRIMARY, bc_thumb.on_black = true, bc_thumb.alpha = 1, bc_thumb.scale = 1;
+  halo_view_commit(bc_track, v), halo_view_commit(bc_fill, v), halo_view_commit(bc_thumb, v);
+}
+#endif
 // The words along the arc, baked again when they change (bt_tick: ~3 ms each — not in the frame the screen opens)
 static void bt_bake(HaloMask &m, char *on, const char *s, bool bottom, float &x, float &y) {
   strcpy(on, s);
@@ -410,21 +474,31 @@ static void bt_texts() {
   if (!b.ok) snprintf(bt_line1, sizeof(bt_line1), "Reading...");
   else if (!b.present) state = "NO BATTERY", snprintf(bt_line1, sizeof(bt_line1), "Powered from USB");
   else if (b.usb) {
-    state = b.charging ? "CHARGING" : "ON USB";
+    state = b.charging && !b.charge_limited ? "CHARGING" : "ON USB";
     const uint32_t s = bp.at && clock && now > bp.at ? now - bp.at : 0;
     const int added = pct - bp.pct;
     if (bp.at && clock) {
       if (s < 60) snprintf(d, sizeof(d), "just plugged in");
       else bt_duration(t, sizeof(t), s), snprintf(d, sizeof(d), "plugged in %s", t);
     }
-    if (!b.charging) {
+    if (b.charge_limited) {
+      snprintf(bt_line1, sizeof(bt_line1), "Charging paused");
+    } else if (!b.charging) {
       c1 = pct >= 99 ? BT_GREEN : GL_DIM;
       snprintf(bt_line1, sizeof(bt_line1), pct >= 99 ? "Fully charged" : "Not charging");
     } else if (!bp.at || !clock) {
       c1 = BT_GREEN, snprintf(bt_line1, sizeof(bt_line1), "%.2f V", b.mv / 1000.0f);
     } else {
       c1 = BT_GREEN;
-      if (added >= 2 && s >= 300) bt_about(a, sizeof(a), (100 - pct) * s / (float)added), snprintf(bt_line1, sizeof(bt_line1), "Full in about %s", a);
+#ifdef HALO_ROUND
+      const int remaining = charge_limit_selected() - pct;
+      const char *estimate = "Limit in about %s";
+#else
+      const int remaining = 100 - pct;
+      const char *estimate = "Full in about %s";
+#endif
+      if (added >= 2 && s >= 300 && remaining > 0)
+        bt_about(a, sizeof(a), remaining * s / (float)added), snprintf(bt_line1, sizeof(bt_line1), estimate, a);
       else snprintf(bt_line1, sizeof(bt_line1), "Estimating...");
       snprintf(bt_line2, sizeof(bt_line2), "%d%% added since plugged in", max(0, added));
     }
@@ -649,6 +723,9 @@ static void battery_layout(const HaloView &v) {
   bt_text(bt_pct_t, gl_n92, bt_pct, bt_mid_pct, CX, BT_PCT_Y + dy, has ? GL_TEXT : GL_DIM, 1, v);
   bt_text(bt_line1_t, gl_t24, bt_line1, bt_mid_t24, CX, BT_LINE1_Y + dy, bt_c1, 1, v);
   bt_text(bt_line2_t, gl_t20, bt_line2, bt_mid_t20, CX, BT_LINE2_Y, GL_DIM, 1, v, bt_line2[0] ? 1 : 0);
+#ifdef HALO_ROUND
+  charge_limit_layout(v);
+#endif
 }
 
 static void battery_draw() {
@@ -656,6 +733,10 @@ static void battery_draw() {
   for (auto &it : bt_fill) halo_item_draw(it);
   halo_item_draw(bt_top_i), halo_item_draw(bt_bot_i);
   halo_item_draw(bt_pct_t), halo_item_draw(bt_line1_t), halo_item_draw(bt_line2_t);
+#ifdef HALO_ROUND
+  halo_item_draw(bc_label), halo_item_draw(bc_min), halo_item_draw(bc_max);
+  halo_item_draw(bc_track), halo_item_draw(bc_fill), halo_item_draw(bc_thumb);
+#endif
 }
 #endif  // HALO_SQUARE
 #endif
@@ -697,6 +778,12 @@ static bool st_has(const FaceScreen &S, uint8_t kind) {
 
 // Before halo_begin: the saved brightness (the panel starts at it), the battery's history
 static void settings_load() {
+#if HAS_BATTERY || defined(HALO_ROUND)
+  bh_prefs.begin("battery", false);
+#endif
+#ifdef HALO_ROUND
+  charge_limit_load();
+#endif
 #if (HAS_VIDEO || HAS_RADIO) && CONFIG_IDF_TARGET_ESP32P4 && !defined(__EMSCRIPTEN__) && FN_WIFI
   void hf_tiles(int n);  // (the P4 port's, ports/p4_lcd7/halo_p4.h: only video_hw.h includes that, and a Radio without Video
                          // did not build — 17 Nov 2026)
@@ -709,7 +796,6 @@ static void settings_load() {
   dp_shown = dp_from = dp_value, pw_awake_level = DP_LEVEL[dp_value];
 #endif
 #if HAS_BATTERY
-  bh_prefs.begin("battery", false);
   battery_read();
 #ifdef __EMSCRIPTEN__
   battery_demo(0);  // (the editor's page: on battery for a while — not the desk's "on USB, full")
@@ -757,6 +843,9 @@ static void settings_build() {  // the fonts' middles (face_build)
 // after the last change (not on every step of a drag); the battery's slot
 static void settings_poll() {
   dev_poll();
+#ifdef HALO_ROUND
+  charge_limit_save();
+#endif
 #if HAS_DISPLAY
   const int v = dp_value;
   if (v != dp_seen) dp_seen = v, dp_changed_at = millis();
@@ -870,6 +959,9 @@ static void settings_enter(const FaceScreen &S) {
 #endif
 }
 static void settings_update(const FaceScreen &S, float dt) {
+#if HAS_BATTERY && defined(HALO_ROUND)
+  if (st_has(S, FL_BATTERY)) battery_update();
+#endif
 #if HAS_DISPLAY
   if (st_has(S, FL_DISPLAY)) display_update(dt);
 #endif

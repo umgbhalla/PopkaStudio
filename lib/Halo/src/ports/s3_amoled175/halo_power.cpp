@@ -356,6 +356,7 @@ static uint8_t sleep_now(uint32_t ms, bool motion) {
 static uint8_t sleep_real() {
   static int64_t deaf_until;
   int quiet = 0;
+  const uint32_t charge_poll_ms = 60000;
   for (;;) {
     const int64_t now = esp_timer_get_time(), gone_ms = (now - asleep_at_us) / 1000;
     if (sleep_ms && gone_ms >= sleep_ms) return HALO_WAKE_TIMER;
@@ -365,7 +366,10 @@ static uint8_t sleep_real() {
       const uint32_t d = (uint32_t)((deaf_until - now) / 1000) + 1;
       ms = ms ? min(ms, d) : d;
     }
+    const bool charge_timer = ht_charge_limit() && (!ms || ms > charge_poll_ms);
+    if (charge_timer) ms = charge_poll_ms;
     const uint8_t w = sleep_now(ms, imu_on && !imu_live && !deaf);  // accel + gyro data: INT1 is off
+    if (w == HALO_WAKE_TIMER && charge_timer && ht_charge_usb() && !on_usb_ok) return 0;
     if (w == HALO_WAKE_TIMER && !(sleep_ms && (esp_timer_get_time() - asleep_at_us) / 1000 >= sleep_ms)) {
       quiet++;
       continue;  // the end of a deaf spell, not the sketch's timer
@@ -406,7 +410,7 @@ void hp_frame_end() {
     // Really asleep: nobody holds the board up, it is not on USB (or allowed), BOOT and the finger are up
     if (!holds && (!usb || on_usb_ok) && boot_up && !finger) {
       w = sleep_real();
-      LOG("sleep: %.1f s, woke by %s\n", (esp_timer_get_time() - asleep_at_us) / 1e6f, wake_name(w));
+      if (w) LOG("sleep: %.1f s, woke by %s\n", (esp_timer_get_time() - asleep_at_us) / 1e6f, wake_name(w));
     } else if (usb && !on_usb_ok && !told_usb) {
       told_usb = true;
       LOG("sleep: on USB power — staying up, waking the same way (halo_sleep_on_usb to really sleep)\n");
