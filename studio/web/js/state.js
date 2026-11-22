@@ -136,7 +136,7 @@ export const CLOCK_LOOKS = [
   ['hands', 'Hands', ['#FFF8EE', '#FF8A80', '#4A4B50'], ['Hands', 'Second hand', 'Dots'], 0],
   ['bezel', 'Bezel', ['#FFF8EE', '#FF8A80', '#9E9E9E'], ['Hour', 'Marker', 'Scale'], 3],
   ['dive', 'Dive', ['#3F1116', '#FF453A', '#F2EEE6'], ['Bezel', 'Accent', 'Light'], 4],
-  ['field', 'Field', ['#E6EAF4', '#FF453A', '#5E7CC8'], ['Bars and hands', 'Accent', 'Tint'], 3],
+  ['field', 'Field', ['#F2F2F2', '#A8C7FA', '#FAFAFA'], ['Light', 'Accent', 'Containers'], 3],
 ];
 export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK_LOOKS[0];
 // What a live card or a device screen shows (device.h: DV_CPU …)

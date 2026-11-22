@@ -187,7 +187,7 @@ SC_LOOKS = {
              ("fa-solid-900.ttf", 46, 60, "0xf0d7", "", None)],
     "field": [("GoogleSansFlex.ttf", 30, 40, 'digits "°%-"', "wght=640,ROND=100", None),
               ("GoogleSansFlex.ttf", 30, 40, "digits", "wght=640,ROND=100", None),
-              ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA" digits "-"', "wght=760,ROND=100", None)],
+              ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA%" digits "-"', "wght=760,ROND=100", None)],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES}  # what a layer's look may be, by its kind

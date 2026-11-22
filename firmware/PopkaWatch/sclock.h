@@ -345,7 +345,8 @@ static int dl_hand(ScRun &c, int nc, float ax, float ay, float deg, float neck, 
 }
 // The hour and minute hands, their pivot, a colored disc with a dark dot over it (no second hand)
 static int dl_hands(ScRun &c, int nc, float ax, float ay, float R, uint32_t light, uint32_t channel, uint32_t sec,
-                    float hour_tip, float min_tip, float a, float sa, const HaloView &v) {
+                    float hour_tip, float min_tip, float a, float sa, const HaloView &v, uint32_t hour = 0,
+                    bool hour_hollow = true) {
   const struct tm &t = sc_tm;
   // The hour and minute hands move by half a pixel at their tips — continuous to the eye, but not redrawn every frame
   // (each redraw is the hand, its shadow and all under it: measured 47 fps when they moved every frame). The second
@@ -354,7 +355,9 @@ static int dl_hands(ScRun &c, int nc, float ax, float ay, float R, uint32_t ligh
   const float ha = floorf(((t.tm_hour % 12) + t.tm_min / 60.0f + sc_sec / 3600) * 30 / hq) * hq;
   const float ma = floorf((t.tm_min + sc_sec / 60) * 6 / mq) * mq;
   const float sdeg = sc_sec * 6;
-  nc = dl_hand(c, nc, ax, ay, ha, R * 0.13f, hour_tip, R * 0.068f, R * 0.016f, light, channel, true, a, v);
+  // (Wear OS's analog faces: a thick hour hand in the accent, solid; a thinner light minute hand)
+  nc = dl_hand(c, nc, ax, ay, ha, R * 0.13f, hour_tip, R * (hour_hollow ? 0.068f : 0.078f), R * 0.016f, hour ? hour : light,
+               channel, hour_hollow, a, v);
   nc = dl_hand(c, nc, ax, ay, ma, R * 0.13f, min_tip, R * 0.062f, R * 0.016f, light, channel, true, a, v);
   sc_cap(c, nc++, ax, ay, ax, ay, R * 0.03f, light, a, v);    // the hands' pivot: a light ring…
   sc_cap(c, nc++, ax, ay, ax, ay, R * 0.013f, channel, a, v);  // …round a dark hole
@@ -1058,19 +1061,22 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
 #endif
 #if SC_ON(SC_FIELD)
     case SC_FIELD: {
-      // color — the hour bars and the hands' outline; color2 — the accent (the second hand, the weekday, the gauge's
-      // knob); color3 — the channel of the hands and the subdials' rim (a tint). Four subdials at 12, 3, 6, 9
+      // Material 3 for Wear OS (the guide: 640 of Google's images, 23 Nov 2026): flat tonal containers on black (no
+      // borders), each complication its own pastel accent with a dim track of the same hue, rings from 12 o'clock
+      // clockwise with round ends; the hour hand thick and solid in the accent, the minute hand light and hollow.
+      // color — the light (bars, minute hand, values); color2 — the accent (hour hand, the weekday); color3 — the
+      // containers' tint (their fill is it deep in black)
       const float R = 228 * k, sr = R * 0.245f, sd = R * 0.47f;
-      const uint32_t light = L.color, acc = L.color2, tint = L.color3, disc = sc_mix(tint, 0x000000, 0.86f);
+      const uint32_t light = L.color, acc = L.color2, disc = sc_mix(L.color3, 0x000000, 0.84f);
+      const uint32_t wx_acc = 0xFFB68A, bat_acc = 0xA4F9B5, sec_acc = 0xFF8A80;  // (peach, mint, coral: pastel accents)
       float sx[4], sy[4];
       HaloItem *dsc[4];
       for (int j = 0; j < 4; j++) {
         dl_at(ax, ay, j * 90, sd, sx[j], sy[j]);
         dsc[j] = &c.it[n++];
         sc_circle(*dsc[j], sx[j], sy[j], sr, disc, a, v);
-        dsc[j]->on_black = true;  // (a solid disc: its texts' edges in its color)
+        dsc[j]->on_black = true;  // (a solid container: its texts' edges in its color)
         halo_view_commit(*dsc[j], v);
-        dl_ring(c.it[n++], sx[j], sy[j], sr, 1.6f * k, 1, sc_mix(tint, 0x000000, 0.45f), 0, a, v);
       }
       sc_ob = false;
       const int dial = n;
@@ -1079,52 +1085,56 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
         if (j % 5 == 0) continue;
         float x0, y0, x1, y1;
         dl_at(ax, ay, j * 6, R * 0.94f, x0, y0), dl_at(ax, ay, j * 6, R * 0.985f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 0.75f * k, light, a * 0.45f, v);
+        sc_cap(c, nc++, x0, y0, x1, y1, 0.75f * k, light, a * 0.4f, v);
       }
-      for (int j = 0; j < 12; j++) {  // the hour bars: rounded, thick
+      for (int j = 0; j < 12; j++) {  // the hour bars: pills
         float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 30, R * 0.79f, x0, y0), dl_at(ax, ay, j * 30, R * 0.93f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 4.2f * k, light, a, v);
+        dl_at(ax, ay, j * 30, R * 0.8f, x0, y0), dl_at(ax, ay, j * 30, R * 0.93f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, 4.6f * k, light, a, v);
       }
-      // 9: the running seconds — its own little dial (ticks, a red hand)
+      // 9: the running seconds — its own little dial, coral
       for (int j = 0; j < 12; j++) {
         float x0, y0, x1, y1;
-        dl_at(sx[3], sy[3], j * 30, sr * (j % 3 ? 0.78f : 0.68f), x0, y0), dl_at(sx[3], sy[3], j * 30, sr * 0.86f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, (j % 3 ? 0.7f : 1.1f) * k, light, a * (j % 3 ? 0.5f : 0.85f), v);
+        dl_at(sx[3], sy[3], j * 30, sr * (j % 3 ? 0.76f : 0.64f), x0, y0), dl_at(sx[3], sy[3], j * 30, sr * 0.84f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, (j % 3 ? 0.8f : 1.4f) * k, light, a * (j % 3 ? 0.45f : 0.9f), v);
       }
       {
         float x0, y0, x1, y1;
-        dl_at(sx[3], sy[3], sc_sec * 6, -sr * 0.18f, x0, y0), dl_at(sx[3], sy[3], sc_sec * 6, sr * 0.8f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 1.0f * k, acc, sa, v);
-        sc_cap(c, nc++, sx[3], sy[3], sx[3], sy[3], 3.2f * k, acc, sa, v);
+        dl_at(sx[3], sy[3], sc_sec * 6, -sr * 0.16f, x0, y0), dl_at(sx[3], sy[3], sc_sec * 6, sr * 0.78f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, 1.3f * k, sec_acc, sa, v);
+        sc_cap(c, nc++, sx[3], sy[3], sx[3], sy[3], 3.6f * k, sec_acc, sa, v);
       }
       const int ticks = nc;
       // 12: the date — the weekday in the accent, the day big
       strlcpy(c.txt[0], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[1], 8, "%d", sc_tm.tm_mday);
       dl_text(c.it[n++], L.font3, c.txt[0], sx[0], sy[0] - sr * 0.36f, c.g[2], 1, acc, a, v, dsc[0]);
       dl_text(c.it[n++], L.font, c.txt[1], sx[0], sy[0] + sr * 0.16f, c.g[0], 1, light, a, v, dsc[0]);
-      // 3: the weather — now in the middle, a gauge from today's low to high with a knob at now, the low and the high
+      // 3: the weather — a ranged gauge (low → high, open at the bottom) in peach on a dim peach track, a knob at now
       const WxDay w = wx_day(0);
       wx_deg(c.txt[2], 8, w.now), snprintf(c.txt[3], 8, "%d", w.lo), snprintf(c.txt[4], 8, "%d", w.hi);
-      const float g0 = -0.75f * HALO_PI, g1 = 0.75f * HALO_PI;  // (radians from 12: the gauge's ends, open at the bottom)
-      // (the track in two arcs, each within 0 … 2π: one across 12 o'clock is not drawn whole)
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 4.5f * k, g0 + 2 * HALO_PI, 2 * HALO_PI, sc_mix(tint, 0x000000, 0.35f), a, v);
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 4.5f * k, 0, g1, sc_mix(tint, 0x000000, 0.35f), a, v);
+      const float g0 = -0.75f * HALO_PI, g1 = 0.75f * HALO_PI;  // (radians from 12)
+      const uint32_t wx_dim = sc_mix(wx_acc, 0x000000, 0.68f);
       const float f = w.hi > w.lo ? halo_clamp01((float)(w.now - w.lo) / (w.hi - w.lo)) : 0.5f, ga = g0 + (g1 - g0) * f;
+      // (each arc within 0 … 2π: one across 12 o'clock is not drawn whole) — the dim track, then the filled part to now
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, g0 + 2 * HALO_PI, 2 * HALO_PI, wx_dim, a, v);
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, 0, g1, wx_dim, a, v);
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, g0 + 2 * HALO_PI, fminf(ga, 0) + 2 * HALO_PI, wx_acc, a, v);
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, 0, ga, wx_acc, ga > 0 ? a : 0, v);
       const float kx = sx[1] + sr * 0.8f * sinf(ga), ky = sy[1] - sr * 0.8f * cosf(ga);
-      sc_circle(c.it[n++], kx, ky, 6.2f * k, disc, a, v);  // the knob's gap
-      sc_circle(c.it[n++], kx, ky, 4.2f * k, acc, a, v);
-      dl_text(c.it[n++], L.font, c.txt[2], sx[1] + 3 * k, sy[1] - sr * 0.02f, c.g[0], 1, light, a, v, dsc[1]);
-      dl_text(c.it[n++], L.font3, c.txt[3], sx[1] - sr * 0.56f, sy[1] + sr * 0.62f, c.g[2], 1, light, a * 0.7f, v, dsc[1]);
-      dl_text(c.it[n++], L.font3, c.txt[4], sx[1] + sr * 0.56f, sy[1] + sr * 0.62f, c.g[2], 1, light, a * 0.7f, v, dsc[1]);
-      // 6: the battery — a ring of its charge, the percent
+      sc_circle(c.it[n++], kx, ky, 7.5f * k, disc, a, v);  // the knob: a gap of the container's color, then the knob
+      sc_circle(c.it[n++], kx, ky, 5 * k, light, a, v);
+      dl_text(c.it[n++], L.font, c.txt[2], sx[1] + 3 * k, sy[1] - sr * 0.04f, c.g[0], 1, light, a, v, dsc[1]);
+      dl_text(c.it[n++], L.font3, c.txt[3], sx[1] - sr * 0.52f, sy[1] + sr * 0.64f, c.g[2], 1, wx_acc, a, v, dsc[1]);
+      dl_text(c.it[n++], L.font3, c.txt[4], sx[1] + sr * 0.52f, sy[1] + sr * 0.64f, c.g[2], 1, wx_acc, a, v, dsc[1]);
+      // 6: the battery — a ring of its charge from 12 o'clock, mint on dim mint (coral when low)
       const HaloBattery b = halo_battery();
       const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
-      snprintf(c.txt[5], 8, "%d%%", pct);
-      dl_ring(c.it[n++], sx[2], sy[2], sr * 0.8f, 4.5f * k, pct / 100.0f, pct > 20 ? 0x7BE08A : 0xFF6B5E,
-              sc_mix(tint, 0x000000, 0.35f), a, v);
-      dl_text(c.it[n++], L.font, c.txt[5], sx[2], sy[2], c.g[0], 1, light, a, v, dsc[2]);
-      nc = dl_hands(c, nc, ax, ay, R, light, tint, acc, R * 0.52f, R * 0.88f, a, sa, v);
+      const uint32_t bat = pct > 20 ? bat_acc : sec_acc;
+      snprintf(c.txt[5], 8, "%d", pct);
+      dl_ring(c.it[n++], sx[2], sy[2], sr * 0.8f, 5 * k, pct / 100.0f, bat, sc_mix(bat, 0x000000, 0.68f), a, v);
+      dl_text(c.it[n++], L.font, c.txt[5], sx[2], sy[2] - sr * 0.06f, c.g[0], 1, light, a, v, dsc[2]);
+      dl_text(c.it[n++], L.font3, "%", sx[2], sy[2] + sr * 0.4f, c.g[2], 1, bat, a, v, dsc[2]);
+      nc = dl_hands(c, nc, ax, ay, R, light, 0x000000, acc, R * 0.52f, R * 0.88f, a, sa, v, acc, false);
       c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
       sc_hide_caps(c, nc);
       sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));

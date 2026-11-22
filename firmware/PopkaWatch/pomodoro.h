@@ -361,8 +361,11 @@ static void pm_layout_main(float a) {
   pm_text(PMF_T20, PM_NAME[pm_mode], pm_mid_t20, PMC, PM_NAME_Y, PM_DIM, a, 1, &halo_black, 1, 2);
   // The row: Reset, START / PAUSE, Settings
   const float ps = pm_sc(PB_PILL);
-  HaloItem &pill = pm_rrect(PMC, PM_BTN_Y, PM_PILL_W * ps, PM_PILL_H * ps, PM_PILL_H / 2 * ps, PM_GREY, a);
-  pm_text(PMF_T24, pm_running ? "PAUSE" : "START", pm_mid_t24, PMC, PM_BTN_Y, PM_TEXT, a, 1, &pill, ps, 2);
+  // Material 3 for Wear OS: the primary action is a pastel fill with a dark label of the same hue (START, in the mode's
+  // color); while it runs, PAUSE steps down to the tonal grey with a light label
+  const uint32_t pill_c = pm_running ? PM_GREY : PM_HEAD[pm_mode], label_c = pm_running ? PM_TEXT : pm_mix(PM_HEAD[pm_mode], 0x000000, 0.78f);
+  HaloItem &pill = pm_rrect(PMC, PM_BTN_Y, PM_PILL_W * ps, PM_PILL_H * ps, PM_PILL_H / 2 * ps, pill_c, a);
+  pm_text(PMF_T24, pm_running ? "PAUSE" : "START", pm_mid_t24, PMC, PM_BTN_Y, label_c, a, 1, &pill, ps, 2);
   pm_icon_btn(PB_RESET, PMC - PM_SIDE_DX, PM_BTN_Y, PM_SIDE_R, PM_IC_RESET, a, 0x000000);
   pm_icon_btn(PB_GEAR, PMC + PM_SIDE_DX, PM_BTN_Y, PM_SIDE_R, PM_IC_GEAR, a, 0x000000);
   // (the side buttons: outlined, as in the design — a ring around the black)
