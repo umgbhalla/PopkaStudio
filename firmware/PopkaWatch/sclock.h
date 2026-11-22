@@ -1149,7 +1149,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const float R = 228 * k;
       const uint32_t light = L.color3, band = L.color, acc = L.color2;
       HaloItem &bz = c.it[n++];
-      dl_ring(bz, ax, ay, R * 0.887f, R * 0.226f, 1, band, 0, a, v);  // the band: 0.774 R … 1.0 R
+      dl_ring(bz, ax, ay, R * 0.905f, R * 0.17f, 1, band, 0, a, v);  // the band: 0.82 R … 0.99 R (slim: a heavy band dominated)
       for (int j = 0; j < 12; j++) {  // the dot indices: the whole ring (its rhythm unbroken)
         float x, y;
         dl_at(ax, ay, j * 30, R * 0.578f, x, y);
@@ -1166,17 +1166,17 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       }
       for (int j = 1; j < 12; j += 2) {  // the bezel's short bars between its numerals
         float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 30, R * 0.85f, x0, y0), dl_at(ax, ay, j * 30, R * 0.93f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 2.2f * k, light, a * 0.92f, v);
+        dl_at(ax, ay, j * 30, R * 0.87f, x0, y0), dl_at(ax, ay, j * 30, R * 0.94f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, 1.5f * k, light, a * 0.9f, v);
       }
       const int ticks = nc;
       for (int j = 2; j <= 10; j += 2) {  // 10 … 50, upright
         snprintf(c.txt[j / 2], 8, "%d", j * 5);
         float x, y;
-        dl_at(ax, ay, j * 30, R * 0.885f, x, y);
+        dl_at(ax, ay, j * 30, R * 0.905f, x, y);
         dl_text(c.it[n++], L.font, c.txt[j / 2], x, y, c.g[0], 1, light, a, v, &bz);
       }
-      dl_text(c.it[n++], L.font4, "\xEF\x83\x97", ax, ay - R * 0.885f, c.g[3], 1, acc, a, v, &bz);  // the caret at 12
+      dl_text(c.it[n++], L.font4, "\xEF\x83\x97", ax, ay - R * 0.905f, c.g[3], 1, acc, a, v, &bz);  // the caret at 12
       // The date inside, right of the middle (as Count Up: the ring of dots stays whole): the weekday, tracked, in the
       // accent over the day
       strlcpy(c.txt[8], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[9], 8, "%d", sc_tm.tm_mday);
@@ -1196,7 +1196,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       // clockwise with round ends; the hour hand thick and solid in the accent, the minute hand light and hollow.
       // color — the light (bars, minute hand, values); color2 — the accent (hour hand, the weekday); color3 — the
       // containers' tint (their fill is it deep in black)
-      const float R = 228 * k, sr = R * 0.215f, sd = R * 0.43f;  // (smaller and closer in: air round them, as Meridian)
+      const float R = 228 * k, sr = R * 0.235f, sd = R * 0.45f;  // (each owns its quadrant, with air round it, as Meridian)
       const uint32_t light = L.color, acc = L.color2, disc = sc_mix(L.color3, 0x000000, 0.84f);
       const uint32_t wx_acc = 0xFFB68A, bat_acc = 0xA4F9B5, sec_acc = 0xFF8A80;  // (peach, mint, coral: pastel accents)
       float sx[4], sy[4];
@@ -1220,7 +1220,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       for (int j = 0; j < 12; j++) {  // the hour bars: pills
         float x0, y0, x1, y1;
         dl_at(ax, ay, j * 30, R * 0.76f, x0, y0), dl_at(ax, ay, j * 30, R * 0.93f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 3.4f * k, light, a, v);  // (long and slender, as Meridian's)
+        sc_cap(c, nc++, x0, y0, x1, y1, 2.6f * k, light, a, v);  // (long and slender, as Meridian's)
       }
       // 9: the running seconds — its own little dial, coral
       for (int j = 0; j < 12; j++) {
@@ -1246,13 +1246,13 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const uint32_t wx_dim = sc_mix(wx_acc, 0x000000, 0.68f);
       const float f = w.hi > w.lo ? halo_clamp01((float)(w.now - w.lo) / (w.hi - w.lo)) : 0.5f, ga = g0 + (g1 - g0) * f;
       // (each arc within 0 … 2π: one across 12 o'clock is not drawn whole) — the dim track, then the filled part to now
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, g0 + 2 * HALO_PI, 2 * HALO_PI, wx_dim, a, v);
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, 0, g1, wx_dim, a, v);
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, g0 + 2 * HALO_PI, fminf(ga, 0) + 2 * HALO_PI, wx_acc, a, v);
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.8f, 5 * k, 0, ga, wx_acc, ga > 0 ? a : 0, v);
-      const float kx = sx[1] + sr * 0.8f * sinf(ga), ky = sy[1] - sr * 0.8f * cosf(ga);
-      sc_circle(c.it[n++], kx, ky, 7.5f * k, disc, a, v);  // the knob: a gap of the container's color, then the knob
-      sc_circle(c.it[n++], kx, ky, 5 * k, light, a, v);
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, g0 + 2 * HALO_PI, 2 * HALO_PI, wx_dim, a, v);
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, 0, g1, wx_dim, a, v);
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, g0 + 2 * HALO_PI, fminf(ga, 0) + 2 * HALO_PI, wx_acc, a, v);
+      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, 0, ga, wx_acc, ga > 0 ? a : 0, v);
+      const float kx = sx[1] + sr * 0.86f * sinf(ga), ky = sy[1] - sr * 0.86f * cosf(ga);
+      sc_circle(c.it[n++], kx, ky, 6 * k, disc, a, v);  // the knob: a gap of the container's color, then the knob
+      sc_circle(c.it[n++], kx, ky, 4 * k, light, a, v);
       dl_text(c.it[n++], L.font2, c.txt[2], sx[1] + 3 * k, sy[1] - sr * 0.02f, c.g[1], 1, light, a, v, dsc[1]);
       dl_text(c.it[n++], L.font3, c.txt[3], sx[1] - sr * 0.52f, sy[1] + sr * 0.64f, c.g[2], 1, wx_acc, a * 0.85f, v, dsc[1]);
       dl_text(c.it[n++], L.font3, c.txt[4], sx[1] + sr * 0.52f, sy[1] + sr * 0.64f, c.g[2], 1, wx_acc, a * 0.85f, v, dsc[1]);
@@ -1261,7 +1261,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
       const uint32_t bat = pct > 20 ? bat_acc : sec_acc;
       snprintf(c.txt[5], 8, "%d", pct);
-      dl_ring(c.it[n++], sx[2], sy[2], sr * 0.8f, 5 * k, pct / 100.0f, bat, sc_mix(bat, 0x000000, 0.68f), a, v);
+      dl_ring(c.it[n++], sx[2], sy[2], sr * 0.86f, 3.5f * k, pct / 100.0f, bat, sc_mix(bat, 0x000000, 0.68f), a, v);
       dl_text(c.it[n++], L.font2, c.txt[5], sx[2], sy[2] - sr * 0.05f, c.g[1], 1, light, a, v, dsc[2]);
       dl_text(c.it[n++], L.font3, "%", sx[2], sy[2] + sr * 0.42f, c.g[2], 1, bat, a * 0.85f, v, dsc[2]);
       nc = dl_hands(c, nc, ax, ay, R, light, 0x000000, acc, R * 0.52f, R * 0.9f, a, sa, v, acc, false);
@@ -1315,7 +1315,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
           dl_at(ax, ay, j * 6, R * 0.935f, x0, y0), dl_at(ax, ay, j * 6, R * 0.97f, x1, y1);
           sc_cap(c, nc++, x0, y0, x1, y1, 0.8f * k, light, a * 0.55f, v);
         } else {
-          dl_at(ax, ay, j * 6, R * 0.47f, x0, y0), dl_at(ax, ay, j * 6, R * 0.8f, x1, y1);
+          dl_at(ax, ay, j * 6, R * 0.5f, x0, y0), dl_at(ax, ay, j * 6, R * 0.75f, x1, y1);  // (clear of the numbers: ≥ 0.05 R)
           sc_cap(c, nc++, x0, y0, x1, y1, 1.05f * k, light, a * 0.85f, v);  // (from further out, thinner: as Solar Analog)
         }
       }
@@ -1323,7 +1323,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       for (int j = 1; j <= 12; j++) {  // 05 … 60 at the edge
         snprintf(c.txt[j - 1], 8, "%02d", j * 5);
         float x, y;
-        dl_at(ax, ay, j * 30, R * 0.875f, x, y);
+        dl_at(ax, ay, j * 30, R * 0.86f, x, y);
         dl_text(c.it[n++], L.font, c.txt[j - 1], x, y, c.g[0], 1, light, a * 0.9f, v, nullptr);
       }
       strlcpy(c.txt[12], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[13], 8, "%d", sc_tm.tm_mday);
@@ -1388,7 +1388,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const HaloBattery b = halo_battery();
       const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
       snprintf(c.txt[2], 8, "%d", pct);
-      dl_ring(c.it[n++], ax, ay + R * 0.38f, R * 0.13f, 4 * k, pct / 100.0f, full, dim, a, v);
+      dl_ring(c.it[n++], ax, ay + R * 0.38f, R * 0.17f, 3.5f * k, pct / 100.0f, full, dim, a, v);
       dl_text(c.it[n++], L.font2, c.txt[2], ax, ay + R * 0.38f, c.g[1], 1, 0xFFFFFF, a, v, &halo_black);
       nc = dl_hands(c, nc, ax, ay, R, L.color3, 0x000000, L.color2, R * 0.5f, R * 0.88f, a, a, v);
       c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
@@ -1402,10 +1402,10 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       // color — the bezel band; color2 — the accent (the subdials' hands, the pivot); color3 — the light (numerals,
       // ticks, the subdials' faces, the hands). The band from 0.62 R to the edge with 1-12 on it and sixty ticks at its
       // rim; three light subdials (running seconds at 9, the battery at 3, the date at 6) with dark marks
-      const float R = 228 * k, sr = R * 0.165f, sd = R * 0.31f;
+      const float R = 228 * k, sr = R * 0.245f, sd = R * 0.4f;  // (the subdials fill the inner dial, as Chronograph Pro's)
       const uint32_t light = L.color3, acc = L.color2, ink = 0x1C1B1F;
       HaloItem &band = c.it[n++];
-      dl_ring(band, ax, ay, R * 0.81f, R * 0.38f, 1, L.color, 0, a, v);
+      dl_ring(band, ax, ay, R * 0.875f, R * 0.23f, 1, L.color, 0, a, v);  // (0.76 R … 0.99 R: slim)
       float sx[3], sy[3];
       HaloItem *dsc[3];
       for (int j = 0; j < 3; j++) {  // 9, 3, 6
@@ -1421,8 +1421,8 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       for (int j = 0; j < 60; j++) {  // the band's rim ticks
         const bool big = j % 5 == 0;
         float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 6, R * (big ? 0.925f : 0.95f), x0, y0), dl_at(ax, ay, j * 6, R * 0.985f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, (big ? 1.4f : 0.8f) * k, light, a * (big ? 1 : 0.7f), v);
+        dl_at(ax, ay, j * 6, R * (big ? 0.955f : 0.965f), x0, y0), dl_at(ax, ay, j * 6, R * 0.985f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, (big ? 1.2f : 0.7f) * k, light, a * (big ? 0.9f : 0.6f), v);
       }
       for (int j = 0; j < 12; j++) {  // the running seconds' ticks (9)
         float x0, y0, x1, y1;
@@ -1455,11 +1455,11 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       for (int h = 1; h <= 12; h++) {  // 1-12 on the band
         snprintf(c.txt[h - 1], 8, "%d", h);
         float x, y;
-        dl_at(ax, ay, h * 30, R * 0.79f, x, y);
+        dl_at(ax, ay, h * 30, R * 0.855f, x, y);
         dl_text(c.it[n++], L.font, c.txt[h - 1], x, y, c.g[0], 1, light, a, v, &band);
       }
       snprintf(c.txt[12], 8, "%d", pct);
-      dl_text(c.it[n++], L.font3, c.txt[12], sx[1], sy[1] + sr * 0.48f, c.g[2], 1, ink, a, v, dsc[1], 1);
+      dl_text(c.it[n++], L.font2, c.txt[12], sx[1], sy[1] + sr * 0.46f, c.g[1], 1, ink, a, v, dsc[1]);
       strlcpy(c.txt[13], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[14], 8, "%d", sc_tm.tm_mday);
       dl_text(c.it[n++], L.font3, c.txt[13], sx[2], sy[2] - sr * 0.42f, c.g[2], 1, acc, a, v, dsc[2], DL_TRACK);
       dl_text(c.it[n++], L.font2, c.txt[14], sx[2], sy[2] + sr * 0.14f, c.g[1], 1, ink, a, v, dsc[2]);

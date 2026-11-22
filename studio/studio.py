@@ -181,12 +181,12 @@ SC_LOOKS = {
               ("GoogleSansFlex.ttf", 40, 48, "digits", "wght=660,ROND=100", None)],
     # The dials (sclock.h dl_*): Dive — the bezel's numerals, the date's day, the weekday, the caret at 12 (Font Awesome);
     # Field — the subdials' big values, (none), their small words and numbers
-    "dive": [("GoogleSansFlex.ttf", 25, 34, "digits", "wght=600,ROND=100", None),
+    "dive": [("GoogleSansFlex.ttf", 21, 28, "digits", "wght=600,ROND=100", None),
              ("GoogleSansFlex.ttf", 30, 40, "digits", "wght=640,ROND=100", None),
              ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA"', "wght=800,ROND=100", None),
-             ("fa-solid-900.ttf", 46, 60, "0xf0d7", "", None)],
+             ("fa-solid-900.ttf", 38, 50, "0xf0d7", "", None)],
     "field": [("GoogleSansFlex.ttf", 29, 40, 'digits "°%-"', "wght=640,ROND=100", None),
-              ("GoogleSansFlex.ttf", 22, 32, 'digits "°%-"', "wght=600,ROND=100", None),
+              ("GoogleSansFlex.ttf", 23, 32, 'digits "°%-"', "wght=600,ROND=100", None),
               ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA%" digits "-"', "wght=760,ROND=100", None)],
     # Solar: the numbers at the edge, the day, the weekday
     "solar": [("GoogleSansFlex.ttf", 17, 24, "digits", "wght=520,ROND=100", None),
@@ -195,12 +195,12 @@ SC_LOOKS = {
     # California: the numerals (Roman and Arabic, one rounded bold), the day, the weekday, the caret at 12
     "california": [("GoogleSansFlex.ttf", 50, 66, '"XIV4578"', "wght=780,ROND=100", None),
                    ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=700,ROND=100", None),
-                   ("GoogleSansFlex.ttf", 16, 22, '"SUNMOTEWDHFRIA"', "wght=760,ROND=100", None),
+                   ("GoogleSansFlex.ttf", 16, 22, '"SUNMOTEWDHFRIA" digits', "wght=760,ROND=100", None),
                    ("fa-solid-900.ttf", 92, 120, "0xf0d7", "", None)],  # (the caret: the heaviest mark, as California's)
     # Chrono: the band's 1-12, the date's day, the small words and numbers on the subdials
-    "chrono": [("GoogleSansFlex.ttf", 28, 38, "digits", "wght=640,ROND=100", None),
-               ("GoogleSansFlex.ttf", 22, 30, "digits", "wght=700,ROND=100", None),
-               ("GoogleSansFlex.ttf", 13, 18, '"SUNMOTEWDHFRIA" digits', "wght=760,ROND=100", None)],
+    "chrono": [("GoogleSansFlex.ttf", 22, 30, "digits", "wght=620,ROND=100", None),
+               ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=680,ROND=100", None),
+               ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA" digits', "wght=760,ROND=100", None)],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES}  # what a layer's look may be, by its kind
