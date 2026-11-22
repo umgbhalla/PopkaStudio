@@ -181,15 +181,15 @@ SC_LOOKS = {
               ("GoogleSansFlex.ttf", 40, 48, "digits", "wght=660,ROND=100", None)],
     # The dials (sclock.h dl_*): Dive — the bezel's numerals, the date's day, the weekday, the caret at 12 (Font Awesome);
     # Field — the subdials' big values, (none), their small words and numbers
-    "dive": [("GoogleSansFlex.ttf", 30, 40, "digits", "wght=700,ROND=100", None),
-             ("GoogleSansFlex.ttf", 34, 44, "digits", "wght=640,ROND=100", None),
+    "dive": [("GoogleSansFlex.ttf", 25, 34, "digits", "wght=600,ROND=100", None),
+             ("GoogleSansFlex.ttf", 30, 40, "digits", "wght=640,ROND=100", None),
              ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA"', "wght=800,ROND=100", None),
              ("fa-solid-900.ttf", 46, 60, "0xf0d7", "", None)],
-    "field": [("GoogleSansFlex.ttf", 30, 40, 'digits "°%-"', "wght=640,ROND=100", None),
-              ("GoogleSansFlex.ttf", 30, 40, "digits", "wght=640,ROND=100", None),
+    "field": [("GoogleSansFlex.ttf", 29, 40, 'digits "°%-"', "wght=640,ROND=100", None),
+              ("GoogleSansFlex.ttf", 22, 32, 'digits "°%-"', "wght=600,ROND=100", None),
               ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA%" digits "-"', "wght=760,ROND=100", None)],
     # Solar: the numbers at the edge, the day, the weekday
-    "solar": [("GoogleSansFlex.ttf", 19, 26, "digits", "wght=600,ROND=100", None),
+    "solar": [("GoogleSansFlex.ttf", 17, 24, "digits", "wght=520,ROND=100", None),
               ("GoogleSansFlex.ttf", 26, 34, "digits", "wght=700,ROND=100", None),
               ("GoogleSansFlex.ttf", 18, 24, '"SUNMOTEWDHFRIA"', "wght=700,ROND=100", None)],
 }
