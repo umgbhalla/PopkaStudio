@@ -179,6 +179,15 @@ SC_LOOKS = {
     "bezel": [("GoogleSansFlex.ttf", 176, 280, "digits", "wght=700,ROND=100", None),
               ("GoogleSansFlex.ttf", 24, 30, "digits", "wght=660,ROND=100", None),
               ("GoogleSansFlex.ttf", 40, 48, "digits", "wght=660,ROND=100", None)],
+    # The dials (sclock.h dl_*): Dive — the bezel's numerals, the date's day, the weekday, the caret at 12 (Font Awesome);
+    # Field — the subdials' big values, (none), their small words and numbers
+    "dive": [("GoogleSansFlex.ttf", 30, 40, "digits", "wght=700,ROND=100", None),
+             ("GoogleSansFlex.ttf", 34, 44, "digits", "wght=640,ROND=100", None),
+             ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA"', "wght=800,ROND=100", None),
+             ("fa-solid-900.ttf", 46, 60, "0xf0d7", "", None)],
+    "field": [("GoogleSansFlex.ttf", 30, 40, 'digits "°%-"', "wght=640,ROND=100", None),
+              ("GoogleSansFlex.ttf", 30, 40, "digits", "wght=640,ROND=100", None),
+              ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA" digits "-"', "wght=760,ROND=100", None)],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES}  # what a layer's look may be, by its kind

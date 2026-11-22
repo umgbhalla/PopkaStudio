@@ -638,6 +638,23 @@ static void face_switch_build() {
     for (int i = 0; i < face_n; i++) LOG("%c %d %s\n", i == fc_face ? '*' : ' ', i, face_scr[face_ids[i]].name ? face_scr[face_ids[i]].name : "");
   });
 }
+static bool fs_snap(int slot, int fi);  // (below, by the face's drawing)
+static int fs_pic_face[2] = {-1, -1};   // the faces the pictures are of (an index of face_ids; -1 — none)
+static bool fs_pics;                     // switching from the pictures in this frame
+// While switching: the shown face's picture, and the neighbor's once the move shows which one comes in
+static void face_switch_pics() {
+  const bool moving = fs_drag || fs_off.x != 0 || fs_off.target != 0;
+  if (!moving) {
+    fs_pic_face[0] = fs_pic_face[1] = -1;  // (at rest: the next switch takes fresh ones — the time has moved on)
+    fs_pics = false;
+    return;
+  }
+  if (fs_pic_face[0] != fc_face && !fs_snap(0, fc_face)) return (void)(fs_pics = false);
+  const float o = fs_off.x != 0 ? fs_off.x : fs_off.target;
+  const int ni = fc_face + (o > 0 ? 1 : -1);
+  if (o != 0 && ni >= 0 && ni < face_n && fs_pic_face[1] != ni && !fs_snap(1, ni)) return (void)(fs_pics = false);
+  fs_pics = true;
+}
 // Every frame: the edge swipe on the face, the spring, landing on the neighbor
 static void face_switch_tick(float dt) {
   HaloFinger &f = halo_finger;
@@ -662,7 +679,7 @@ static void face_switch_tick(float dt) {
       if (o > hi) o = hi + halo_rubber((o - hi) * W) / W;  // (past the last one: rubber)
       else if (o < lo) o = lo + halo_rubber((o - lo) * W) / W;
       fs_off.x = o, fs_off.v = -f.vx / W;
-      return;
+      return face_switch_pics();
     }
     fs_drag = false;
     const float o = fs_off.x, v = fs_off.v;  // faces, faces a second
@@ -671,13 +688,14 @@ static void face_switch_tick(float dt) {
     if ((to > 0 && fc_face + 1 >= face_n) || (to < 0 && fc_face == 0)) to = 0;
     fs_off.target = to;
   }
-  if (fs_off.x == fs_off.target && fs_off.v == 0 && fs_off.target == 0) return;
+  if (fs_off.x == fs_off.target && fs_off.v == 0 && fs_off.target == 0) return face_switch_pics();
   halo_spring_run(fs_off, fs_off.target != 0 ? K_FS_IN : K_FS_BACK, dt);
   if (fs_off.target != 0 && fs_off.x == fs_off.target) {  // there: the neighbor is the face now
     fc_face += (int)fs_off.target;
     halo_spring_set(fs_off, 0);
     face_switch_save();
   }
+  face_switch_pics();
 }
 
 // Every frame, whatever is on screen: the clock and the date, the rolls and the icon spring
@@ -1031,10 +1049,72 @@ static int screen_pages(const FaceScreen &S) {
   return screen_paged(S) ? wx_pages : screen_steps(S) ? 2 : 1;
 }
 
+// ---------- Switching faces from pictures (the user's call, 23 Nov 2026: "pause the faces while swiping") ----------
+// Drawn live, two detailed faces moving and scaling were the whole screen every frame: 38 fps, 22 ms frames, measured on
+// the 1.75. Now when a switch starts each face is drawn once into a picture in PSRAM (as it stands: the faces stand still
+// while switching — sclock.h), and while it moves only the pictures are copied, moved and scaled (nearest pixel: it is
+// moving). Its cost no longer depends on what the face has on it
+static uint16_t *fs_pic[2];
+static bool fs_snap(int slot, int fi) {
+  if (!fs_pic[slot]) {
+#ifdef __EMSCRIPTEN__
+    fs_pic[slot] = (uint16_t *)malloc(HALO_W * HALO_H * 2);
+#else
+    fs_pic[slot] = (uint16_t *)heap_caps_malloc(HALO_W * HALO_H * 2, MALLOC_CAP_SPIRAM);
+#endif
+    if (!fs_pic[slot]) return false;
+  }
+  const int s = face_ids[fi];
+  screen_layout(s, HaloView());  // (in its place, whole)
+  fs_laid[fi] = true;
+  const HaloBand saved = hb;
+  for (int y = 0; y < HALO_H; y += HALO_ROWS) {
+    const int rows = min(HALO_ROWS, HALO_H - y);
+    hb = {fs_pic[slot] + y * HALO_W, y, rows, 0, HALO_W - 1, 0, HALO_W};
+    memset(hb.buf, 0, rows * HALO_W * 2);
+    screen_draw(s);
+  }
+  hb = saved;
+  fs_pic_face[slot] = fi;
+  return true;
+}
+// A picture into this band: its middle at the screen's middle + (vx, vy), scaled by s from there
+static void fs_blit(const uint16_t *pic, float vx, float vy, float s) {
+  if (!pic || s < 0.05f) return;
+  const float inv = 1 / s, ox = HALO_W / 2.0f + vx, oy = HALO_H / 2.0f + vy;
+  const int x0 = max(hb.x0, (int)ceilf(ox - HALO_W / 2.0f * s)), x1 = min(hb.x1, (int)floorf(ox + HALO_W / 2.0f * s) - 1);
+  const int y0 = max(hb.y, (int)ceilf(oy - HALO_H / 2.0f * s)), y1 = min(hb.y + hb.rows - 1, (int)floorf(oy + HALO_H / 2.0f * s) - 1);
+  if (x0 > x1) return;
+  const int32_t step = (int32_t)(inv * 65536);
+  for (int y = y0; y <= y1; y++) {
+    const int sy = (int)((y + 0.5f - oy) * inv + HALO_H / 2.0f);
+    if (sy < 0 || sy >= HALO_H) continue;
+    const uint16_t *src = pic + sy * HALO_W;
+    uint16_t *dst = halo_row(y);
+    int32_t sx = (int32_t)(((x0 + 0.5f - ox) * inv + HALO_W / 2.0f) * 65536);
+    for (int x = x0; x <= x1; x++, sx += step) {
+      const int i = sx >> 16;
+      if ((unsigned)i < (unsigned)HALO_W) dst[x] = src[i];
+    }
+  }
+}
+static HaloView fs_vc, fs_vo;  // where the pictures go in this frame
+static bool fs_was_pics;
+
 // ---------- The face and the screen over it (lib/Halo's navigation, as on HaloWatch) ----------
 static void face_layout(const HaloView &v) {
   const int cur = face_cur(), o_i = fc_face + (fs_off.x > 0 ? 1 : -1);
   const bool two = fs_off.x != 0 && o_i >= 0 && o_i < face_n && face_ids[o_i] < face_scr_n;
+  if (fs_pics) {  // switching: the pictures only — nothing laid out, the whole screen drawn again
+    const float p = fminf(1, fabsf(fs_off.x));
+    fs_vc = v, fs_vc.x += -fs_off.x * FS_STEP * W * v.s, fs_vc.s = v.s * (1 - (1 - FS_SMALL) * p);
+    fs_vo = v, fs_vo.x += ((fs_off.x > 0 ? 1 : -1) - fs_off.x) * FS_STEP * W * v.s, fs_vo.s = v.s * (FS_SMALL + (1 - FS_SMALL) * p);
+    fs_other = two && fs_pic_face[1] == o_i ? face_ids[o_i] : -1;
+    fs_was_pics = true;
+    halo_damage_all();
+    return;
+  }
+  if (fs_was_pics) fs_was_pics = false, halo_damage_all();  // (back to the live face: all of it once)
   // Hidden once: a face laid out in the last frame and no longer on screen (its items damage where they were)
   HaloView gone = v;
   gone.a = 0;
@@ -1063,6 +1143,11 @@ static void face_layout(const HaloView &v) {
 #endif
 }
 static void face_draw() {
+  if (fs_pics) {
+    fs_blit(fs_pic[0], fs_vc.x, fs_vc.y, fs_vc.s);
+    if (fs_other >= 0) fs_blit(fs_pic[1], fs_vo.x, fs_vo.y, fs_vo.s);
+    return;
+  }
   screen_draw(face_cur());
   if (fs_other >= 0) screen_draw(fs_other);
 #if HAS_SHADE && !defined(HALO_ROUND)
