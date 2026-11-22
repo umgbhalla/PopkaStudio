@@ -40,6 +40,7 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #include "weather.h"  // the weather: the editor's cities (wxdata.h) and their weather
 #include "face.h"     // the watch face made of layers
 #include "wxfetch.h"  // fresh weather from Open-Meteo over Wi-Fi (only with Wi-Fi)
+#include "confirm.h"  // one confirm for the whole watch (Material 3 for Wear OS): power off first
 #include "power.h"    // the Functions: Always On, the BOOT and PWR buttons
 #include "steps.h"    // today's steps (only with a Steps layer)
 #include "bt.h"       // Bluetooth (only when it is on)

@@ -409,6 +409,7 @@ GALLERY_FONTS = [
     "font  gl_ic24   fa-solid-900.ttf    24  " + " ".join(f"0x{c:04x}" for c in ICONS.values())
     + " 0xf067 0xf068   # cards' icons; the player's + and −",
     "font  gl_back_ic fa-solid-900.ttf    24  0xf060   # Back arrow",
+    "font  gl_cf_ic  fa-solid-900.ttf    30  0xf00d 0xf00c 0xf011 0xf1f8 0xf2f1   # the confirm (confirm.h): x, check, badges",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
@@ -1676,7 +1677,7 @@ def write_sketch(project, folder, meta=None):
                      "pixelart.h", "parrot.h", "bt.h", "wxfetch.h", "settings.h", "stepscreen.h", "widgets.h", "widgets_rect.h", "wxwidgets.h",
                      "music.h", "music_sd.h", "player.h", "pomodoro.h", "pomodoro_rect.h", "sound.h", "volume.h", "recorder.h", "radio.h", "radio_net.h", "radio_rect.h", "video.h", "video_hw.h", "video_net.h", "snake.h", "games.h", "game_dots.h",
                      "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
-                     "sclock.h"):
+                     "sclock.h", "confirm.h"):
             shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
     fonts, icons = {}, {}  # spec -> name, (set, scale) -> name
     all_layers = [layer for scr in screens for layer in scr["layers"]]

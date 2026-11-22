@@ -9,6 +9,8 @@ extern const HaloFont gl_title;  // GoogleSansFlex.ttf 34 px, 104 букв, ст
 extern const HaloFont gl_t24;  // GoogleSansFlex.ttf 24 px, 104 букв, строка 31, базовая линия 24
 extern const HaloFont gl_t20;  // GoogleSansFlex.ttf 20 px, 103 букв, строка 26, базовая линия 20
 extern const HaloFont gl_ic24;  // fa-solid-900.ttf 24 px, 50 букв, строка 26, базовая линия 22
+extern const HaloFont gl_back_ic;  // fa-solid-900.ttf 24 px, 1 букв, строка 26, базовая линия 22
+extern const HaloFont gl_cf_ic;  // fa-solid-900.ttf 30 px, 5 букв, строка 32, базовая линия 27
 extern const HaloFont gl_ic32;  // fa-solid-900.ttf 32 px, 2 букв, строка 34, базовая линия 29
 extern const HaloFont gl_n92;  // GoogleSansFlex.ttf 92 px, 12 букв, строка 116, базовая линия 89
 extern const HaloFont gl_t16;  // GoogleSansFlex.ttf 16 px, 17 букв, строка 21, базовая линия 16
@@ -21,4 +23,3 @@ extern const HaloImage icons0_partly;  // icons0_partly.png, 63×64
 extern const HaloImage icons0_sun;  // icons0_sun.png, 57×57
 extern const HaloImage icons0_cloud;  // icons0_cloud.png, 63×60
 extern const HaloImage icons0_rain;  // icons0_rain.png, 57×60
-extern const HaloFont gl_back_ic;  // fa-solid-900.ttf 24 px, 1 букв, строка 26, базовая линия 22

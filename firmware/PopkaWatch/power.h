@@ -346,44 +346,13 @@ static void power_view() {
 }
 
 #ifdef HALO_ROUND
-static constexpr float PW_CHOICE_W = 286, PW_CHOICE_H = 70;
-static constexpr float PW_CHOICE_Y[] = {237, 321};
-static constexpr uint32_t PW_CHOICE_COLOR[] = {0x2E3034, 0xFFB4AB};
-static HaloItem pw_confirm_title, pw_confirm_box[2], pw_confirm_text[2];
-static float pw_confirm_mid, pw_confirm_label_mid[2];
-
-static void power_confirm_update(float) {
-  const HaloFinger &f = halo_finger;
-  if (!f.tap || f.owner || fabsf(f.x - CX) > PW_CHOICE_W / 2) return;
-  if (fabsf(f.y - PW_CHOICE_Y[0]) < PW_CHOICE_H / 2) halo_nav_back();
-  else if (fabsf(f.y - PW_CHOICE_Y[1]) < PW_CHOICE_H / 2 && __atomic_load_n(&pw_shutdown, __ATOMIC_RELAXED) != 1)
-    __atomic_store_n(&pw_shutdown, 1, __ATOMIC_RELAXED);
-}
-
-static void power_confirm_layout(const HaloView &v) {
-  const char *title = __atomic_load_n(&pw_shutdown, __ATOMIC_RELAXED) == 3 ? "Try again" : "Power off?";
-  gl_text_mid(pw_confirm_title, gl_title, title, pw_confirm_mid, CX, 144, 1, GL_TEXT, 1, &halo_black);
-  pw_confirm_title.on_black = true;
-  halo_view_commit(pw_confirm_title, v);
-  for (int i = 0; i < 2; i++) {
-    HaloItem &box = pw_confirm_box[i], &text = pw_confirm_text[i];
-    box.kind = HI_RRECT, box.x = CX, box.y = PW_CHOICE_Y[i], box.w = PW_CHOICE_W, box.h = PW_CHOICE_H;
-    box.r = PW_CHOICE_H / 2, box.color = PW_CHOICE_COLOR[i], box.alpha = 1, box.scale = 1, box.on_black = true;
-    gl_text_mid(text, gl_t24, i ? "Confirm" : "Back", pw_confirm_label_mid[i], CX, box.y, 1,
-                i ? 0x561E19 : GL_TEXT, 1, &box);
-    halo_view_commit(box, v), halo_view_commit(text, v);
-  }
-}
-
-static void power_confirm_draw() {
-  halo_item_draw(pw_confirm_title);
-  for (int i = 0; i < 2; i++) halo_item_draw(pw_confirm_box[i]), halo_item_draw(pw_confirm_text[i]);
-}
-
+// Power off: the shared confirm (confirm.h) — ✓ asks the power chip (power_shutdown_poll, from loop()); if it says no,
+// the confirm says so
 static void power_confirm_open() {
   __atomic_store_n(&pw_shutdown, 0, __ATOMIC_RELAXED);
-  nav_scr[1] = -1, nav_stub[1] = "Power off";
-  halo_nav_open({nullptr, power_confirm_update, power_confirm_layout, power_confirm_draw});
+  ui_confirm_open({UI_IC_POWER, "Power off?", "Press PWR to turn it back on", 0xFFB4AB, [] {
+                     if (__atomic_load_n(&pw_shutdown, __ATOMIC_RELAXED) != 1) __atomic_store_n(&pw_shutdown, 1, __ATOMIC_RELAXED);
+                   }});
 }
 
 static void power_shutdown_poll() {
@@ -391,6 +360,7 @@ static void power_shutdown_poll() {
   LOG("power: shutdown confirmed\n");
   const bool accepted = halo_power_off();
   __atomic_store_n(&pw_shutdown, accepted ? 2 : 3, __ATOMIC_RELAXED);
+  if (!accepted) ui_confirm_title("Couldn't power off");
 #ifdef __EMSCRIPTEN__
   if (accepted) halo_display_on(false);
 #endif
@@ -401,11 +371,6 @@ static void power_build() {  // after halo_begin: the motion sensor is on its I2
   K_PW_IN = halo_spring(0.8f, 1);   // to Always On — calm: ~0.5 s most of the way
   K_PW_OUT = halo_spring(0.5f, 1);  // awake — quicker: ~0.3 s
   K_PW_SHIFT = halo_spring(0.3f, 1);
-#ifdef HALO_ROUND
-  pw_confirm_mid = halo_text_mid(gl_title, "Power off?");
-  pw_confirm_label_mid[0] = halo_text_mid(gl_t24, "Back");
-  pw_confirm_label_mid[1] = halo_text_mid(gl_t24, "Confirm");
-#endif
 #if FN_WAKE_RAISE || FN_STEPS || defined(__EMSCRIPTEN__)
   halo_motion_begin(150);  // (Raise off and no Steps — the motion sensor stays off)
 #endif
