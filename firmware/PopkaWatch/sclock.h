@@ -41,6 +41,7 @@
 #define SC_DIVE 16   // a dive bezel: 10..50 on a colored band, dot indices, a date at 3 (Apple's Count Up, our own)
 #define SC_FIELD 17  // hour bars, fine minute ticks, four live subdials (Apple's Meridian, our own)
 #define SC_SOLAR 18  // a glow and a light wedge from 12 to the minute hand (Apple's Solar Analog, our own)
+#define SC_CALIF 19  // Roman over Arabic numerals, a caret at 12, pills (Apple's California, our own)
 #ifdef __EMSCRIPTEN__
 #define SC_ON(n) 1
 #else
@@ -639,7 +640,9 @@ static void sc_layer_build(const FaceScreen &S, int i) {
     case SC_DIVE:
     case SC_FIELD:
     case SC_SOLAR:
-      c->g[0] = sc_mid(L.font), c->g[1] = sc_mid(L.font2), c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI");
+    case SC_CALIF:
+      c->g[0] = sc_mid(L.font, look == SC_CALIF ? "XIV4578" : "0123456789"), c->g[1] = sc_mid(L.font2);
+      c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI");
       c->g[3] = sc_mid(L.font4, "\xEF\x83\x97");
       break;
     default:  // Sunset, Liquid, Comet: the whole time in one line, the colon in the middle
@@ -685,6 +688,7 @@ static void sc_texts(const FaceLayer &L, FaceRun &R, bool animate) {
       case SC_DIVE:
       case SC_FIELD:
       case SC_SOLAR:
+      case SC_CALIF:
         break;
       default:
         halo_roll_set(R.roll, fc_time, animate);
@@ -1338,6 +1342,58 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       break;
     }
 #endif
+#if SC_ON(SC_CALIF)
+    case SC_CALIF: {
+      // color — the numerals (the full shade); color2 — the pivot's accent; color3 — the hands. Three shades of the one
+      // color: numerals full, the 5-minute ticks mid, the minute ticks dim (as California's). Roman over the top (XI, I,
+      // X, II), a caret at 12, Arabic below (4, 5, 7, 8), pills at 3, 6, 9; the date up top, a small ring below
+      const float R = 228 * k;
+      const uint32_t full = L.color, mid = sc_mix(L.color, 0x000000, 0.35f), dim = sc_mix(L.color, 0x000000, 0.62f);
+      sc_ob = false;
+      const int dial = n;
+      int nc = 0;
+      for (int j = 0; j < 60; j++) {
+        const bool big = j % 5 == 0;
+        float x0, y0, x1, y1;
+        dl_at(ax, ay, j * 6, R * (big ? 0.9f : 0.935f), x0, y0), dl_at(ax, ay, j * 6, R * 0.975f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, (big ? 1.6f : 0.9f) * k, big ? mid : dim, a, v);
+      }
+      // the pills at 3, 9 (along the radius) and 6 (across)
+      for (int h : {3, 6, 9}) {
+        float cx0, cy0;
+        dl_at(ax, ay, h * 30, R * 0.72f, cx0, cy0);
+        const float hl = R * 0.075f;
+        sc_cap(c, nc++, cx0 - hl, cy0, cx0 + hl, cy0, 5.5f * k, full, a, v);
+      }
+      // the ring below: the battery, in the numerals' hue on its dim track
+      const int ticks = nc;
+      static const char *const NUM[12] = {"", "I", "II", "", "4", "5", "", "7", "8", "", "X", "XI"};
+      for (int h = 1; h < 12; h++) {
+        if (!*NUM[h]) continue;
+        float x, y;
+        dl_at(ax, ay, h * 30, R * 0.72f, x, y);
+        dl_text(c.it[n++], L.font, NUM[h], x, y, c.g[0], 1, full, a, v, &halo_black);
+      }
+      dl_text(c.it[n++], L.font4, "\xEF\x83\x97", ax, ay - R * 0.72f, c.g[3], 1, full, a, v, &halo_black);  // the caret
+      strlcpy(c.txt[0], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[1], 8, "%d", sc_tm.tm_mday);
+      {
+        const float gap = 8 * k, w1 = dl_width(L.font3, c.txt[0], DL_TRACK), w2 = dl_width(L.font2, c.txt[1]);
+        const float x0 = ax - (w1 + gap + w2) / 2, y = ay - R * 0.38f;
+        dl_text(c.it[n++], L.font3, c.txt[0], x0, y, c.g[2], 0, 0xFFFFFF, a * 0.75f, v, &halo_black, DL_TRACK);
+        dl_text(c.it[n++], L.font2, c.txt[1], x0 + w1 + gap, y, c.g[1], 0, 0xFFFFFF, a, v, &halo_black);
+      }
+      const HaloBattery b = halo_battery();
+      const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
+      snprintf(c.txt[2], 8, "%d", pct);
+      dl_ring(c.it[n++], ax, ay + R * 0.38f, R * 0.13f, 4 * k, pct / 100.0f, full, dim, a, v);
+      dl_text(c.it[n++], L.font2, c.txt[2], ax, ay + R * 0.38f, c.g[1], 1, 0xFFFFFF, a, v, &halo_black);
+      nc = dl_hands(c, nc, ax, ay, R, L.color3, 0x000000, L.color2, R * 0.5f, R * 0.88f, a, a, v);
+      c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
+      sc_hide_caps(c, nc);
+      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      break;
+    }
+#endif
 #if SC_ON(SC_BEZEL)
     case SC_BEZEL: {
       // the minute scale (color3) turns so that the minute is under the marker (color2); the hour (color) in the middle
@@ -1666,10 +1722,11 @@ static void sc_draw(const FaceScreen &S, int i) {
       sc_draw_flip(L, c);
       break;
 #endif
-#if SC_ON(SC_DIVE) || SC_ON(SC_FIELD) || SC_ON(SC_SOLAR)
+#if SC_ON(SC_DIVE) || SC_ON(SC_FIELD) || SC_ON(SC_SOLAR) || SC_ON(SC_CALIF)
     case SC_DIVE:
     case SC_FIELD:
-    case SC_SOLAR: {  // the dial, its ticks, the complications, the hands (dl_*: the order); Solar — its light under all
+    case SC_SOLAR:
+    case SC_CALIF: {  // the dial, its ticks, the complications, the hands (dl_*: the order); Solar — its light under all
       if ((int)L.p2 == SC_SOLAR && c.a > 0.004f) sol_blit(c, c.d[7], c.d[8]);
       const int dial = (int)c.d[10], ticks = (int)c.d[11];
       sc_draw_items(c, 0, dial);

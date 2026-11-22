@@ -192,6 +192,11 @@ SC_LOOKS = {
     "solar": [("GoogleSansFlex.ttf", 17, 24, "digits", "wght=520,ROND=100", None),
               ("GoogleSansFlex.ttf", 26, 34, "digits", "wght=700,ROND=100", None),
               ("GoogleSansFlex.ttf", 18, 24, '"SUNMOTEWDHFRIA"', "wght=700,ROND=100", None)],
+    # California: the numerals (Roman and Arabic, one rounded bold), the day, the weekday, the caret at 12
+    "california": [("GoogleSansFlex.ttf", 50, 66, '"XIV4578"', "wght=780,ROND=100", None),
+                   ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=700,ROND=100", None),
+                   ("GoogleSansFlex.ttf", 16, 22, '"SUNMOTEWDHFRIA"', "wght=760,ROND=100", None),
+                   ("fa-solid-900.ttf", 92, 120, "0xf0d7", "", None)],  # (the caret: the heaviest mark, as California's)
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES}  # what a layer's look may be, by its kind
