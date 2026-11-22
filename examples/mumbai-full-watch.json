@@ -1178,7 +1178,7 @@
   "h24": true
  },
  "name": "Mumbai Full Watch",
- "rev": 4,
+ "rev": 5,
  "functions": {
   "wifi": {
    "on": true
@@ -1191,11 +1191,14 @@
   },
   "pwr": {
    "on": true,
-   "act": "off"
+   "act": "home"
   },
   "boot": {
    "on": true,
    "act": "lock"
+  },
+  "palm": {
+   "on": true
   }
  },
  "weather": {

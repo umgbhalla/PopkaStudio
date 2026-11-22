@@ -331,11 +331,11 @@ export class Engine {
     // The Functions (power.h): off — Always On never, a button nothing. Every copy: a pinned one stands still (no
     // power_tick there), but the quick settings panel shows Always On's state (shade_rect.h)
     {
-      const a = fnOf('aod'), b = fnOf('boot'), p = fnOf('pwr'), act = (f) => (!f.on ? 0 : { off: 1, lock: 2, aod: 3 }[f.act] ?? 1);
+      const a = fnOf('aod'), b = fnOf('boot'), p = fnOf('pwr'), act = (f) => (!f.on ? 0 : { off: 1, lock: 2, aod: 3, home: 4 }[f.act] ?? 1);
       const steps = state.project.screens.some((s) => s.layers.some((l) => l.type === 'steps'));  // (the sensor is the pedometer's)
       const raise = a.raise && !steps && !lacks('raise');
       const fn = [a.on ? 1 : 0, a.idle, a.bright, act(b), lacks('pwr') ? 0 : act(p), a.tap ? 1 : 0, raise ? 1 : 0, a.btn || !(a.tap || raise) ? 1 : 0, a.home ? 1 : 0,
-        a.shift === false || lacks('shift') ? 0 : 1];
+        a.shift === false || lacks('shift') ? 0 : 1, Number(ROUND && fnOf('palm').on)];
       if (fn.join() !== this.fn) this.fn = fn.join(), this.M._studio_fn(...fn);
     }
   }

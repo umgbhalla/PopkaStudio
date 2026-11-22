@@ -225,7 +225,7 @@ MAX_SCREENS, MAX_LAYERS = 24, 32  # what the page's engine has room for (engine/
 FUNCTIONS = {"aod": {"on": False, "idle": 15, "bright": 24, "tap": True, "raise": True, "btn": True, "home": False,
                      "shift": True},
              "boot": {"on": False, "act": "off"},
-             "pwr": {"on": False, "act": "lock"}, "wifi": {"on": False}, "bt": {"on": False}}
+             "pwr": {"on": False, "act": "lock"}, "palm": {"on": False}, "wifi": {"on": False}, "bt": {"on": False}}
 # Wi-Fi (HaloClock: the time from the internet) and Bluetooth (bt.h) — off: not in the firmware at all. The time (the
 # page: state.js ZONES, TIME): the zone (POSIX TZ for the board) and 12 or 24 hours; without Wi-Fi the board gets the
 # computer's time over USB after Flash (the command time)
@@ -778,7 +778,7 @@ def clean_functions(project):
             for way in ("tap", "raise", "btn", "home", "shift"):
                 f[way] = bool(got.get(way, f[way]))
         elif "act" in f:
-            f["act"] = got.get("act") if got.get("act") in ("off", "aod", "lock") else f["act"]
+            f["act"] = got.get("act") if got.get("act") in ("off", "aod", "lock", "home") else f["act"]
     if not (out["aod"]["tap"] or out["aod"]["raise"] or out["aod"]["btn"]):  # (no way to wake: buttons do)
         out["aod"]["btn"] = True
     if out["wifi"]["on"] and out["bt"]["on"]:  # one at a time (internal memory: bt.h) — Wi-Fi keeps the time right
@@ -1647,17 +1647,18 @@ def write_sketch(project, folder, meta=None):
     wifi = fn["wifi"]["on"] or radio  # (the Radio brings Wi-Fi along — and Bluetooth goes: both don't fit)
     stscreen = any(layer["type"] in STEPS_SCREEN for layer in all_layers)
     steps = any(uses_steps(layer, rect) for layer in all_layers)  # (the pedometer runs)
-    act = lambda f: 0 if not f["on"] else {"off": 1, "lock": 2, "aod": 3}[f["act"]]
+    act = lambda f: 0 if not f["on"] else {"off": 1, "lock": 2, "aod": 3, "home": 4}[f["act"]]
     without = passport(project.get("board")).get("without", [])  # (what this board has not got)
     can_raise = fn["aod"]["raise"] and not steps and "raise" not in without
     h += ["// The Functions (power.h): Always On when idle, after idle s, the panel in it (of 255); BOOT and PWR: 0 — nothing,",
-          "// 1 — the screen off, 2 — lock (Always On, the touch off; a long press of that button unlocks), 3 — Always On",
+          "// 1 — screen off, 2 — lock, 3 — Always On, 4 — home",
           f"#define FN_AOD {1 if fn['aod']['on'] else 0}", f"#define FN_AOD_IDLE {fn['aod']['idle']}",
           f"#define FN_AOD_BRIGHT {fn['aod']['bright']}",
           f"#define FN_AOD_HOME {1 if fn['aod']['home'] else 0} // out of Always On on the watch face (1) or where it was",
           f"#define FN_AOD_SHIFT {1 if fn['aod']['shift'] and 'shift' not in without else 0} // Always On: a few pixels elsewhere every minute (burn-in)",
           f"#define FN_BOOT {act(fn['boot'])}",
           f"#define FN_PWR {0 if 'pwr' in without else act(fn['pwr'])}",
+          f"#define FN_PALM_LOCK {int(not rect and fn['palm']['on'])}",
           "// Waking up from Always On or dark (power.h): a touch, picking it up (off, or the Steps layer has the motion",
           "// sensor — not at all), a button; a way that is off does not wake the screen",
           f"#define FN_WAKE_TAP {1 if fn['aod']['tap'] else 0}",

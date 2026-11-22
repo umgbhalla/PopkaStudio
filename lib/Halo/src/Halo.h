@@ -51,6 +51,11 @@ bool halo_boot_click();  // кнопку BOOT (GPIO0) нажали — в это
 // halo_boot_click в каждом кадре (он и читает кнопку). Команда boot long — то же из порта
 #define HALO_BOOT_LONG_MS 1000
 bool halo_boot_long();
+#ifdef HALO_ROUND
+// Poll BOOT once per frame. A short press is reported on release, separately from a long press.
+bool halo_boot_short(bool count_wake);
+bool halo_take_palm();
+#endif
 // Кнопка PWR — её читает чип питания AXP2101 (опрос раз в 100 мс): что было с прошлого вызова — биты HALO_PWR_*.
 // Короткое — после отпускания; долгое — через ~1,5 с, пока ещё держат (держать 6–10 с — плата выключится аппаратно).
 // Команды pwr и pwr long — то же из порта. Нужен тач (cfg.touch): чип на его шине

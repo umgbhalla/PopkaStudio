@@ -176,14 +176,19 @@ EMSCRIPTEN_KEEPALIVE int studio_set(const char *json) {
 }
 
 // The Functions (power.h): Always On when idle (0/1), after idle s, its panel level (of 255); what BOOT and PWR do
-// (FN_NOTHING, FN_SCREEN_OFF, FN_LOCK). A button that no longer locks — unlocked
+// (FN_NOTHING, FN_SCREEN_OFF, FN_LOCK, FN_AMBIENT, FN_HOME).
 EMSCRIPTEN_KEEPALIVE void studio_fn(int aod, int idle, int bright, int boot, int pwr, int tap, int raise, int btn,
-                                    int home, int shift) {
+                                    int home, int shift, int palm) {
   pw_aod_on = aod, pw_idle_s = idle, pw_aod_level = constrain(bright, 1, 255), pw_boot = boot, pw_pwr = pwr;
   pw_aod_home = home;    // (Back to watch face)
   pw_aod_shift = shift;  // (Burn-in shift)
   pw_wake_tap = tap, pw_wake_raise = raise, pw_wake_btn = btn;  // (Wake up)
-  if (pw_locked && (pw_lock_btn == 1 ? boot : pwr) != FN_LOCK) pw_lock_set(false, 0), pw_wake(0);
+  bool lock_enabled = pw_lock_btn == 1 ? boot == FN_LOCK : pwr == FN_LOCK;
+#ifdef HALO_ROUND
+  pw_palm_lock = palm;
+  if (pw_lock_btn == 0) lock_enabled = pw_palm_lock;
+#endif
+  if (pw_locked && !lock_enabled) pw_lock_set(false, 0), pw_wake(0);
 }
 
 // The clock (the editor's Time): 24 hours (1) or 12; shift — s the picked zone is ahead of the computer's

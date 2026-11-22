@@ -265,6 +265,7 @@ export const FUNCTIONS = {
   aod: { name: 'Always On', on: false, idle: 15, bright: 24, tap: true, raise: true, btn: true, home: false, shift: true },  // + how it wakes, on the face or not
   boot: { name: 'BOOT button', on: false, act: 'off' },
   pwr: { name: 'PWR button', on: false, act: 'lock' },
+  palm: { name: 'Lock on palm cover', on: false },
   wifi: { name: 'Wi-Fi', on: false },      // the time from the internet; the network — kept by studio.py, not here (wifi.js)
   bt: { name: 'Bluetooth', on: false },    // the watch shows itself over Bluetooth (bt.h)
 };

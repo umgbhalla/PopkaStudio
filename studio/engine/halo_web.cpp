@@ -261,6 +261,17 @@ bool halo_display_is_on() {
 bool halo_boot_click() {
   return boot_cmd ? (boot_cmd = false, true) : false;
 }
+#ifdef HALO_ROUND
+static bool palm_cmd;
+bool halo_boot_short(bool count_wake) {
+  return halo_boot_click() || (count_wake && woke == HALO_WAKE_BOOT);
+}
+bool halo_take_palm() {
+  const bool detected = palm_cmd;
+  palm_cmd = false;
+  return detected;
+}
+#endif
 bool halo_boot_long() {
   return boot_long_cmd ? (boot_long_cmd = false, true) : false;
 }
@@ -367,6 +378,9 @@ bool halo_begin(HaloUpdate update, HaloDraw draw, const HaloConfig &c) {
   halo_command("slow", [](const char *a) { slowmo = 1 / constrain((float)atof(a), 1.0f, 100.0f); });
   halo_command("bright", [](const char *a) { halo_brightness(atoi(a)); });
   halo_command("boot", [](const char *a) { (strstr(a, "long") ? boot_long_cmd : boot_cmd) = true; });
+#ifdef HALO_ROUND
+  halo_command("palm", [](const char *) { palm_cmd = true; });
+#endif
   halo_command("pwr", [](const char *a) { pwr_cmd = strstr(a, "long") ? HALO_PWR_LONG : HALO_PWR_CLICK; });
   halo_command("shake", [](const char *) { motion_count++, woke_motion = true; });
   halo_command("redraw", [](const char *) { halo_damage_all(); });

@@ -32,6 +32,7 @@ void ht_bus_unlock() {
   if (bus_mx) xSemaphoreGive(bus_mx);
 }
 static volatile uint8_t pwr_ev;  // HALO_PWR_* с прошлого halo_pwr_event()
+static bool palm_pending;
 static uint32_t pmu_at, batt_at;
 static HaloBattery batt;
 static portMUX_TYPE batt_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -128,7 +129,12 @@ uint8_t halo_pwr_event() {
   return __atomic_exchange_n(&pwr_ev, 0, __ATOMIC_RELAXED);
 }
 
+bool halo_take_palm() {
+  return __atomic_exchange_n(&palm_pending, false, __ATOMIC_RELAXED);
+}
+
 static void touch_task(void *) {
+  bool palm_down = false;
   for (;;) {
     ht_bus_lock();
     pmu_poll();
@@ -136,6 +142,7 @@ static void touch_task(void *) {
     ht_bus_unlock();
     if (!ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(60))) {  // 60 мс без отчётов — палец убрали
       if (hist_n) release("timeout");
+      palm_down = false;
       continue;
     }
     const uint32_t t = irq_us;
@@ -147,6 +154,16 @@ static void touch_task(void *) {
     ht_bus_unlock();
     if (!ok) continue;
     if (b[6] != 0xAB) continue;
+    // The CST9217 sets byte 4 bit 7 for a palm cover in a valid D000 report.
+    if (b[4] & 0x80) {
+      if (!palm_down) {
+        release("palm");
+        __atomic_store_n(&palm_pending, true, __ATOMIC_RELAXED);
+      }
+      palm_down = true;
+      continue;
+    }
+    palm_down = false;
     const int n = b[5] & 0x7F;
     if (!n || (b[0] & 0x0F) != 6) {
       release("lift");
@@ -199,6 +216,7 @@ bool halo_i2c_read(HaloI2c d, uint8_t reg, uint8_t *buf, int n) {
 }
 
 bool ht_begin() {
+  halo_command("palm", [](const char *) { __atomic_store_n(&palm_pending, true, __ATOMIC_RELAXED); });
   bus_mx = xSemaphoreCreateMutex();
   i2c_master_bus_config_t bc = {};
   bc.i2c_port = I2C_NUM_0;

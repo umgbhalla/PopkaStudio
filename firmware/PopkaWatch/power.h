@@ -16,9 +16,9 @@
 //
 // The buttons (FN_BOOT, FN_PWR): FN_SCREEN_OFF — the same move to fully dark, the panel off; a touch, a button or
 // picking it up — back. FN_AMBIENT — into Always On at once, as when idle (also with Always On off): the same button
-// again, a touch or picking it up — back. FN_LOCK — into Always On with the touch off (a touch only wiggles the lock at the top); a long
-// press of that same button — back, unlocked. Locked and asleep, a wake-up (a touch, motion, the minute) keeps the
-// lock: the board stays up PW_LISTEN_S listening for the long press, then sleeps again. PWR can't wake the board (its
+// again, a touch or picking it up — back. FN_LOCK — into Always On with the touch off. On round boards, a short BOOT
+// toggles the display while locked, a long BOOT unlocks, and FN_PALM_LOCK locks and turns off the panel. FN_HOME
+// returns to the home screen. PWR can't wake the round board from light sleep (its
 // chip's interrupt is not wired: boards/amoled175/hardware.md) — on battery its long press is read at the next wake-up (pick the
 // watch up). On USB the board does not really sleep (Halo) — the same screens, the frames just go on.
 //
@@ -27,8 +27,7 @@
 // unless the Steps layer needs it — then the pedometer has it and motion never wakes the board), a button (BOOT or PWR:
 // in Always On and dark any press only wakes, its action is for an awake watch). A way that is off is not a way: the
 // board, woken by it, goes straight back to sleep; motion with Raise off is not activity either. At least one is on
-// (the editor and studio.py see to it). Locked — only the long press of the lock's button, as before. The command
-// wake — always.
+// (the editor and studio.py see to it). This setting controls unlocked wake-ups.
 //
 // The editor writes the settings into layers.h; its page changes them on the fly (engine/studio_api.h: studio_fn).
 // Commands: aod on|off, aod N (the panel in Always On, of 255), aod home on|off (Back to watch face), aod shift on|off
@@ -51,12 +50,15 @@
 #ifndef FN_AOD_SHIFT
 #define FN_AOD_SHIFT 1  // Always On: a few pixels elsewhere every minute (AMOLED burn-in)
 #endif
+#ifndef FN_PALM_LOCK
+#define FN_PALM_LOCK 0
+#endif
 #ifndef FN_WAKE_TAP
 #define FN_WAKE_TAP 1
 #define FN_WAKE_RAISE 1
 #define FN_WAKE_BTN 1
 #endif
-enum { FN_NOTHING, FN_SCREEN_OFF, FN_LOCK, FN_AMBIENT };  // what a button does
+enum { FN_NOTHING, FN_SCREEN_OFF, FN_LOCK, FN_AMBIENT, FN_HOME };  // what a button does
 #define PW_AWAKE 180        // the panel awake: HaloWatch's default brightness
 #define PW_AOD_SCALE 0.95f  // Always On and dark: everything 5 % smaller
 #define PW_LISTEN_S 3       // locked: awake this long after a wake-up, for the button's long press
@@ -74,7 +76,7 @@ static uint32_t pw_motion;
 static int pw_sent = -1;      // the brightness last sent to the panel
 static HaloView pw_view;      // the whole interface's view on the way to Always On
 static bool pw_locked;
-static int pw_lock_btn;       // the button that locked: 1 — BOOT, 2 — PWR (its long press unlocks)
+static int pw_lock_btn;       // what locked: 0 — palm, 1 — BOOT or shade, 2 — PWR
 static uint32_t pw_lock_ms;   // locked then: a long press of that same press does not unlock
 static HaloSpring pw_lock;    // 0 — unlocked, 1 — locked: the lock at the top fades and grows in
 static uint32_t pw_shake_at;  // touched while locked then: the lock wiggles
@@ -84,6 +86,9 @@ static volatile bool pw_cmd_sleep, pw_cmd_wake;
 static volatile int pw_aod_on = FN_AOD, pw_idle_s = FN_AOD_IDLE, pw_aod_level = FN_AOD_BRIGHT, pw_aod_home = FN_AOD_HOME;
 static volatile int pw_aod_shift = FN_AOD_SHIFT;
 static volatile int pw_boot = FN_BOOT, pw_pwr = FN_PWR;
+#ifdef HALO_ROUND
+static volatile bool pw_palm_lock = FN_PALM_LOCK;
+#endif
 static int pw_boot_fn() {  // (settings.h: Display's hint)
   return pw_boot;
 }
@@ -138,20 +143,63 @@ static void pw_lock_set(bool on, int btn) {
   LOG("%s\n", on ? "locked" : "unlocked");
 }
 
+#ifdef HALO_ROUND
+static void pw_locked_display(bool on) {
+  pw_mode = on ? PW_AOD : PW_DARK;
+  pw_to_aod = pw_aod_way = on;
+  halo_spring_set(pw_amb, 1);
+  if (on) {
+    halo_wake();
+    face_still(true);
+    fc_check = true;
+    if (pw_aod_home) halo_nav_home_now();
+  }
+  halo_display_on(on);
+  LOG("locked display: %s\n", on ? "on" : "off");
+}
+#endif
+
 // A button pressed (1 — BOOT, 2 — PWR; held — its long press) with what it does
 static void pw_button(int btn, int fn, bool held, int64_t now) {
-  if (pw_locked) {  // only the long press of the button that locked (a new press, not the one that locked): back
+  if (fn == FN_HOME && !held && (!pw_locked || btn == 2)) {
+    halo_nav_home_now();
+    if (!pw_locked) pw_wake(0);
+    return;
+  }
+  if (pw_locked) {
+#ifdef HALO_ROUND
+    if (btn == 1) {
+      if (held) pw_lock_set(false, 0), pw_wake(0);
+      else {
+        pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+        pw_locked_display(!halo_display_is_on());
+      }
+      return;
+    }
+#endif
     if (held && btn == pw_lock_btn && halo_ms() - pw_lock_ms > HALO_BOOT_LONG_MS + 300) pw_lock_set(false, 0), pw_wake(0);
     else if (!held) pw_shake_at = halo_ms() | 1, pw_listen_us = now + PW_LISTEN_S * 1000000ll;
     return;
   }
   if (held) return;
-  if (pw_mode == PW_AOD || pw_mode == PW_DARK) {  // asleep: a press only wakes — if buttons do (Wake up)
+  bool asleep = pw_mode == PW_AOD || pw_mode == PW_DARK;
+#ifdef HALO_ROUND
+  // The round BOOT press is complete by release, so it can lock directly from an idle or dark screen.
+  asleep = asleep && !(btn == 1 && fn == FN_LOCK);
+#endif
+  if (asleep) {  // asleep: a press only wakes — if buttons do (Wake up)
     if (pw_wake_btn) pw_wake(0);
     return;
   }
   if (fn == FN_LOCK) {  // into Always On, locked — from anywhere (from dark too: the panel on, straight to its level)
     pw_lock_set(true, btn);
+#ifdef HALO_ROUND
+    if (pw_mode == PW_DARK) {
+      pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+      pw_locked_display(true);
+      return;
+    }
+#endif
     if (!halo_display_is_on()) halo_display_on(true);
     if (pw_mode != PW_AOD) pw_aod_way = true, pw_fade(true);
   } else if (fn == FN_SCREEN_OFF) {
@@ -171,6 +219,25 @@ static void power_tick(float dt) {
   if (f.down || moved || settings_busy()) pw_active_us = now;  // touched, moved, recording or playing — not idle
   pw_motion = halo_motion_count();
   uint8_t w = halo_woke();
+#ifdef HALO_ROUND
+  const bool boot_locks = pw_boot == FN_LOCK;
+  const bool boot = halo_boot_short(pw_locked || boot_locks);
+  if (w == HALO_WAKE_BOOT && (pw_locked || boot_locks)) {
+    pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+    w = 0;  // wait for the short or long press before changing display state
+  }
+#else
+  const bool boot = halo_boot_click();
+#endif
+  const bool boot_held = halo_boot_long();
+#ifdef HALO_ROUND
+  if (halo_take_palm() && pw_palm_lock && !pw_locked) {
+    halo_finger = {};
+    pw_lock_set(true, 0);
+    pw_locked_display(false);
+    return;  // the cover takes priority over other input in the same frame
+  }
+#endif
   if (pw_cmd_wake) {  // as a touch: asleep — wake, fading out — back, awake — idle from now
     pw_cmd_wake = false, pw_active_us = now;
     if (!w && (pw_mode == PW_AOD || pw_mode == PW_DARK)) w = PW_WAKE_CMD;
@@ -182,7 +249,6 @@ static void power_tick(float dt) {
     if (pw_locked) pw_listen_us = now + PW_LISTEN_S * 1000000ll;
     else pw_wake(4), w = 0;
   }
-  const bool boot = halo_boot_click(), boot_held = halo_boot_long();
   const uint8_t pwr = halo_pwr_event();
   if (halo_finger_blocked() && pw_locked) pw_shake_at = halo_ms() | 1, pw_listen_us = now + PW_LISTEN_S * 1000000ll;
   if (boot || boot_held) pw_button(1, pw_boot, boot_held, now);
@@ -221,8 +287,8 @@ static void power_tick(float dt) {
       }
       break;
     case PW_DARK:
-      if (w && pw_wakes(w)) pw_wake(w);
-      else if (w && !halo_asleep()) pw_sleep();  // (a way that is off: back to sleep)
+      if (w && !pw_locked && pw_wakes(w)) pw_wake(w);
+      else if ((w || pw_locked) && !halo_asleep() && now >= pw_listen_us) pw_sleep();
       break;
   }
   pw_cmd_sleep = false;  // sent while already asleep — it must not put the board back to sleep right after it wakes
@@ -280,6 +346,9 @@ static void power_build() {  // after halo_begin: the motion sensor is on its I2
   halo_command("idle", [](const char *a) { pw_idle_s = max(0, atoi(a)), LOG("idle: %d s\n", pw_idle_s); });
   halo_command("sleep", [](const char *) { pw_cmd_sleep = true; });
   halo_command("wake", [](const char *) { pw_cmd_wake = true; });
+  halo_command("power", [](const char *) {
+    LOG("power: %s, display %s\n", pw_locked ? "locked" : "unlocked", halo_display_is_on() ? "on" : "off");
+  });
 }
 
 #if HAS_SHADE

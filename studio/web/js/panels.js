@@ -1763,9 +1763,8 @@ function wakeGroup() {
   })));
 }
 
-// What a button does: nothing, the screen off, Always On (the button again — back), Always On locked (its long press —
-// back)
 const PRESS = [['none', 'Nothing'], ['off', 'Screen off'], ['aod', 'Always On'], ['lock', 'Lock']];
+if (ROUND) PRESS.push(['home', 'Clock']);
 function pressOf(id) {
   const now = () => (fnOf(id).on ? fnOf(id).act : 'none');
   const buttons = PRESS.map(([v, t]) => {
@@ -1787,7 +1786,9 @@ function fnProps(id) {
     // as on the board (and on Try's bezel): PWR above, BOOT under it
     return [head(ICON.buttons, 'Buttons', 'Function', toggle(f.on, (on) => setRow(id, on), 'Buttons')),
       lacks('pwr') ? null : h('div', { class: 'group' }, h('h3', {}, 'PWR'), pressOf('pwr')),
-      h('div', { class: 'group' }, h('h3', {}, 'BOOT'), pressOf('boot'))];
+      h('div', { class: 'group' }, h('h3', {}, 'BOOT'), pressOf('boot')),
+      ROUND ? h('div', { class: 'switch-row' }, h('label', {}, FUNCTIONS.palm.name),
+        toggle(fnOf('palm').on, (on) => setFn('palm', { on }, { structure: true }), FUNCTIONS.palm.name)) : null];
   }
   const f = fnOf(id), set = (v) => { setFn(id, v, { structure: true }); };
   const parts = [head(ICON[id], f.name, 'Function', toggle(f.on, (on) => set({ on }), f.name))];

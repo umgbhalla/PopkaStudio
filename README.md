@@ -146,6 +146,11 @@ mkdir -p projects
 cp -n examples/mumbai-full-watch.json projects/mumbai-full-watch.json
 ```
 
+Press **PWR** to return to the clock. Press **BOOT** to lock the watch.
+While locked, press **BOOT** to toggle the display or hold it for one second to unlock.
+Cover the screen with your palm while unlocked to lock it and turn the display off.
+You can change these settings under **System > Buttons**.
+
 To go back to the firmware that was on the board, use the copy from **Save its firmware** (`studio/backups/`,
 with `restore.txt`), or see [Waveshare's examples](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75C) for
 the factory demo.

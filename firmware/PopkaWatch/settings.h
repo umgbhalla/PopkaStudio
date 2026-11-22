@@ -127,6 +127,7 @@ static const char *dp_hint_text() {  // what BOOT does (the editor's Buttons): 1
     case 1: return "Press BOOT to turn the screen off";
     case 2: return "Press BOOT to lock";
     case 3: return "Press BOOT for Always On";
+    case 4: return "Press BOOT to return to the clock";
   }
   return "";
 }

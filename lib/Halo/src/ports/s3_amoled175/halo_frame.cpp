@@ -650,25 +650,48 @@ bool halo_display_is_on() {
 // (дребезг контактов — короче кадра). Команда boot — то же нажатие из порта. Держат дольше HALO_BOOT_LONG_MS — ещё и
 // долгое (halo_boot_long), и у нажатия, которым её разбудили, тоже
 static bool boot_swallow;  // BOOT разбудила плату (halo_power.cpp): это нажатие уже «засчитано»
-static bool boot_down, boot_long_done = true;
+static bool boot_down, boot_long_done = true, boot_report_release, boot_release_long;
 static uint32_t boot_down_ms;
 
 void hf_swallow_boot() {
   boot_swallow = true;
 }
 
-bool halo_boot_click() {
+static bool boot_poll(bool on_release, bool count_wake) {
   static uint8_t hist = 0xFF;
   hist = hist << 1 | (gpio_get_level(GPIO_NUM_0) ? 1 : 0);
-  if (boot_cmd) return boot_cmd = false, true;
-  if (boot_swallow) boot_swallow = false, boot_down = true, boot_down_ms = millis(), boot_long_done = false;
-  if (!boot_down && (hist & 3) == 0) return boot_down_ms = millis(), boot_long_done = false, boot_down = true;
-  if (boot_down && (hist & 3) == 3) boot_down = false, boot_long_done = true;
-  return false;
+  bool click = boot_cmd;
+  boot_cmd = false;
+  if (boot_swallow || (!boot_down && (hist & 3) == 0)) {
+    boot_report_release = on_release && (!boot_swallow || count_wake);
+    click |= !on_release && !boot_swallow;
+    boot_swallow = false;
+    boot_down = true;
+    boot_down_ms = millis();
+    boot_long_done = false;
+  }
+  if (boot_down && (hist & 3) == 3) {
+    if (!boot_long_done && on_release) {
+      boot_release_long = millis() - boot_down_ms >= HALO_BOOT_LONG_MS;
+      click |= boot_report_release && !boot_release_long;
+    }
+    boot_down = false;
+    boot_long_done = true;
+  }
+  return click;
+}
+
+bool halo_boot_click() {
+  return boot_poll(false, false);
+}
+
+bool halo_boot_short(bool count_wake) {
+  return boot_poll(true, count_wake);
 }
 
 bool halo_boot_long() {
   if (boot_long_cmd) return boot_long_cmd = false, true;
+  if (boot_release_long) return boot_release_long = false, true;
   if (boot_long_done || !boot_down || millis() - boot_down_ms < HALO_BOOT_LONG_MS) return false;
   return boot_long_done = true;
 }
