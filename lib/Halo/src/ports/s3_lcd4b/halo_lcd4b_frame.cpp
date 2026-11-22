@@ -212,9 +212,18 @@ static void helper_task(void *) {
 static uint16_t *volatile shot_buf;
 static volatile bool shot_req, shot_ready, bench_ring_req;
 
+// A band for a whole frame drawn by one core (bench): in internal memory, as a real frame's band — or, when that has
+// no 15 KB block left (Wi-Fi up), in PSRAM; tried again on every call until it is there
+static uint16_t *band_tmp() {
+  static uint16_t *tmp;
+  if (!tmp) tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!tmp) tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_SPIRAM);
+  return tmp;
+}
+
 static void render_full(uint16_t *dst, bool swap) {  // dst — the whole screen, in PSRAM
   // Пачка — во внутренней памяти, как у настоящего кадра: иначе замер bench врёт (запись в PSRAM медленная)
-  static uint16_t *tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  uint16_t *const tmp = band_tmp();
   if (!tmp) return;
   const HaloBand saved = hb;
   for (int y = 0; y < HALO_H; y += HALO_ROWS) {
@@ -501,7 +510,8 @@ static void cmd_shot(const char *) {
 
 // bench ring — одно кольцо (r 100, толщина 20) во внутреннюю пачку в разных вариантах: тактов на пиксель кольца
 static void bench_ring() {
-  static uint16_t *tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  uint16_t *const tmp = band_tmp();
+  if (!tmp) return (void)LOG("bench: no memory for a band\n");
   if (!tmp) return;
   const HaloBand saved = hb;
   const float area = 2 * HALO_PI * 100 * 20;

@@ -210,12 +210,22 @@ static void helper_task(void *) {
 
 // ---------- Скриншот и замер: весь кадр одним ядром в память ----------
 static uint16_t *volatile shot_buf;
-static volatile bool shot_req, shot_ready, bench_ring_req;
+static volatile bool shot_ok, shot_req, shot_ready, bench_ring_req;
 
-static void render_full(uint16_t *dst, bool swap) {  // dst — the whole screen, in PSRAM
+// A band for a whole frame drawn by one core (shot, bench): in internal memory, as a real frame's band — or, when that has
+// no 15 KB block left (Wi-Fi up: ~12 KB the largest), in PSRAM: slower, but the shot is still this frame. Tried again on
+// every call until it is there (a failed static was never retried: every shot after it sent stale PSRAM — 23 Nov 2026)
+static uint16_t *band_tmp() {
+  static uint16_t *tmp;
+  if (!tmp) tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!tmp) tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_SPIRAM);
+  return tmp;
+}
+
+static bool render_full(uint16_t *dst, bool swap) {  // dst — the whole screen, in PSRAM
   // Пачка — во внутренней памяти, как у настоящего кадра: иначе замер bench врёт (запись в PSRAM медленная)
-  static uint16_t *tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-  if (!tmp) return;
+  uint16_t *const tmp = band_tmp();
+  if (!tmp) return false;
   const HaloBand saved = hb;
   for (int y = 0; y < HALO_H; y += HALO_ROWS) {
     hb = {tmp, y, min(HALO_ROWS, HALO_H - y), 0, HALO_W - 1, 0, HALO_W};
@@ -225,6 +235,7 @@ static void render_full(uint16_t *dst, bool swap) {  // dst — the whole screen
     for (int i = 0; i < hb.rows * HALO_W; i++) dst[y * HALO_W + i] = swap ? __builtin_bswap16(tmp[i]) : tmp[i];
   }
   hb = saved;
+  return true;
 }
 
 // ---------- Задача кадров ----------
@@ -529,7 +540,7 @@ static void frame_task(void *) {
         plan_te = te_now, plan_chase = true;
     }
     if (shot_req) {
-      render_full(shot_buf, true);
+      shot_ok = render_full(shot_buf, true);
       shot_req = false, shot_ready = true;
     }
     if (bench_ring_req) bench_ring(), bench_ring_req = false;
@@ -554,12 +565,14 @@ static void cmd_shot(const char *) {
   shot_ready = false, shot_req = true;
   const uint32_t t0 = millis();
   while (!shot_ready && millis() - t0 < 1000) delay(2);
-  if (shot_ready) hc_send_image(shot_buf, HALO_W, HALO_H);
+  if (shot_ready && shot_ok) hc_send_image(shot_buf, HALO_W, HALO_H);
+  else if (shot_ready) LOG("shot: no memory for a band — no picture\n");  // (not the stale buffer)
 }
 
 // bench ring — одно кольцо (r 100, толщина 20) во внутреннюю пачку в разных вариантах: тактов на пиксель кольца
 static void bench_ring() {
-  static uint16_t *tmp = (uint16_t *)heap_caps_malloc(HALO_ROWS * HALO_W * 2, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  uint16_t *const tmp = band_tmp();
+  if (!tmp) return (void)LOG("bench: no memory for a band\n");
   if (!tmp) return;
   const HaloBand saved = hb;
   const float area = 2 * HALO_PI * 100 * 20;
