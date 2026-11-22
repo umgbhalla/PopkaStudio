@@ -188,6 +188,10 @@ SC_LOOKS = {
     "field": [("GoogleSansFlex.ttf", 30, 40, 'digits "°%-"', "wght=640,ROND=100", None),
               ("GoogleSansFlex.ttf", 30, 40, "digits", "wght=640,ROND=100", None),
               ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA%" digits "-"', "wght=760,ROND=100", None)],
+    # Solar: the numbers at the edge, the day, the weekday
+    "solar": [("GoogleSansFlex.ttf", 19, 26, "digits", "wght=600,ROND=100", None),
+              ("GoogleSansFlex.ttf", 26, 34, "digits", "wght=700,ROND=100", None),
+              ("GoogleSansFlex.ttf", 18, 24, '"SUNMOTEWDHFRIA"', "wght=700,ROND=100", None)],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES}  # what a layer's look may be, by its kind

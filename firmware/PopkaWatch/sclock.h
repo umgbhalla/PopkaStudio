@@ -40,6 +40,7 @@
 #define SC_BEZEL 15
 #define SC_DIVE 16   // a dive bezel: 10..50 on a colored band, dot indices, a date at 3 (Apple's Count Up, our own)
 #define SC_FIELD 17  // hour bars, fine minute ticks, four live subdials (Apple's Meridian, our own)
+#define SC_SOLAR 18  // a glow and a light wedge from 12 to the minute hand (Apple's Solar Analog, our own)
 #ifdef __EMSCRIPTEN__
 #define SC_ON(n) 1
 #else
@@ -92,6 +93,15 @@ struct ScRun {
   float *wave;            // Liquid: the front and the back water line per column
   int wave_x0, wave_n;
   float last_sec;
+  // Solar: the glow's color by the distance from its middle (8-bit R, G, B, a radius a step), the wedge's light by how
+  // far round it is (0..255 of 0 … the hand) — made when its colors or the wedge change
+  uint8_t sol_rgb[3][256], sol_a[256];
+  uint32_t sol_key;
+  // Solar's light as pictures (PSRAM, the whole screen): the one shown and the one being made, a few rows a frame, when
+  // the wedge moves — no frame pays for the per-pixel work, a transition only copies (sol_*)
+  uint16_t *sol_buf[2];
+  float sol_w[2];   // the wedge each picture has (-1 — none yet)
+  int sol_front, sol_y;  // the picture shown; the next row of the one being made (-1 — none being made)
   bool vis;               // seen in the last frame (not: a screen over it, hidden — nothing worked out then)
 };
 
@@ -369,11 +379,129 @@ static int dl_hands(ScRun &c, int nc, float ax, float ay, float R, uint32_t ligh
   return nc;
 }
 
+// ---------- Solar: a glow, and a wedge of light from 12 to the minute hand (drawn per pixel, under everything) ----------
+// atan2 by a polynomial (±0.0015 rad): the wedge's edge is under the minute hand, the rest is a soft ramp
+static inline float sol_atan2(float y, float x) {
+  const float ax = fabsf(x), ay = fabsf(y), mx = fmaxf(ax, ay), mn = fminf(ax, ay), a = mn / (mx + 1e-9f), q = a * a;
+  float r = ((-0.0464964749f * q + 0.15931422f) * q - 0.327622764f) * q * a + a;
+  if (ay > ax) r = 1.57079637f - r;
+  if (x < 0) r = 3.14159274f - r;
+  return y < 0 ? -r : r;
+}
+static const uint8_t SOL_BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+// The band's part of the dial: d[0] ax, d[1] ay, d[2] R, d[3] the wedge's angle (radians from 12), d[4] the glow's middle y,
+// d[5] its reach; light — the wedge's color. Per pixel only lookups, a blend and the dither: the angle and the two
+// distances are worked out every 8 pixels and run straight between (they are smooth there; a step that jumps — near the
+// middle, across 6 o'clock — is worked out pixel by pixel). Measured on the 1.75: 162 ms a whole dial with them per
+// pixel (two roots, an atan, three divisions), now a few times less
+#define SOL_STEP 8
+static inline void sol_at(float dx, float dy, float gdy, float inv_reach, float inv_r, float &an, float &gi, float &rf) {
+  an = sol_atan2(dx, -dy);
+  if (an < 0) an += 2 * HALO_PI;
+  gi = fminf(255, halo_sqrt(dx * dx + gdy * gdy) * inv_reach);
+  rf = fminf(1, halo_sqrt(dx * dx + dy * dy) * inv_r);
+}
+static void sol_draw_bg(const ScRun &c, uint32_t light, float ax, float ay, float R, float wd) {
+  const float gy = ay - 0.3f * R, reach = 1.25f * R;
+  const int lr = light >> 16 & 255, lg = light >> 8 & 255, lb = light & 255;
+  const float inv_w = wd > 0.01f ? 255.0f / wd : 0, inv_reach = 255.0f / reach, inv_r = 1 / R;
+  for (int y = max(hb.y, (int)(ay - R)); y < min(hb.y + hb.rows, (int)(ay + R) + 1); y++) {
+    const float dy = y + 0.5f - ay, half = R * R - dy * dy;
+    if (half <= 0) continue;
+    const float hw = halo_sqrt(half);
+    const int x0 = max(hb.x0, (int)ceilf(ax - hw)), x1 = min(hb.x1, (int)floorf(ax + hw));
+    if (x0 > x1) continue;
+    uint16_t *row = halo_row(y);
+    const uint8_t *t = SOL_BAYER[y & 3];
+    const float gdy = y + 0.5f - gy;
+    float an1, gi1, rf1;
+    sol_at(x0 + 0.5f - ax, dy, gdy, inv_reach, inv_r, an1, gi1, rf1);
+    for (int xs = x0; xs <= x1; xs += SOL_STEP) {
+      const int xe = min(x1 + 1, xs + SOL_STEP), n = xe - xs;
+      const float an0 = an1, gi0 = gi1, rf0 = rf1;
+      sol_at(xe + 0.5f - ax, dy, gdy, inv_reach, inv_r, an1, gi1, rf1);
+      const bool exact = fabsf(an1 - an0) > 0.35f;  // (near the middle, or across 6 o'clock: angle by pixel)
+      const float da = (an1 - an0) / n, dg = (gi1 - gi0) / n, dr = (rf1 - rf0) / n;
+      float an = an0, gi = gi0, rf = rf0;
+      for (int x = xs; x < xe; x++, an += da, gi += dg, rf += dr) {
+        float a_px = an, g_px = gi, r_px = rf;
+        if (exact) sol_at(x + 0.5f - ax, dy, gdy, inv_reach, inv_r, a_px, g_px, r_px);
+        const int g8 = (int)g_px;
+        int r = c.sol_rgb[0][g8], g = c.sol_rgb[1][g8], b = c.sol_rgb[2][g8];
+        if (a_px <= wd) {  // the wedge: clockwise from 12 up to the hand, brighter toward the hand and the edge
+          const int A = c.sol_a[min(255, (int)(a_px * inv_w))] * (77 + (int)(178 * r_px)) >> 8;
+          r += (lr - r) * A >> 8, g += (lg - g) * A >> 8, b += (lb - b) * A >> 8;
+        }
+        const int th = t[x & 3];  // (dithered to 565: r·31·16/255 ≈ r·497/256, g·63·16/255 ≈ g·1012/256)
+        const int r5 = min(31, ((r * 497 >> 8) + th) >> 4), g6 = min(63, ((g * 1012 >> 8) + th) >> 4),
+                  b5 = min(31, ((b * 497 >> 8) + th) >> 4);
+        row[x] = HALO_PX(r5 << 11 | g6 << 5 | b5);
+      }
+    }
+  }
+}
+
+// The pictures: made in place (the layer's own middle, scale 1) a few rows at a time into the back one; shown — the
+// front one through the view (copied as it is in place, nearest pixel when scaled: in a transition)
+#define SOL_ROWS 8  // rows a frame (~1 s for a whole picture)
+static bool sol_alloc(ScRun &c) {
+  for (auto &b : c.sol_buf)
+    if (!b) {
+#ifdef __EMSCRIPTEN__
+      b = (uint16_t *)malloc(HALO_W * HALO_H * 2);
+#else
+      b = (uint16_t *)heap_caps_malloc(HALO_W * HALO_H * 2, MALLOC_CAP_SPIRAM);
+#endif
+      if (!b) return false;
+    }
+  return true;
+}
+static void sol_make_rows(ScRun &c, int back, int y0, int y1, uint32_t light, float ax, float ay, float R, float wd) {
+  const HaloBand saved = hb;
+  for (int y = y0; y < y1; y += HALO_ROWS) {
+    const int rows = min(HALO_ROWS, y1 - y);
+    hb = {c.sol_buf[back] + y * HALO_W, y, rows, 0, HALO_W - 1, 0, HALO_W};
+    memset(hb.buf, 0, rows * HALO_W * 2);
+    sol_draw_bg(c, light, ax, ay, R, wd);
+  }
+  hb = saved;
+}
+static void sol_blit(const ScRun &c, float bax, float bay) {  // the front picture into this band, through c.d's view
+  const uint16_t *pic = c.sol_buf[c.sol_front];
+  if (!pic || c.sol_w[c.sol_front] < 0) return;
+  const float sax = c.d[0], say = c.d[1], s = c.d[2] / c.d[6], R = c.d[2];
+  const int y0 = max(hb.y, (int)(say - R)), y1 = min(hb.y + hb.rows - 1, (int)(say + R));
+  const bool same = fabsf(s - 1) < 1e-4f && fabsf(sax - bax) < 1e-3f && fabsf(say - bay) < 1e-3f;
+  const float inv = 1 / s;
+  for (int y = y0; y <= y1; y++) {
+    const int sy = same ? y : (int)((y + 0.5f - say) * inv + bay);
+    if (sy < 0 || sy >= HALO_H) continue;
+    const float dy = y + 0.5f - say, half = R * R - dy * dy;
+    if (half <= 0) continue;
+    const float hw = halo_sqrt(half);
+    const int x0 = max(hb.x0, (int)ceilf(sax - hw)), x1 = min(hb.x1, (int)floorf(sax + hw));
+    if (x0 > x1) continue;
+    const uint16_t *src = pic + sy * HALO_W;
+    uint16_t *dst = halo_row(y);
+    if (same) {
+      memcpy(dst + x0, src + x0, (x1 - x0 + 1) * 2);
+      continue;
+    }
+    int32_t sx = (int32_t)(((x0 + 0.5f - sax) * inv + bax) * 65536);
+    const int32_t step = (int32_t)(inv * 65536);
+    for (int x = x0; x <= x1; x++, sx += step) {
+      const int i = sx >> 16;
+      if ((unsigned)i < (unsigned)HALO_W) dst[x] = src[i];
+    }
+  }
+}
+
 // ---------- Built once a change (face_layer_build) ----------
 static void sc_layer_free(FaceRun &R) {
   ScRun *c = R.sc;
   if (!c) return;
   free(c->mir), free(c->mir_bits), free(c->wave), free(c->rowp), free(c->full), free(c->full_bits);
+  free(c->sol_buf[0]), free(c->sol_buf[1]);
   c->~ScRun();
   free(c);
   R.sc = nullptr;
@@ -389,6 +517,7 @@ static ScRun *sc_new() {
   ScRun *c = new (p) ScRun();
   for (auto &k : c->cap) k.o[4] = -1, k.a = 0;
   c->sec_shown = -1, c->last_sec = -1;
+  c->sol_w[0] = c->sol_w[1] = -1, c->sol_y = -1;
   return c;
 }
 static void sc_roll(HaloRoll &r, const HaloFont *f, int align, bool tabular) {
@@ -517,6 +646,7 @@ static void sc_layer_build(const FaceScreen &S, int i) {
       break;
     case SC_DIVE:
     case SC_FIELD:
+    case SC_SOLAR:
       c->g[0] = sc_mid(L.font), c->g[1] = sc_mid(L.font2), c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI");
       c->g[3] = sc_mid(L.font4, "\xEF\x83\x97");
       break;
@@ -562,6 +692,7 @@ static void sc_texts(const FaceLayer &L, FaceRun &R, bool animate) {
       case SC_HANDS:
       case SC_DIVE:
       case SC_FIELD:
+      case SC_SOLAR:
         break;
       default:
         halo_roll_set(R.roll, fc_time, animate);
@@ -1141,6 +1272,86 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       break;
     }
 #endif
+#if SC_ON(SC_SOLAR)
+    case SC_SOLAR: {
+      // color — the glow (its hue: bright in the middle above center, deep at the edge); color2 — the wedge's light;
+      // color3 — the lines, the numbers, the hands' core. The wedge runs from 12 to the minute hand: the hour's progress
+      const float R = 233 * k;
+      const struct tm &t = sc_tm;
+      const float q = 0.5f;  // (the wedge moves by half a degree — every 5 s; its picture is made over ~1 s meanwhile)
+      const float want = floorf((t.tm_min + sc_sec / 60) * 6 / q) * q * (HALO_PI / 180);
+      const float hq = 0.5f / (R * 0.5f) * (180 / HALO_PI);
+      const float ha = floorf(((t.tm_hour % 12) + t.tm_min / 60.0f + sc_sec / 3600) * 30 / hq) * hq;
+      // The glow and the wedge's ramp: made again when the colors change
+      const uint32_t key = L.color * 31 + L.color2;
+      const bool fresh = c.sol_key != key;
+      if (fresh) {
+        const uint32_t mid = L.color, edge = sc_mix(L.color, 0x000000, 0.93f);  // (dark mode: deep at the edge)
+        for (int i = 0; i < 256; i++) {
+          const float u = i / 255.0f, e = u * u * (3 - 2 * u);  // (smoothstep: bright core, a long soft fall)
+          const uint32_t col = sc_mix(mid, edge, e);
+          c.sol_rgb[0][i] = col >> 16 & 255, c.sol_rgb[1][i] = col >> 8 & 255, c.sol_rgb[2][i] = col & 255;
+          c.sol_a[i] = (uint8_t)(215 * powf(u, 1.5f));  // (dark at 12, brightest at the hand: a saturated light, never white)
+        }
+        halo_damage_all();
+      }
+      // The light's pictures: none yet — the first made at once; the wedge moved — the next made a few rows a frame,
+      // shown when whole. The minute hand goes with the picture shown, so its edge is always under the hand
+      if (sol_alloc(c)) {
+        if (c.sol_w[c.sol_front] < 0 || c.sol_key != key) {
+          sol_make_rows(c, c.sol_front, 0, HALO_H, L.color2, ax, ay, R, want);
+          c.sol_w[c.sol_front] = want, c.sol_y = -1, c.sol_key = key;
+        } else if (c.sol_y < 0 && c.sol_w[c.sol_front] != want) {
+          c.sol_y = 0, c.sol_w[!c.sol_front] = want;
+        }
+        if (c.sol_y >= 0) {
+          const int back = !c.sol_front, y1 = min(HALO_H, c.sol_y + SOL_ROWS);
+          sol_make_rows(c, back, c.sol_y, y1, L.color2, ax, ay, R, c.sol_w[back]);
+          c.sol_y = y1 < HALO_H ? y1 : -1;
+          if (c.sol_y < 0) c.sol_front = back;  // (whole: shown from this frame)
+        }
+      }
+      const float wedge = c.sol_w[c.sol_front] >= 0 ? c.sol_w[c.sol_front] : want, ma = wedge * (180 / HALO_PI);
+      const float sax = halo_view_x(v, ax), say = halo_view_y(v, ay), sR = R * v.s;
+      if (c.d[3] != wedge || c.d[0] != sax || c.d[1] != say || c.d[2] != sR)  // (the picture or its place changed)
+        halo_damage_f(sax - sR, say - sR, sax + sR, say + sR);
+      c.d[0] = sax, c.d[1] = say, c.d[2] = sR, c.d[3] = wedge, c.d[6] = R, c.d[7] = ax, c.d[8] = ay;
+      sc_ob = false;  // (everything lies on the glow: blend)
+      const int dial = n;
+      int nc = 0;
+      const uint32_t light = L.color3;
+      for (int j = 0; j < 60; j++) {  // the minute ticks at the edge, the 12 long hour lines
+        float x0, y0, x1, y1;
+        if (j % 5) {
+          dl_at(ax, ay, j * 6, R * 0.935f, x0, y0), dl_at(ax, ay, j * 6, R * 0.97f, x1, y1);
+          sc_cap(c, nc++, x0, y0, x1, y1, 0.8f * k, light, a * 0.55f, v);
+        } else {
+          dl_at(ax, ay, j * 6, R * 0.42f, x0, y0), dl_at(ax, ay, j * 6, R * 0.8f, x1, y1);
+          sc_cap(c, nc++, x0, y0, x1, y1, 1.3f * k, light, a * 0.85f, v);
+        }
+      }
+      const int ticks = nc;
+      for (int j = 1; j <= 12; j++) {  // 05 … 60 at the edge
+        snprintf(c.txt[j - 1], 8, "%02d", j * 5);
+        float x, y;
+        dl_at(ax, ay, j * 30, R * 0.875f, x, y);
+        dl_text(c.it[n++], L.font, c.txt[j - 1], x, y, c.g[0], 1, light, a * 0.9f, v, nullptr);
+      }
+      strlcpy(c.txt[12], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[13], 8, "%d", sc_tm.tm_mday);
+      dl_text(c.it[n++], L.font3, c.txt[12], ax - 4 * k, ay - R * 0.3f, c.g[2], 2, light, a * 0.8f, v, nullptr);
+      dl_text(c.it[n++], L.font2, c.txt[13], ax + 4 * k, ay - R * 0.3f, c.g[1], 0, light, a, v, nullptr);
+      // The hands: lume — a light core in an outline of the glow's hue, a neck; soft shadows
+      const uint32_t rim = sc_mix(L.color, 0xFFFFFF, 0.25f);
+      nc = dl_hand(c, nc, ax, ay, ha, R * 0.12f, R * 0.5f, R * 0.07f, R * 0.016f, rim, light, true, a, v);
+      nc = dl_hand(c, nc, ax, ay, ma, R * 0.12f, R * 0.86f, R * 0.062f, R * 0.016f, rim, light, true, a, v);
+      sc_cap(c, nc++, ax, ay, ax, ay, R * 0.03f, light, a, v);
+      sc_cap(c, nc++, ax, ay, ax, ay, R * 0.013f, rim, a, v);
+      c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
+      sc_hide_caps(c, nc);
+      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      break;
+    }
+#endif
 #if SC_ON(SC_BEZEL)
     case SC_BEZEL: {
       // the minute scale (color3) turns so that the minute is under the marker (color2); the hour (color) in the middle
@@ -1469,9 +1680,11 @@ static void sc_draw(const FaceScreen &S, int i) {
       sc_draw_flip(L, c);
       break;
 #endif
-#if SC_ON(SC_DIVE) || SC_ON(SC_FIELD)
+#if SC_ON(SC_DIVE) || SC_ON(SC_FIELD) || SC_ON(SC_SOLAR)
     case SC_DIVE:
-    case SC_FIELD: {  // the dial, its ticks, the complications, the hands (dl_*: the order)
+    case SC_FIELD:
+    case SC_SOLAR: {  // the dial, its ticks, the complications, the hands (dl_*: the order); Solar — its light under all
+      if ((int)L.p2 == SC_SOLAR && c.a > 0.004f) sol_blit(c, c.d[7], c.d[8]);
       const int dial = (int)c.d[10], ticks = (int)c.d[11];
       sc_draw_items(c, 0, dial);
       for (int j = 0; j < ticks && j < c.ncap; j++) sc_cap_draw(c.cap[j]);

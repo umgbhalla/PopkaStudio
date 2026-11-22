@@ -390,7 +390,7 @@ static void over_views(HaloView &vf, HaloView &vo) {
   const float q = over_q.x, lift = 0.25f * over_pull.x;
 #ifdef HALO_ROUND
   if (home_return && home_corner) {
-    vf = home_corner_view(q), vo = home_corner_view(q - 1);
+    vf = home_corner_view(-q), vo = home_corner_view(1 - q);  // (back the way it came: the screen to the upper right)
     over_cover.alpha = 0;
     return;
   }
@@ -838,9 +838,11 @@ void halo_nav_update(float dt) {
       v_face = id, v_home = v_top = hidden;
 #ifdef HALO_ROUND
     } else if (sheet_corner_open || (home_return && home_corner)) {
-      const float direction = sheet_corner_open ? -1 : 1;
-      v_face = home_corner_view(direction * p);
-      const HaloView apps = home_corner_view(direction * (p - 1));
+      // The power button: open — Apps comes in from the upper right, the face leaves to the lower left; back — the same
+      // path backwards (the user's word, 23 Nov 2026: back left to right): Apps leaves to the upper right, the face
+      // comes back from the lower left. One direction for both, p going 0 → 1 to open and 1 → 0 to go back
+      v_face = home_corner_view(-p);
+      const HaloView apps = home_corner_view(1 - p);
       for (HaloView *v : {&v_home, &v_top}) view_under(*v, apps), v->over = false;
 #endif
     } else if (p >= 0.9995f) {
