@@ -118,13 +118,14 @@ void halo_list_reset(HaloList &l) {
   layout(l, l.scroll);
 }
 
-void halo_list_update(HaloList &l, float dt, bool take_touch) {
+void halo_list_update(HaloList &l, float dt, bool take_touch, bool clamp_top) {
   HaloFinger &f = halo_finger;
   const float mn = fminf(l.top, halo_list_min(l));
   if (f.pressed) l.flinging = false;  // ленту, летящую по инерции, палец останавливает
   if (f.drag_start && !f.horiz && take_touch && halo_finger_claim(&l)) {
     // Взяли ленту за краем (она отскакивает) — продолжить «резину» с того же места, без скачка
-    l.g_start = l.scroll > l.top ? l.top + rubber_inv(l.scroll - l.top) : l.scroll < mn ? mn + rubber_inv(l.scroll - mn) : l.scroll;
+    l.g_start = l.scroll > l.top ? l.top + (clamp_top ? 0 : rubber_inv(l.scroll - l.top))
+                               : l.scroll < mn ? mn + rubber_inv(l.scroll - mn) : l.scroll;
     l.g_ref = f.y, l.back_on = false;
     // Сама лента поедет со следующего кадра, но экран откликается уже в этом (индикатор прокрутки проявляется,
     // подпись стадии меняется): этот кадр тоже вслед за проходом. Иначе он шёл впереди, а следующий — вслед, и он
@@ -132,10 +133,10 @@ void halo_list_update(HaloList &l, float dt, bool take_touch) {
     halo_heavy();
   }
   if (f.owner == &l) {
+    const float raw = l.g_start + f.y - l.g_ref;
     if (f.down) {  // ведём пальцем — ровно за ним, за краями — резина
-      const float raw = l.g_start + f.y - l.g_ref;
-      l.scroll = raw > l.top ? l.top + halo_rubber(raw - l.top) : raw < mn ? mn + halo_rubber(raw - mn) : raw;
-    } else if (f.released) {
+      l.scroll = raw > l.top ? l.top + (clamp_top ? 0 : halo_rubber(raw - l.top)) : raw < mn ? mn + halo_rubber(raw - mn) : raw;
+    } else if (f.released && !(clamp_top && raw > l.top)) {
       l.fling_v = f.vy, l.flinging = true;
     }
   }

@@ -1053,7 +1053,16 @@ static HaloScreen level(int d, uint8_t home) {
 
 // The gallery — lib/Halo's main screen (none — the face is alone: a swipe up on it leads nowhere)
 static void gallery_begin() {
-  if (nav_scr[0] > 0 && nav_scr[0] < face_scr_n) halo_nav_begin(level(0, 0));  // to the face — down from the top edge
+  if (nav_scr[0] <= 0 || nav_scr[0] >= face_scr_n) return;
+  HaloScreen gallery = level(0, 0);
+#ifdef HALO_ROUND
+  gallery.main_list = []() -> const HaloList * {
+    const int i = nav_scr[0];
+    const GalRun *g = i > 0 && i < face_scr_n ? face_scr[i].gal : nullptr;
+    return g && g->list.n ? &g->list : nullptr;
+  };
+#endif
+  halo_nav_begin(gallery);
 }
 
 // A tap on a card or on the button (gal_update, the frame before): open its screen over the one it is on — as HaloWatch

@@ -494,7 +494,8 @@ struct HaloList {
 void halo_list_init(HaloList &l, const float *heights, int n, float top, float bottom, bool header = false);
 void halo_list_reset(HaloList &l);  // в начало и на месте (без инерции и доводки), раскладка — сразу
 // В update после halo_finger_update. take_touch — можно ли ленте забирать вертикальный жест
-void halo_list_update(HaloList &l, float dt, bool take_touch = true);
+// clamp_top reserves a drag past the top for the parent screen.
+void halo_list_update(HaloList &l, float dt, bool take_touch = true, bool clamp_top = false);
 static inline float halo_list_min(const HaloList &l) {
   return l.bottom - l.total;
 }
@@ -592,6 +593,7 @@ struct HaloScreen {
   // Жест с этого экрана (главного или открытого на нём) на циферблат (halo_nav_face) — под то, как экран движется:
   // HALO_HOME_*; 0 — свайп вниз от верхнего края
   uint8_t home;
+  const HaloList *(*main_list)() = nullptr;  // root list whose downward drag continues onto the face
 };
 enum : uint8_t {
   HALO_HOME_DOWN = 1,  // свайп вниз от верхнего края: всё уходит вниз (списки — как у ленты галереи)

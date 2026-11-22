@@ -97,7 +97,7 @@ static bool nav_moving; // в прошлом кадре шёл переход (h
 
 // Циферблат под всем
 static HaloScreen face;
-static bool has_face, sheet_drag;
+static bool has_face, sheet_drag, sheet_list_drag;
 static bool has_main;  // был halo_nav_begin: с циферблата есть куда уйти свайпом вверх (без него циферблат — один)
 static bool sheet_in;  // переход к главному (уходит циферблат); false — к циферблату
 static bool main_seen;  // главный был виден с тех пор, как пришли на циферблат (по приходе — закрыть и в начало)
@@ -161,7 +161,7 @@ void halo_nav_begin(const HaloScreen &h) {
   if (has_main) {  // главный меняют: прежний и открытые на нём — спрятать, на циферблат
     for (int d = depth; d >= 0; d--)
       if (scr[d].layout) scr[d].layout({0, 0, 1, 0});
-    depth = 0, view = V_HOME, back_drag = sheet_drag = main_seen = false;
+    depth = 0, view = V_HOME, back_drag = sheet_drag = sheet_list_drag = main_seen = false;
     if (has_face) halo_spring_set(sheet, 0), halo_spring_set(sheet_pull, 0);
   }
   scr[0] = h, has_main = h.layout != nullptr;
@@ -245,7 +245,7 @@ void halo_nav_back_zone(float x) {
 }
 
 bool halo_nav_at_home() {  // главный на месте или уже доезжает к нему (отпустили) и виден
-  return view == V_HOME && (!has_face || (!sheet_drag && sheet.target == 1 && sheet.x > 0.5f));
+  return view == V_HOME && (!has_face || (!sheet_drag && !sheet_list_drag && sheet.target == 1 && sheet.x > 0.5f));
 }
 
 int halo_nav_depth() {
@@ -446,7 +446,7 @@ void halo_nav_home_now() {
   over_drag = over_closing = false;
   if (has_face) {
     if (sheet.x > 0 || sheet.target > 0) main_seen = true;
-    sheet_drag = false;
+    sheet_drag = sheet_list_drag = false;
     halo_spring_set(sheet, 0), halo_spring_set(sheet_pull, 0);
     face_arrived();  // открытое на главном — закрыть, главный — с начала
   }
@@ -480,14 +480,16 @@ static bool sheet_update(float dt) {
   }
   const bool up = sheet.target > 0.5f;
   const bool here = view == V_HOME || view == V_TOP;  // не посреди перехода Android 16 между ними
+  const HaloList *list = up && view == V_HOME && scr[0].main_list ? scr[0].main_list() : nullptr;
   // Вверх по циферблату (откуда угодно); с главного или открытого на нём экрана — его жест. Sideways (halo_nav_side):
   // to the left anywhere on the face; back from the main itself — also to the right from the left edge (a screen opened
   // on the main has that gesture as its own back: top_frame)
-  if (f.drag_start && here && !sheet_drag) {
+  if (f.drag_start && here && !sheet_drag && !sheet_list_drag) {
     float dir = 0;
     bool ax = false;
     if (!f.horiz) {
-      dir = up ? home_gesture(f) : !nav_side && f.y < f.y0 ? 1 : 0;
+      if (up) dir = list ? 0 : home_gesture(f);
+      else if (!nav_side && f.y < f.y0) dir = 1;
     } else if (nav_side) {
       ax = up ? view == V_HOME && f.x > f.x0 && f.x0 < back_zone : f.x < f.x0;
       dir = ax ? 1 : 0;
@@ -507,7 +509,7 @@ static bool sheet_update(float dt) {
     }
   }
   if (cmd_face >= 0) {
-    if (here && !sheet_drag) {
+    if (here && !sheet_drag && !sheet_list_drag) {
       if (sheet.x == sheet.target) {  // с места; в пути — тот же переход вперёд или назад
         sheet_in = cmd_face == 1;
         sheet_ax = nav_side;  // (sideways — by a command too)
@@ -539,7 +541,22 @@ static bool sheet_update(float dt) {
 #endif
     }
   }
-  if (!sheet_drag) {
+  // The root list keeps the gesture. Only movement beyond its top moves the sheet, so reversing the drag scrolls again.
+  const bool list_owns = list && !sheet_drag && f.owner == list && (f.down || f.released);
+  const float pull = list_owns ? fmaxf(0, list->g_start + f.y - list->g_ref - list->top) : 0;
+  if (list_owns && (pull > 0 || sheet_list_drag)) {
+    if (!sheet_list_drag) sheet_g0 = sheet.x;
+    sheet_in = sheet_ax = false;
+    sheet_dir = 1;
+    sheet.x = halo_clamp01(sheet_g0 - pull / OVER_TRAVEL);
+    sheet.v = pull > 0 ? -f.vy / OVER_TRAVEL : 0;
+    if (f.released) {
+      const bool dismiss = f.vy >= -700 && (pull > OVER_TRAVEL / 3 || (pull > 24 && f.vy > 700));
+      sheet.target = dismiss ? 0 : 1;
+    }
+  }
+  sheet_list_drag = f.down && pull > 0;
+  if (!sheet_drag && !sheet_list_drag) {
 #ifndef HALO_ROUND
     // Прямоугольник: остаток пути — по времени (своя доля SH_S) и кривой Material standard, без пружины и её хвоста
     if (sh_restart || sheet.target != sh_tgt) sh_x0 = sheet.x, sh_t = 0, sh_tgt = sheet.target, sh_restart = false;

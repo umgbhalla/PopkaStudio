@@ -208,7 +208,7 @@ static void gal_update(FaceScreen &S, float dt, int depth) {
   HaloList &menu = g->list;
   const bool list = menu.n > 0;
   if (list) {
-    halo_list_update(menu, dt);
+    halo_list_update(menu, dt, true, depth == 0);
     // The button: full height at the end of the list, lower — by how far it is from the end (in the rubber past the
     // end — full height)
     g->eb_h.target = gal_eb_height(*g);

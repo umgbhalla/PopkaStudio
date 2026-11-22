@@ -22,6 +22,7 @@ what the watch shows, pixel for pixel — the same fonts, the same animations, t
   motion chip's own pedometer), Display brightness, Battery, a Music player, a voice Recorder, three self-playing
   snake games, and About and Power — live cards about the board itself (processor, memory, battery, temperature,
   sound, motion; voltages).
+  On round boards, scroll to the top of the gallery and keep dragging down in the same gesture to return to the clock.
 - **Pomodoro** (new in 2.6, by [YKatrechko](https://github.com/YKatrechko)) — a focus timer on every board: focus
   intervals and breaks, a long break after every four, Skip, Reset and Auto-start, three beeps when one ends, its own
   settings on the watch. On the round watch the time left runs along a ring at the edge; on a rectangle — along the
@@ -137,6 +138,13 @@ a clock's time or pick a weather city, and the Wi-Fi window lists the networks y
 
 Your projects are saved on your computer (`projects/`). The Wi-Fi password stays on your computer too
 (`studio/secrets/`) and goes only into the firmware it builds.
+
+To open the included AMOLED 1.75C configuration, copy it into the local projects folder and select **Kolkata Full Watch** in the editor.
+
+```bash
+mkdir -p projects
+cp -n examples/kolkata-full-watch.json projects/kolkata-full-watch.json
+```
 
 To go back to the firmware that was on the board, use the copy from **Save its firmware** (`studio/backups/`,
 with `restore.txt`), or see [Waveshare's examples](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75C) for

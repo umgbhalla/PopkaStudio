@@ -232,7 +232,8 @@ FUNCTIONS = {"aod": {"on": False, "idle": 15, "bright": 24, "tap": True, "raise"
 ZONES = {"New York": "EST5EDT,M3.2.0,M11.1.0", "Chicago": "CST6CDT,M3.2.0,M11.1.0", "Denver": "MST7MDT,M3.2.0,M11.1.0",
          "Los Angeles": "PST8PDT,M3.2.0,M11.1.0", "London": "GMT0BST,M3.5.0/1,M10.5.0",
          "Berlin": "CET-1CEST,M3.5.0,M10.5.0/3", "Kyiv": "EET-2EEST,M3.5.0/3,M10.5.0/4", "Moscow": "MSK-3",
-         "Dubai": "<+04>-4", "Tokyo": "JST-9", "Sydney": "AEST-10AEDT,M10.1.0,M4.1.0/3", "UTC": "UTC0"}
+         "Dubai": "<+04>-4", "Kolkata": "IST-5:30", "Tokyo": "JST-9", "Sydney": "AEST-10AEDT,M10.1.0,M4.1.0/3",
+         "UTC": "UTC0"}
 TIME = {"zone": "New York", "h24": False}
 # The weather (the page: state.js CITY, WX_MAX): the cities — the Weather screen's pages (the first one — the face's
 # pill too) — and °C or °F. Open-Meteo: free, no key, the whole world (geocoding — a city's name; a US ZIP — Zippopotam)

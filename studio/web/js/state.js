@@ -273,7 +273,8 @@ export const FUNCTIONS = {
 export const ZONES = [
   ['New York', 'America/New_York'], ['Chicago', 'America/Chicago'], ['Denver', 'America/Denver'],
   ['Los Angeles', 'America/Los_Angeles'], ['London', 'Europe/London'], ['Berlin', 'Europe/Berlin'], ['Kyiv', 'Europe/Kyiv'],
-  ['Moscow', 'Europe/Moscow'], ['Dubai', 'Asia/Dubai'], ['Tokyo', 'Asia/Tokyo'], ['Sydney', 'Australia/Sydney'], ['UTC', 'UTC'],
+  ['Moscow', 'Europe/Moscow'], ['Dubai', 'Asia/Dubai'], ['Kolkata', 'Asia/Kolkata'], ['Tokyo', 'Asia/Tokyo'],
+  ['Sydney', 'Australia/Sydney'], ['UTC', 'UTC'],
 ];
 export const TIME = { zone: 'New York', h24: false };
 // The project's swipes (project.swipe; idea and first code — dimonmontana, PR #4), on every board: 'up' (none — as before)
