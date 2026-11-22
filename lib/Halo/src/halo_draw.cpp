@@ -34,13 +34,23 @@ struct Paint {  // цвет для одного вызова: в формате 
   const uint16_t *lut;  // маски на сплошном фоне: 16 уровней маски → готовые цвета (nullptr — смешивать)
   int r16, g16, b16;    // точный цвет в уровнях 565 × 16 — для узора
   bool dith;            // цвета нет среди уровней 565: заливка — узором
+  bool gray;            // near-neutral: R, G, B dithered as one — G is always 2 × R's level (no pink, no green)
   int a5;               // полупрозрачная заливка: прозрачность 0..32
   uint32_t fa;          // и цвет × прозрачность в полях 0x07E0F81F, точно (в 1/32 уровня)
 };
 static inline Paint paint(uint32_t rgb, float alpha) {
   Paint P;
   P.r16 = lv5(rgb >> 16 & 255), P.g16 = lv6(rgb >> 8 & 255), P.b16 = lv5(rgb & 255);
-  P.r5 = (P.r16 + 8) >> 4, P.g6 = (P.g16 + 8) >> 4, P.b5 = (P.b16 + 8) >> 4;
+  // A near-neutral gray (its channels within 12 of each other: the list's cards, the panels): one level for all three.
+  // Dithered channel by channel, R and B (5 bits) and G (6 bits) round at different steps — the pattern mixed pink and
+  // green pixels, and as a card's dimming changed frame to frame while the list moved, the tint swung (measured: R−G
+  // ±7 levels, up to 82 % of a card's pixels tinted; 23 Nov 2026)
+  {
+    const int r = rgb >> 16 & 255, g = rgb >> 8 & 255, b = rgb & 255;
+    P.gray = max(r, max(g, b)) - min(r, min(g, b)) <= 12 && (r | g | b);
+    if (P.gray) P.r16 = P.b16 = lv5((r + 2 * g + b) >> 2), P.g16 = 2 * P.r16;
+  }
+  P.r5 = (P.r16 + 8) >> 4, P.g6 = P.gray ? 2 * P.r5 : (P.g16 + 8) >> 4, P.b5 = (P.b16 + 8) >> 4;
   P.c = HALO_PX((P.r5 << 11) | (P.g6 << 5) | P.b5);
   P.A = (int)(halo_clamp01(alpha) * 256 + 0.5f), P.lut = nullptr;
   P.dith = ((P.r16 | P.g16 | P.b16) & 15) != 0;
@@ -58,9 +68,15 @@ static inline void dith_span(uint16_t *row, int y, int x0, int x1, const Paint &
   if (x0 > x1) return;
   const uint8_t *t = BAYER[y & 3];
   uint16_t col[4];
-  for (int i = 0; i < 4; i++)
-    col[i] = HALO_PX(min(31, (P.r16 + t[i]) >> 4) << 11 | min(63, (P.g16 + t[i]) >> 4) << 5 |
-                               min(31, (P.b16 + t[i]) >> 4));
+  for (int i = 0; i < 4; i++) {
+    if (P.gray) {  // (one level for all three: G = 2 R)
+      const int v = min(31, (P.r16 + t[i]) >> 4);
+      col[i] = HALO_PX(v << 11 | (2 * v) << 5 | v);
+    } else {
+      col[i] = HALO_PX(min(31, (P.r16 + t[i]) >> 4) << 11 | min(63, (P.g16 + t[i]) >> 4) << 5 |
+                       min(31, (P.b16 + t[i]) >> 4));
+    }
+  }
   int x = x0;
   if ((uintptr_t)(row + x) & 2) row[x] = col[x & 3], x++;
   const uint32_t w0 = col[x & 3] | (uint32_t)col[(x + 1) & 3] << 16;
