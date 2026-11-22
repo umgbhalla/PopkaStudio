@@ -106,6 +106,7 @@ static bool main_seen;  // главный был виден с тех пор, к
 // back (the rest of the main screen stays its own: the weather's pages, the radio's window). The screens opened on the
 // main keep their back. sheet_ax — the transition in hand runs along x (sheet_dir is 1 then: to the main — leftwards)
 static bool nav_side, sheet_ax;
+static bool nav_bottom_back = true;
 static float sheet_dir = 1;  // 1 — к главному вверх (к циферблату — вниз), −1 — к циферблату вверх (жест снизу)
 static HaloSpring sheet = {1, 0, 1};  // 0 — циферблат, 1 — главный
 static HaloSpring sheet_pull;  // жест на циферблат снизу: насколько тянут, px (точки страниц)
@@ -272,6 +273,10 @@ void halo_nav_side(bool side) {
   nav_side = side;
 }
 
+void halo_nav_bottom_back(bool enabled) {
+  nav_bottom_back = enabled;
+}
+
 void halo_nav_to_face(bool f) {
   cmd_face = f ? 0 : 1;
 }
@@ -317,17 +322,16 @@ static bool over_update(float dt) {
   // не берёт: иначе свайп снизу сразу после «назад» (хотели открыть галерею) хватал его как новый «назад», ставил путь
   // по пальцу как от открытого — и экран погоды на долю секунды показывался снова
   const bool open = over_q.target > 0.5f;
-  if (open && f.drag_start && !f.horiz && f.y < f.y0 && f.y0 > HALO_H - OVER_ZONE && !over_drag &&
+  if (nav_bottom_back && open && f.drag_start && !f.horiz && f.y < f.y0 && f.y0 > HALO_H - OVER_ZONE && !over_drag &&
       halo_finger_claim(&over_owner))
     over_drag = over_closing = true, over_ax = false, over_y0 = f.y;
-  // Sideways (halo_nav_side): back is also a swipe to the right from the left edge, as every screen's (the rest of the
-  // screen is its own: the weather's pages start past it). over_y0 is then the finger's x
-  if (nav_side && open && f.drag_start && f.horiz && f.x > f.x0 && f.x0 < back_zone && !over_drag &&
+  const bool edge_back = nav_side || !nav_bottom_back;
+  if (edge_back && open && f.drag_start && f.horiz && f.x > f.x0 && f.x0 < back_zone && !over_drag &&
       halo_finger_claim(&over_owner))
     over_drag = over_closing = over_ax = true, over_y0 = f.x;
   if (cmd_back) {
     cmd_back = false;
-    if (!over_drag) over_closing = true, over_ax = nav_side, over_q.target = 0;
+    if (!over_drag) over_closing = true, over_ax = edge_back, over_q.target = 0;
   }
   if (over_drag) {
     if (f.down && f.owner == &over_owner) {  // переход — за пальцем
@@ -464,7 +468,7 @@ static float home_gesture(const HaloFinger &f) {
   uint8_t g = scr[depth].home;
   if (!g) g = HALO_HOME_DOWN;
   if (g & HALO_HOME_DOWN && f.y > f.y0 && f.y0 < face_zone) return 1;
-  if (g & HALO_HOME_UP && f.y < f.y0 && f.y0 > HALO_H - OVER_ZONE) return -1;
+  if (nav_bottom_back && (g & HALO_HOME_UP) && f.y < f.y0 && f.y0 > HALO_H - OVER_ZONE) return -1;
   return 0;
 }
 
@@ -513,7 +517,8 @@ static bool sheet_update(float dt) {
       if (sheet.x == sheet.target) {  // с места; в пути — тот же переход вперёд или назад
         sheet_in = cmd_face == 1;
         sheet_ax = nav_side;  // (sideways — by a command too)
-        sheet_dir = !sheet_ax && cmd_face == 0 && view == V_TOP && scr[depth].home == HALO_HOME_UP ? -1 : 1;
+        sheet_dir = nav_bottom_back && !sheet_ax && cmd_face == 0 && view == V_TOP && scr[depth].home == HALO_HOME_UP
+                        ? -1 : 1;
       }
       sheet.target = cmd_face;
     }

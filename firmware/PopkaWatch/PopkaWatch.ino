@@ -3,7 +3,7 @@
 // The home is HaloWatch's face (projects/HaloWatch/face.h), one to one, made of layers — the date, the clock and the
 // weather pill, as many of each as the editor put on the screen, where it put them and as it styled them (face.h); the
 // other screens are made of the same layers and open over the face from a layer with a link, as HaloWatch opens its
-// Weather screen from the pill (Fade; back — a swipe up from the bottom edge). HaloWatch's Weather screen and its
+// Weather screen from the pill (Fade; on the round watch, back from the left edge). HaloWatch's Weather screen and its
 // gallery are layers too (wxscreen.h, gallery.h): the gallery is reached by a swipe up on the face, its cards open
 // their screens with the Android 16 transition (back — a swipe from the left edge). The editor writes layers.h and
 // assets/halo.conf (the fonts and icons at the sizes picked); tools/halo_assets.py makes them into src/halo_assets.*.
@@ -74,6 +74,9 @@ void setup() {
 #endif
   face_build();
   gallery_begin();      // the gallery (if the project has one) — lib/Halo's main screen: a swipe up on the face
+#ifdef HALO_ROUND
+  halo_nav_bottom_back(false);
+#endif
 #ifdef MAIN_SIDE
   halo_nav_side(true);  // (layers.h: the project's swipes sideways — the gallery to the left, back from the left edge)
 #endif

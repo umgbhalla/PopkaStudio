@@ -23,6 +23,7 @@ what the watch shows, pixel for pixel — the same fonts, the same animations, t
   snake games, and About and Power — live cards about the board itself (processor, memory, battery, temperature,
   sound, motion; voltages).
   On round boards, scroll to the top of the gallery and keep dragging down in the same gesture to return to the clock.
+  In an app, swipe right from the left edge to go back to the screen that opened it.
 - **Pomodoro** (new in 2.6, by [YKatrechko](https://github.com/YKatrechko)) — a focus timer on every board: focus
   intervals and breaks, a long break after every four, Skip, Reset and Auto-start, three beeps when one ends, its own
   settings on the watch. On the round watch the time left runs along a ring at the edge; on a rectangle — along the

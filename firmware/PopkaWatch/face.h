@@ -13,9 +13,8 @@
 //
 // Screens: screen 0 is the watch face — the home; the others are made of the same layers and open right over the
 // face, as HaloWatch opens its Weather screen from the pill: a layer of the face with a link (FaceLayer::tap) opens its
-// screen with HaloWatch's transition (halo_nav_face_open: Fade, from the layer's place and size), back — a swipe up
-// from the bottom edge, the same motion mirrored (built into lib/Halo's navigation). A tap on the face anywhere else
-// does nothing.
+// screen with HaloWatch's transition (halo_nav_face_open: Fade, from the layer's place and size). On the round watch,
+// swipe right from the left edge to go back. A tap on the face anywhere else does nothing.
 //
 // Layers that overlap: text over another layer is blended with what is under it (on HaloWatch nothing overlaps, so
 // text is drawn the fast way, as if on black — over the pill that would leave dark edges).
@@ -1079,8 +1078,7 @@ static void gallery_tick() {
   for (int k = 0; k <= d; k++)
     if (to >= 0 && nav_scr[k] == to) return;
   nav_scr[d + 1] = to, nav_stub[d + 1] = L->text;
-  // The gesture to the face from it: one that pages — up from the bottom edge (as Weather), others — both (as Settings)
-  // (on a rectangle lib/Halo opens it with Material's shared axis X: halo_nav.cpp)
+  // Paged screens reserve down-swipes for the screen. Bottom-edge dismissal is disabled on the round watch.
   halo_nav_open(level(d + 1, to >= 0 && (screen_paged(face_scr[to]) || screen_pages(face_scr[to]) > 1) ? HALO_HOME_UP
                                                                                                     : HALO_HOME_BOTH));
 }

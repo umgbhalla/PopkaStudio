@@ -620,6 +620,8 @@ bool halo_nav_on_face();  // виден циферблат (и не едет)
 // by a swipe to the right from the left edge (back_zone) — on the main itself and on a screen right over the face, as
 // every screen's back; the gesture from the edge (down from the top) stays too. The transitions run along x
 void halo_nav_side(bool side);
+// Disable upward dismissal from app screens. Apps opened directly from the face use left-edge back instead.
+void halo_nav_bottom_back(bool enabled);
 void halo_nav_to_face(bool face);  // на циферблат / на главный экран (как команды face, face off; с главного или открытого на нём)
 // Экран прямо поверх циферблата (нажали на его элемент — плашку погоды): переход fx из элемента с центром (x, y) и
 // размером w×h. Назад — свайп вверх от нижнего края (начат ниже H − 70): переход идёт за пальцем, отпустили на трети

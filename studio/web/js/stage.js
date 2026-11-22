@@ -3,8 +3,8 @@
 //          stays in the middle (no panning there), only the zoom changes;
 //   Map  — every screen of the project, each drawn by its own copy of the board's code, and the links between them:
 //          one blue curve per link, as Figma's prototype connections (a dot at the layer, an arrow at the screen it
-//          opens; the way back — a swipe up from its bottom edge to the face, or from the left edge to the gallery — is
-//          the same link), and one from the face to the gallery (a swipe up, a swipe down back); pan and zoom; a screen is grabbed whole (by its name or anywhere on it) — its layers are edited in Edit.
+//          opens; the same link shows where Back returns), and one from the face to the gallery.
+//          Pan and zoom; a screen is grabbed whole (by its name or anywhere on it) — its layers are edited in Edit.
 // A part of the gallery is placed by its list: it is selected, not moved (a selected one the list scrolls to); a
 // title or a card is dragged up or down to another place in the list (a line shows where it goes), and a new one
 // dropped onto a list goes in where it was dropped.
@@ -218,8 +218,8 @@ export class Stage {
   }
   // ---------- Edit: back and forward between screens, as on the board ----------
   // Back — where the board's back goes from this screen: the screen whose layer opens it (the one just come from, if it
-  // is one of those — the swipe from the left edge), the face from the gallery and from what the face opens (the swipe
-  // up from the bottom edge: home), the face too from a screen nothing opens; from the face itself — nowhere. Forward —
+  // is one of those), the face from the gallery and from what the face opens, and the face from an unlinked screen.
+  // Forward —
   // the screen left by Back; going anywhere else forgets it (as a browser's)
   backOf(s) {
     if (!s || s === home()) return null;

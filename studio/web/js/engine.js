@@ -7,7 +7,7 @@
 //
 // The map has one copy of the engine per screen, pinned to it (studio_pin: the screen at rest, as the navigation shows
 // it when its transition is over) — and a screen with pages (the Weather screen's cities) one per page (studio_page). Try has one more, not pinned: it runs the sketch as the board does — the face, a tap
-// on a layer with a link, HaloWatch's transition, back with a swipe up from the bottom edge; the gallery (a swipe up on
+// on a layer with a link, HaloWatch's transition, back from the left edge on the round watch; the gallery (a swipe up on
 // the face), its cards, the Android 16 transition, back with a swipe from the left edge.
 import { BOARD, TW, TH, ROUND, lacks } from './screen.js';
 import { state, KIND_INDEX, FX, KINDS, ICONS, TAPS, RADIO_LINKED, fnOf, timeOf, zoneShift, citiesOf, weatherOf, CLOCK_LOOKS, clockLook, WXLOOKS, swipeSide } from './state.js';
