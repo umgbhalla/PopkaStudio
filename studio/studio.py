@@ -197,6 +197,10 @@ SC_LOOKS = {
                    ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=700,ROND=100", None),
                    ("GoogleSansFlex.ttf", 16, 22, '"SUNMOTEWDHFRIA"', "wght=760,ROND=100", None),
                    ("fa-solid-900.ttf", 92, 120, "0xf0d7", "", None)],  # (the caret: the heaviest mark, as California's)
+    # Chrono: the band's 1-12, the date's day, the small words and numbers on the subdials
+    "chrono": [("GoogleSansFlex.ttf", 28, 38, "digits", "wght=640,ROND=100", None),
+               ("GoogleSansFlex.ttf", 22, 30, "digits", "wght=700,ROND=100", None),
+               ("GoogleSansFlex.ttf", 13, 18, '"SUNMOTEWDHFRIA" digits', "wght=760,ROND=100", None)],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES}  # what a layer's look may be, by its kind

@@ -139,6 +139,7 @@ export const CLOCK_LOOKS = [
   ['field', 'Field', ['#F2F2F2', '#A8C7FA', '#FAFAFA'], ['Light', 'Accent', 'Containers'], 3],
   ['solar', 'Solar', ['#1E3BE0', '#6F8CFF', '#FFFFFF'], ['Glow', 'Light', 'Lines and hands'], 3],
   ['california', 'California', ['#FF5A4E', '#FF5A4E', '#F5F5F5'], ['Numerals', 'Accent', 'Hands'], 4],
+  ['chrono', 'Chrono', ['#9E2B25', '#E5392F', '#F3EFE8'], ['Band', 'Accent', 'Light'], 3],
 ];
 export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK_LOOKS[0];
 // What a live card or a device screen shows (device.h: DV_CPU …)

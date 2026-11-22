@@ -42,6 +42,7 @@
 #define SC_FIELD 17  // hour bars, fine minute ticks, four live subdials (Apple's Meridian, our own)
 #define SC_SOLAR 18  // a glow and a light wedge from 12 to the minute hand (Apple's Solar Analog, our own)
 #define SC_CALIF 19  // Roman over Arabic numerals, a caret at 12, pills (Apple's California, our own)
+#define SC_CHRONO 20  // a colored bezel band with 1-12, three light subdials (Apple's Chronograph Pro, our own)
 #ifdef __EMSCRIPTEN__
 #define SC_ON(n) 1
 #else
@@ -641,6 +642,7 @@ static void sc_layer_build(const FaceScreen &S, int i) {
     case SC_FIELD:
     case SC_SOLAR:
     case SC_CALIF:
+    case SC_CHRONO:
       c->g[0] = sc_mid(L.font, look == SC_CALIF ? "XIV4578" : "0123456789"), c->g[1] = sc_mid(L.font2);
       c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI");
       c->g[3] = sc_mid(L.font4, "\xEF\x83\x97");
@@ -689,6 +691,7 @@ static void sc_texts(const FaceLayer &L, FaceRun &R, bool animate) {
       case SC_FIELD:
       case SC_SOLAR:
       case SC_CALIF:
+      case SC_CHRONO:
         break;
       default:
         halo_roll_set(R.roll, fc_time, animate);
@@ -1394,6 +1397,79 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       break;
     }
 #endif
+#if SC_ON(SC_CHRONO)
+    case SC_CHRONO: {
+      // color — the bezel band; color2 — the accent (the subdials' hands, the pivot); color3 — the light (numerals,
+      // ticks, the subdials' faces, the hands). The band from 0.62 R to the edge with 1-12 on it and sixty ticks at its
+      // rim; three light subdials (running seconds at 9, the battery at 3, the date at 6) with dark marks
+      const float R = 228 * k, sr = R * 0.165f, sd = R * 0.31f;
+      const uint32_t light = L.color3, acc = L.color2, ink = 0x1C1B1F;
+      HaloItem &band = c.it[n++];
+      dl_ring(band, ax, ay, R * 0.81f, R * 0.38f, 1, L.color, 0, a, v);
+      float sx[3], sy[3];
+      HaloItem *dsc[3];
+      for (int j = 0; j < 3; j++) {  // 9, 3, 6
+        dl_at(ax, ay, j == 0 ? 270 : j == 1 ? 90 : 180, sd, sx[j], sy[j]);
+        dsc[j] = &c.it[n++];
+        sc_circle(*dsc[j], sx[j], sy[j], sr, light, a, v);
+        dsc[j]->on_black = true;
+        halo_view_commit(*dsc[j], v);
+      }
+      sc_ob = false;
+      const int dial = n;
+      int nc = 0;
+      for (int j = 0; j < 60; j++) {  // the band's rim ticks
+        const bool big = j % 5 == 0;
+        float x0, y0, x1, y1;
+        dl_at(ax, ay, j * 6, R * (big ? 0.925f : 0.95f), x0, y0), dl_at(ax, ay, j * 6, R * 0.985f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, (big ? 1.4f : 0.8f) * k, light, a * (big ? 1 : 0.7f), v);
+      }
+      for (int j = 0; j < 12; j++) {  // the running seconds' ticks (9)
+        float x0, y0, x1, y1;
+        dl_at(sx[0], sy[0], j * 30, sr * (j % 3 ? 0.74f : 0.62f), x0, y0), dl_at(sx[0], sy[0], j * 30, sr * 0.86f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, (j % 3 ? 0.7f : 1.2f) * k, ink, a, v);
+      }
+      {
+        float x0, y0, x1, y1;
+        dl_at(sx[0], sy[0], sc_sec * 6, -sr * 0.15f, x0, y0), dl_at(sx[0], sy[0], sc_sec * 6, sr * 0.8f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, 1.2f * k, acc, a, v);
+        sc_cap(c, nc++, sx[0], sy[0], sx[0], sy[0], 3 * k, acc, a, v);
+      }
+      // the battery (3): a hand from empty to full over a scale of 0-100 at the top, as a chronograph's register
+      const HaloBattery b = halo_battery();
+      const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
+      for (int j = 0; j <= 10; j++) {
+        float x0, y0, x1, y1;
+        const float an = -120 + j * 24;
+        dl_at(sx[1], sy[1], an, sr * (j % 5 ? 0.74f : 0.64f), x0, y0), dl_at(sx[1], sy[1], an, sr * 0.86f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, (j % 5 ? 0.7f : 1.2f) * k, ink, a, v);
+      }
+      {
+        float x0, y0, x1, y1;
+        const float an = -120 + 240 * pct / 100.0f;
+        dl_at(sx[1], sy[1], an, -sr * 0.15f, x0, y0), dl_at(sx[1], sy[1], an, sr * 0.78f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, 1.2f * k, acc, a, v);
+        sc_cap(c, nc++, sx[1], sy[1], sx[1], sy[1], 3 * k, acc, a, v);
+      }
+      const int ticks = nc;
+      for (int h = 1; h <= 12; h++) {  // 1-12 on the band
+        snprintf(c.txt[h - 1], 8, "%d", h);
+        float x, y;
+        dl_at(ax, ay, h * 30, R * 0.79f, x, y);
+        dl_text(c.it[n++], L.font, c.txt[h - 1], x, y, c.g[0], 1, light, a, v, &band);
+      }
+      snprintf(c.txt[12], 8, "%d", pct);
+      dl_text(c.it[n++], L.font3, c.txt[12], sx[1], sy[1] + sr * 0.48f, c.g[2], 1, ink, a, v, dsc[1], 1);
+      strlcpy(c.txt[13], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[14], 8, "%d", sc_tm.tm_mday);
+      dl_text(c.it[n++], L.font3, c.txt[13], sx[2], sy[2] - sr * 0.42f, c.g[2], 1, acc, a, v, dsc[2], DL_TRACK);
+      dl_text(c.it[n++], L.font2, c.txt[14], sx[2], sy[2] + sr * 0.14f, c.g[1], 1, ink, a, v, dsc[2]);
+      nc = dl_hands(c, nc, ax, ay, R, light, 0x000000, acc, R * 0.5f, R * 0.86f, a, a, v);
+      c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
+      sc_hide_caps(c, nc);
+      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      break;
+    }
+#endif
 #if SC_ON(SC_BEZEL)
     case SC_BEZEL: {
       // the minute scale (color3) turns so that the minute is under the marker (color2); the hour (color) in the middle
@@ -1722,11 +1798,12 @@ static void sc_draw(const FaceScreen &S, int i) {
       sc_draw_flip(L, c);
       break;
 #endif
-#if SC_ON(SC_DIVE) || SC_ON(SC_FIELD) || SC_ON(SC_SOLAR) || SC_ON(SC_CALIF)
+#if SC_ON(SC_DIVE) || SC_ON(SC_FIELD) || SC_ON(SC_SOLAR) || SC_ON(SC_CALIF) || SC_ON(SC_CHRONO)
     case SC_DIVE:
     case SC_FIELD:
     case SC_SOLAR:
-    case SC_CALIF: {  // the dial, its ticks, the complications, the hands (dl_*: the order); Solar — its light under all
+    case SC_CALIF:
+    case SC_CHRONO: {  // the dial, its ticks, the complications, the hands (dl_*: the order); Solar — its light under all
       if ((int)L.p2 == SC_SOLAR && c.a > 0.004f) sol_blit(c, c.d[7], c.d[8]);
       const int dial = (int)c.d[10], ticks = (int)c.d[11];
       sc_draw_items(c, 0, dial);
