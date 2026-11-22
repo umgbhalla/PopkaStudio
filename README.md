@@ -139,11 +139,11 @@ a clock's time or pick a weather city, and the Wi-Fi window lists the networks y
 Your projects are saved on your computer (`projects/`). The Wi-Fi password stays on your computer too
 (`studio/secrets/`) and goes only into the firmware it builds.
 
-To open the included AMOLED 1.75C configuration, copy it into the local projects folder and select **Kolkata Full Watch** in the editor.
+To open the included AMOLED 1.75C configuration, copy it into the local projects folder and select **Mumbai Full Watch** in the editor.
 
 ```bash
 mkdir -p projects
-cp -n examples/kolkata-full-watch.json projects/kolkata-full-watch.json
+cp -n examples/mumbai-full-watch.json projects/mumbai-full-watch.json
 ```
 
 To go back to the firmware that was on the board, use the copy from **Save its firmware** (`studio/backups/`,

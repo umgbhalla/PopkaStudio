@@ -1177,8 +1177,8 @@
   "zone": "Kolkata",
   "h24": true
  },
- "name": "Kolkata Full Watch",
- "rev": 3,
+ "name": "Mumbai Full Watch",
+ "rev": 4,
  "functions": {
   "wifi": {
    "on": true
@@ -1201,12 +1201,6 @@
  "weather": {
   "units": "C",
   "cities": [
-   {
-    "name": "Kolkata",
-    "where": "West Bengal, India",
-    "lat": 22.56263,
-    "lon": 88.36304
-   },
    {
     "name": "Mumbai",
     "where": "Maharashtra, India",
