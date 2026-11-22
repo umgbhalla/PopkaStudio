@@ -290,6 +290,12 @@ export const swipeWords = () => (swipeOf() === 'side' ? 'a swipe to the left' : 
 export function setSwipe(v) {
   change((p) => { p.swipe = v === 'side' ? 'side' : 'up'; }, { structure: true });
 }
+// Swipe to switch watch faces (firmware face.h): the saved faces go to the watch too — a swipe from the side edge of the
+// face switches between the home and them (studio.py extra_faces). On unless turned off
+export const faceSwipeOn = () => state.project?.faceSwipe !== false;
+export function setFaceSwipe(v) {
+  change((p) => { p.faceSwipe = !!v; }, { structure: true });
+}
 export const timeOf = () => ({ ...TIME, ...(state.project.time || {}) });
 export function setTime(values) {
   change((p) => { p.time = { ...timeOf(), ...values }; }, { structure: true });

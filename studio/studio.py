@@ -785,6 +785,37 @@ def clean_screens(project):
     return out or [{"id": "face", "name": "Watch face", "layers": []}]
 
 
+FACE_MAX = 8  # face.h: the watch faces a firmware switches between (the home and the saved ones)
+
+
+def face_swipe(project):
+    """Swipe to switch watch faces ("faceSwipe", on by default): the board gets the project's saved faces too."""
+    return project.get("faceSwipe", True) is not False
+
+
+def extra_faces(project, screens):
+    """The saved faces (Watch faces → Saved) the board switches to by a swipe from the side edge, as screens after the
+    project's own: [] — off, or none saved. Not the one the home is now (it is the home); links kept only to the
+    project's screens; the quick settings panel is the home's (one panel)."""
+    if not face_swipe(project):
+        return []
+    home = next((raw for raw in project.get("screens", []) if isinstance(raw, dict)), {})
+    ids = {scr["id"] for scr in screens}
+    out = []
+    for f in project.get("faces") or []:
+        if not isinstance(f, dict) or home.get("face") == "saved:" + str(f.get("id")):
+            continue
+        layers = []
+        for layer in map(clean_layer, (f.get("layers") or [])[:MAX_LAYERS]):
+            if not layer or layer["type"] == "shade":
+                continue
+            if layer["tap"] and layer["tap"].get("to") not in ids:
+                layer["tap"] = None
+            layers.append(layer)
+        out.append({"id": "face:" + str(f.get("id")), "name": str(f.get("name") or "Watch face"), "layers": layers})
+    return out[:FACE_MAX - 1]
+
+
 def clean_functions(project):
     """The project's Functions, checked; missing ones — FUNCTIONS."""
     raw = project.get("functions") if isinstance(project.get("functions"), dict) else {}
@@ -1575,8 +1606,10 @@ def live_shape(project, screens):
     """What only a Load brings for the whole watch: the screens and their order, the gallery, the Functions, the clock,
     the cities — 8 hex digits (LIVE_SHAPE)."""
     side = [1] if main_side(project) else []  # (only when sideways: a project without it keeps the number it had)
+    # (the saved faces the board switches to: only a Load brings them — only when there are some, as side)
+    faces = [[scr["id"] for scr in extra_faces(project, screens)]] if extra_faces(project, screens) else []
     return live_hash([[scr["id"] for scr in screens], main_index(project, screens), clean_functions(project),
-                      clean_time(project), clean_weather(project)] + side, 8)
+                      clean_time(project), clean_weather(project)] + side + faces, 8)
 
 
 # ---------- The board sketch from a project ----------
@@ -1595,8 +1628,13 @@ def write_sketch(project, folder, meta=None):
     lacks = set(passport(project.get("board")).get("without", []))  # (the round board: no Video — it needs the P4)
     for scr in screens:
         scr["layers"] = [layer for layer in scr["layers"] if not layer["hidden"] and layer["type"] not in lacks]
+    own = screens  # (the project's own: Live knows only these)
+    extra = extra_faces(project, own)
+    for scr in extra:
+        scr["layers"] = [layer for layer in scr["layers"] if not layer["hidden"] and layer["type"] not in lacks]
+    screens = own + extra
     index = {scr["id"]: i for i, scr in enumerate(screens)}
-    main = main_index(project, screens)
+    main = main_index(project, own)
     os.makedirs(os.path.join(folder, "assets"), exist_ok=True)
     if os.path.abspath(folder) != os.path.abspath(FIRMWARE):
         for name in ("PopkaWatch.ino", "face.h", "weather.h", "wxscreen.h", "gallery.h", "wxscreen_rect.h", "gallery_rect.h", "player_rect.h", "recorder_rect.h", "settings_rect.h", "device_rect.h", "game_dots_rect.h", "power.h", "steps.h", "stars.h",
@@ -1662,6 +1700,10 @@ def write_sketch(project, folder, meta=None):
          f"#define MAIN_SCREEN {main} // the gallery: a swipe up on the face (-1 — none)"]
     if main_side(project):  # (only then: a project without it builds the same sketch)
         h.append("#define MAIN_SIDE 1 // the swipes sideways: the gallery to the left, back from the left edge")
+    if extra:  # (only then: a project without saved faces builds the same sketch)
+        faces = [0] + [len(own) + i for i in range(len(extra))]
+        h += [f"#define FACE_N {len(faces)} // the watch faces a swipe from the side edge switches (face.h)",
+              f"static const int8_t FACE_LIST[FACE_N] = {{{', '.join(map(str, faces))}}};"]
     fn = clean_functions(project)
     radio = any(layer["type"] == "radio" or layer["type"] in RADIO_PARTS or layer["type"] in dict(RADIO_SCREENS) for layer in all_layers)
     wifi = fn["wifi"]["on"] or radio  # (the Radio brings Wi-Fi along — and Bluetooth goes: both don't fit)
@@ -1753,9 +1795,9 @@ def write_sketch(project, folder, meta=None):
     # Live (live.h): what this firmware has — for the page to send each layer's numbers to its place and to tell what
     # only a Load brings: the shape; each screen's id and its layers' ids, kinds and keys (live_key)
     live_map = ";".join(f"{scr['id']}=" + ",".join(f"{layer['id']}:{KINDS[layer['type']]}:{live_key(layer, i == 0, rect)}"
-                                                   for layer in scr["layers"]) for i, scr in enumerate(screens))
+                                                   for layer in scr["layers"]) for i, scr in enumerate(own))
     h += ["// Live (live.h): what this firmware has, for the editor's Live to check its project against",
-          f"#define LIVE_SHAPE {c_string(live_shape(project, screens))}", f"#define LIVE_MAP {c_string(live_map)}"]
+          f"#define LIVE_SHAPE {c_string(live_shape(project, own))}", f"#define LIVE_MAP {c_string(live_map)}"]
     for i, scr in enumerate(screens):
         h += ["", f"// {scr['name']}" + (" — the home" if i == 0 else ""), f"static FaceLayer screen{i}_layers[] = {{"]
         for layer in scr["layers"]:

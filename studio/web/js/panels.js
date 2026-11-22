@@ -9,7 +9,7 @@ import {
   pagesOf, pageName, weatherPaged,
   LISTED, listed, moveInList, newLayer, FACE_SCREEN, FUNCTIONS, fnOf, setFn, ZONES, timeOf, setTime, citiesOf, unitsOf,
   setWeather, WX_MAX, moveCity, isGallery, galleryFor, SECTIONS, sectionParts, sectionPart, addSection, addAbout, DEVS, SECTION_PATH, titleOf, subGallery, keepHead, gamesGallery, newList, stepsSet, STEP_FAMILY,
-  savedFaces, saveFace, removeFace, faceLayers, SWIPES, swipeOf, setSwipe, swipeWords,
+  savedFaces, saveFace, removeFace, faceLayers, SWIPES, swipeOf, setSwipe, swipeWords, faceSwipeOn, setFaceSwipe,
   roomFor, relayClock, relaySizes, WXW, wxLooksOf, FACE_PRESETS, FOUR_SIDES, CURVES, INFOS, PIXEL_ART, SHADE_LOOKS, CLOCK_LOOKS, clockLook,
   RADIO_PARTS, isRadio, allowedOn, RADIO_LINKED, radioTarget,
 } from './state.js';
@@ -270,7 +270,7 @@ const fits = (key) => (SCREEN_CARDS[key] ? allowed('screens', SCREEN_CARDS[key].
 const itemsOf = (cat) => cat.items.filter(fits);
 const itemsOf_some = (cat) => itemsOf(cat).length > 0;
 const shelfCats = (stage, id) => SHELVES[id].map((cat) => saved_(id, cat)
-  ? { cat, n: savedFaces().length, tiles: () => [...savedFaces().map((f) => onWatch(savedFaceCard(stage, f), home().face === 'saved:' + f.id ? [home().name] : [])), addFaceCard(stage)] }
+  ? { cat, n: savedFaces().length, tiles: () => [faceSwipeRow(stage), ...savedFaces().map((f) => onWatch(savedFaceCard(stage, f), home().face === 'saved:' + f.id ? [home().name] : [])), addFaceCard(stage)] }
   : { cat, n: itemsOf(cat).length, tiles: () => itemsOf(cat).map((key, i) => tile(stage, key, i)) })
   .filter((c) => !BOARD.layers || saved_(id, c.cat) || c.n);
 const folderCount = (id) => SHELVES[id].reduce((n, cat) => n + (saved_(id, cat) ? savedFaces().length : itemsOf(cat).length), 0);
@@ -590,6 +590,14 @@ function savedFaceCard(stage, f) {
   b.append(del);
   b.addEventListener('click', () => { toHomeFace(stage, 'saved:' + f.id); });
   return b;
+}
+// Swipe to switch: the saved faces go to the watch too; a swipe from the side edge of the face switches them (face.h)
+function faceSwipeRow(stage) {
+  const on = faceSwipeOn(), n = 1 + savedFaces().filter((f) => home().face !== 'saved:' + f.id).length;
+  const words = !on ? 'Swipe to switch faces: off' : n > 1 ? `Swipe from the side edge: ${n} faces on the watch` : 'Swipe to switch faces: save a face to add one';
+  return h('div', { class: 'face-swipe', style: 'grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 2px 2px 8px; font-size: 12px',
+    title: 'The watch gets the home and the saved faces: a swipe from the left or the right edge of the face switches them' },
+  toggle(on, (v) => { setFaceSwipe(v); renderPalette(stage); }, 'Swipe to switch faces'), h('span', {}, words));
 }
 // Add: the watch face now saved as a new one — first its name (one is offered); Enter saves, Esc or a click away — not
 function addFaceCard(stage) {

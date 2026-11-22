@@ -284,6 +284,35 @@ static int face_over = -1;  // the screen open over the face now
 #define NAV_LEVELS 5        // the gallery and up to 4 screens over it (lib/Halo: NAV_MAX)
 static int nav_scr[NAV_LEVELS] = {MAIN_SCREEN, -1, -1, -1, -1};  // the screen on each level (0 — the gallery); -1 — a stub
 
+// ---------- Several watch faces: a swipe from the side edge switches them (as Apple's "Swipe to switch") ----------
+// layers.h (the editor: the project's saved faces) lists the screens that are watch faces, in order: FACE_LIST, the
+// first is screen 0, the home. Without it — one face. On the face, a swipe from the left or the right edge drags the
+// neighbor in under the finger (left — the next one, right — the one before); let go past a third or flung — it comes,
+// else back. Past the first and the last — rubber. The face shown is kept in flash: the board starts on it.
+#ifndef FACE_N
+#define FACE_N 1
+static const int8_t FACE_LIST[1] = {0};
+#endif
+#define FACE_MAX 8
+static int8_t face_ids[FACE_MAX] = {0};
+static int face_n = 1, fc_face;  // the faces (screens), the one shown (an index of face_ids)
+static HaloSpring fs_off;        // the switch now: -1..1 faces from the shown one (+ — toward the next)
+static HaloSpringK K_FSWITCH;
+static bool fs_drag;
+static float fs_x0, fs_g0;
+static char fs_owner;            // (halo_finger_claim's: the swipe is the face switch's)
+static int fs_other = -1;        // the neighbor on screen with the shown face in this frame (-1 — none)
+static bool fs_laid[FACE_MAX];   // laid out in the last frame (one no longer on screen — hidden once)
+static int fs_cmd = -1;          // the command faces N: go there
+static inline int face_cur() {
+  return fc_face < face_n && face_ids[fc_face] < face_scr_n ? face_ids[fc_face] : 0;
+}
+static inline bool face_is(int s) {  // screen s is a watch face (it is never opened over the face)
+  for (int i = 0; i < face_n; i++)
+    if (face_ids[i] == s) return true;
+  return s == 0;
+}
+
 #ifdef HALO_ROUND
 // HaloWatch's place of each kind: the date and the clock are centered on the screen by their middle (the clock — by
 // its colon), the pill — by its center
@@ -560,6 +589,7 @@ static bool face_layer_rebuild(const FaceLayer &was, const FaceLayer &L) {
          was.k != L.k || was.p != L.p || (L.kind == FL_CURVE && was.p3 != L.p3);
 }
 
+static void face_switch_build();  // (below, with the switch)
 static void face_build() {
   K_ICON = halo_spring(0.5f, 0.7f);  // the icon pops with a visible overshoot
   K_PAGER = halo_spring(HALO_M3_PAGER);
@@ -572,6 +602,7 @@ static void face_build() {
 #endif
   for (int k = 0; k < face_scr_n; k++)
     for (int i = 0; i < face_scr[k].n; i++) face_layer_build(face_scr[k], i);
+  face_switch_build();
   gal_build();
 #if HAS_STARS
   stars_commands();
@@ -582,8 +613,71 @@ static void face_build() {
   halo_command("day", [](const char *) { fc_cmd_shift = 86400; });
 }
 
+static Preferences fs_prefs;
+static void face_switch_save() {
+  fs_prefs.putUChar("cur", fc_face), fs_prefs.putUChar("n", face_n);
+}
+// The faces from layers.h (the screens there — checked), the one kept in flash
+static void face_switch_build() {
+  K_FSWITCH = halo_spring(HALO_M3_PAGER);
+  face_n = 0;
+  for (int i = 0; i < FACE_N && face_n < FACE_MAX; i++)
+    if (FACE_LIST[i] >= 0 && FACE_LIST[i] < face_scr_n) face_ids[face_n++] = FACE_LIST[i];
+  if (!face_n) face_ids[0] = 0, face_n = 1;
+  fs_prefs.begin("faces", false);
+  // (another set of faces flashed since — from the first one)
+  fc_face = fs_prefs.getUChar("n", 0) == face_n ? min((int)fs_prefs.getUChar("cur", 0), face_n - 1) : 0;
+  // faces — the list (the shown one marked); faces N — slide to face N (as the swipe does, one step a time; further — at once)
+  halo_command("faces", [](const char *a) {
+    if (*a) return (void)(fs_cmd = atoi(a));
+    for (int i = 0; i < face_n; i++) LOG("%c %d %s\n", i == fc_face ? '*' : ' ', i, face_scr[face_ids[i]].name ? face_scr[face_ids[i]].name : "");
+  });
+}
+// Every frame: the edge swipe on the face, the spring, landing on the neighbor
+static void face_switch_tick(float dt) {
+  HaloFinger &f = halo_finger;
+  if (face_cur() != face_ids[fc_face]) fc_face = 0;  // (the editor's page: its own screens)
+  if (fs_cmd >= 0) {
+    const int to = constrain(fs_cmd, 0, face_n - 1);
+    fs_cmd = -1;
+    if (to != fc_face && !fs_drag) {
+      if (abs(to - fc_face) == 1 && halo_nav_on_face()) fs_off.target = to - fc_face, halo_heavy();
+      else fc_face = to, halo_spring_set(fs_off, 0), face_switch_save(), halo_damage_all();
+    }
+  }
+  if (face_n > 1 && f.drag_start && f.horiz && (f.edge == HALO_EDGE_LEFT || f.edge == HALO_EDGE_RIGHT) &&
+      halo_nav_on_face() && !halo_asleep() && halo_finger_claim(&fs_owner)) {
+    fs_drag = true, fs_x0 = f.x, fs_g0 = fs_off.x;
+    halo_heavy();  // the whole screen moves from this frame on
+  }
+  if (fs_drag) {
+    if (f.down && f.owner == &fs_owner) {
+      const float lo = fc_face > 0 ? -1 : 0, hi = fc_face + 1 < face_n ? 1 : 0;
+      float o = fs_g0 + (fs_x0 - f.x) / W;
+      if (o > hi) o = hi + halo_rubber((o - hi) * W) / W;  // (past the last one: rubber)
+      else if (o < lo) o = lo + halo_rubber((o - lo) * W) / W;
+      fs_off.x = o, fs_off.v = -f.vx / W;
+      return;
+    }
+    fs_drag = false;
+    const float o = fs_off.x, v = fs_off.v;  // faces, faces a second
+    int to = fabsf(o) > 0.33f ? (o > 0 ? 1 : -1) : 0;
+    if (fabsf(v) > 0.9f && fabsf(o) > 0.02f) to = v > 0 ? 1 : -1;  // flung (~420 px/s on the round watch)
+    if ((to > 0 && fc_face + 1 >= face_n) || (to < 0 && fc_face == 0)) to = 0;
+    fs_off.target = to;
+  }
+  if (fs_off.x == fs_off.target && fs_off.v == 0 && fs_off.target == 0) return;
+  halo_spring_run(fs_off, K_FSWITCH, dt);
+  if (fs_off.target != 0 && fs_off.x == fs_off.target) {  // there: the neighbor is the face now
+    fc_face += (int)fs_off.target;
+    halo_spring_set(fs_off, 0);
+    face_switch_save();
+  }
+}
+
 // Every frame, whatever is on screen: the clock and the date, the rolls and the icon spring
 static void face_tick(float dt) {
+  face_switch_tick(dt);
   static uint32_t checked;
   if (fc_cmd_wx != -1) face_weather(fc_cmd_wx < 0 ? -1 : fc_cmd_wx), fc_cmd_wx = -1;
   if (fc_cmd_demo) face_demo(), fc_cmd_demo = false;
@@ -658,7 +752,7 @@ static void screen_layout(int s, const HaloView &v) {
   const HaloView &v_all = v;
 #endif
   if (!S.n) {  // empty (not the face): its name in the middle, as the stub of a card without a link
-    if (s == 0 || !S.name) return;
+    if (face_is(s) || !S.name) return;
     if (!S.name_ok) S.name_mid = halo_text_mid(gl_title, gl_str(S.name)), S.name_ok = true;
     gl_text_mid(S.name_it, gl_title, gl_str(S.name), S.name_mid, CX, CY, 1, GL_TEXT, 1, &halo_black);
     S.name_it.on_black = true;
@@ -934,10 +1028,36 @@ static int screen_pages(const FaceScreen &S) {
 
 // ---------- The face and the screen over it (lib/Halo's navigation, as on HaloWatch) ----------
 static void face_layout(const HaloView &v) {
-  screen_layout(0, v);
+  const int cur = face_cur(), o_i = fc_face + (fs_off.x > 0 ? 1 : -1);
+  const bool two = fs_off.x != 0 && o_i >= 0 && o_i < face_n && face_ids[o_i] < face_scr_n;
+  // Hidden once: a face laid out in the last frame and no longer on screen (its items damage where they were)
+  HaloView gone = v;
+  gone.a = 0;
+  for (int i = 0; i < face_n; i++)
+    if (fs_laid[i] && i != fc_face && !(two && i == o_i)) screen_layout(face_ids[i], gone), fs_laid[i] = false;
+  HaloView vc = v;
+  vc.x += -fs_off.x * W * v.s;
+  screen_layout(cur, vc);
+  fs_laid[fc_face] = true;
+  if (two) {
+    HaloView vo = v;
+    vo.x += ((fs_off.x > 0 ? 1 : -1) - fs_off.x) * W * v.s;
+    screen_layout(face_ids[o_i], vo);
+    fs_laid[o_i] = true;
+  }
+  fs_other = two ? face_ids[o_i] : -1;
+#if HAS_SHADE && !defined(HALO_ROUND)
+  // A rectangle's quick settings panel is the home's layer (screen 0 lays it out): on another face — laid out here
+  const int sh = cur != 0 ? shade_index(face_scr[0]) : -1;
+  if (sh >= 0) shade_layout(0, face_scr[0], sh, v);
+#endif
 }
 static void face_draw() {
-  screen_draw(0);
+  screen_draw(face_cur());
+  if (fs_other >= 0) screen_draw(fs_other);
+#if HAS_SHADE && !defined(HALO_ROUND)
+  if (face_cur() != 0 && shade_index(face_scr[0]) >= 0) shade_draw();
+#endif
 }
 // Opened: the values in place (no rolling), the first page — as HaloWatch's weather_enter; the list from its top — as
 // menu_enter
@@ -1013,11 +1133,14 @@ static bool layer_rect(const FaceScreen &S, int i, float &x, float &y, float &w,
 static void face_update(float) {
   const HaloFinger &f = halo_finger;
   if (!f.tap || f.owner) return;
-  const FaceScreen &S = face_scr[0];
+  if (fs_drag || fs_off.x != 0) return;
+  const FaceScreen &S = face_scr[face_cur()];
   for (int i = S.n - 1; i >= 0; i--) {
     const FaceLayer &L = S.layers[i];
     float x, y, w, h;
-    if (L.hidden || L.tap <= 0 || L.tap >= face_scr_n || L.tap == nav_scr[0] || !layer_rect(S, i, x, y, w, h)) continue;
+    if (L.hidden || L.tap <= 0 || L.tap >= face_scr_n || L.tap == nav_scr[0] || face_is(L.tap) ||
+        !layer_rect(S, i, x, y, w, h))
+      continue;
     if (fabsf(f.x - x) < w / 2 + 10 && fabsf(f.y - y) < h / 2 + 10) {
       face_over = L.tap;
       halo_nav_face_open(OVER, L.fx, x, y, w, h);
