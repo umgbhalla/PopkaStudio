@@ -98,6 +98,9 @@ static bool nav_moving; // в прошлом кадре шёл переход (h
 // Циферблат под всем
 static HaloScreen face;
 static bool has_face, sheet_drag, sheet_list_drag;
+static bool home_return, home_corner;
+static constexpr float HOME_SECONDS = 0.30f;
+static float home_from, home_time;
 static bool has_main;  // был halo_nav_begin: с циферблата есть куда уйти свайпом вверх (без него циферблат — один)
 static bool sheet_in;  // переход к главному (уходит циферблат); false — к циферблату
 static bool main_seen;  // главный был виден с тех пор, как пришли на циферблат (по приходе — закрыть и в начало)
@@ -313,6 +316,19 @@ float halo_nav_pull() {
   return fmaxf(0, over_on ? over_pull.x : sheet_pull.x);
 }
 
+static void home_step(HaloSpring &path, float dt) {
+  home_time += dt;
+  const float t = halo_clamp01(home_time / (HOME_SECONDS * fmaxf(0.45f, home_from)));
+  path.x = home_from * (1 - t * t * (3 - 2 * t));
+}
+
+#ifdef HALO_ROUND
+static HaloView home_corner_view(float away) {
+  const float shift = 50.0f * away;
+  return {shift, -shift, 1, halo_clamp01(1 - 2 * away)};
+}
+#endif
+
 // Экран поверх циферблата: жест назад снизу, пружины; true — экран открыт или его ведут пальцем (палец — ему), false —
 // его нет или он уже закрывается (палец — циферблату и галерее, хотя экран ещё доигрывает закрытие)
 static bool over_update(float dt) {
@@ -350,7 +366,8 @@ static bool over_update(float dt) {
     }
   }
   if (!over_drag) {
-    halo_spring_run(over_q, over_q.target > 0.5f ? K_OVER_IN : K_OVER_OUT, dt);
+    if (home_return) home_step(over_q, dt);
+    else halo_spring_run(over_q, over_q.target > 0.5f ? K_OVER_IN : K_OVER_OUT, dt);
     halo_spring_run(over_pull, K_PULL, dt);
   }
   const bool rest = !over_drag && over_q.x == over_q.target;
@@ -362,12 +379,19 @@ static bool over_update(float dt) {
   // Закрыли: спрятать и забыть — как только переход дошёл до циферблата. «Потягивание» (насколько тянули, для точек
   // страниц) гаснет дольше (~0,7 с от свайпа), но экрана уже не видно — его не ждём
   if (rest && over_q.x == 0) over_forget();
-  return over_on && (over_drag || over_q.target > 0.5f);  // закрывается — палец уже циферблату и галерее
+  return over_on && (home_return || over_drag || over_q.target > 0.5f);
 }
 
 // Виды циферблата (vf) и экрана над ним (vo) по пружине перехода
 static void over_views(HaloView &vf, HaloView &vo) {
   const float q = over_q.x, lift = 0.25f * over_pull.x;
+#ifdef HALO_ROUND
+  if (home_return && home_corner) {
+    vf = home_corner_view(q), vo = home_corner_view(1 - q);
+    over_cover.alpha = 0;
+    return;
+  }
+#endif
   switch (over_fx) {
     case HALO_FX_ZOOM: {
       // Экран вырастает из элемента (масштаб — от его размера, центр — от его центра) и проявляется за первую треть;
@@ -395,6 +419,7 @@ static void over_views(HaloView &vf, HaloView &vo) {
         const float T = 0.25f * OVER_TRAVEL, k = halo_clamp01((q - 0.5f) / 0.5f), kf = halo_clamp01((0.5f - q) / 0.5f);
         vo = {0, -(1 - q) * T, 0.92f + 0.08f * k, k, true};
         vf = {0, q * T, 1 + 0.08f * (1 - kf), kf};
+        if (home_return && home_from >= 0.98f) vf.s = vo.s = 1;
       }
       break;
     }
@@ -442,10 +467,34 @@ static void face_arrived() {
   if (scr[0].enter) scr[0].enter();
 }
 
+void halo_nav_home(bool power_button) {
+  if (!has_face) return halo_nav_home_now();
+  if (home_return || halo_nav_on_face()) return;
+  home_return = true;
+  home_from = over_on ? over_q.x : sheet.x;
+  home_time = 0;
+  // Keep the path of a gesture or screen transition already in progress.
+  home_corner = power_button && home_from >= 0.98f;
+  cmd_back = false, cmd_face = -1;
+  if (halo_finger.down || halo_finger.released) halo_finger.owner = &sheet_owner;
+  if (over_on) {
+    if (over_q.x == 1) over_closing = true, over_ax = nav_side || !nav_bottom_back;
+    over_drag = false;
+    over_q.v = 0, over_q.target = 0;
+    return;
+  }
+  if (sheet.x == 1 && !sheet_drag && !sheet_list_drag) {
+    sheet_in = false, sheet_ax = nav_side, sheet_dir = 1;
+  }
+  sheet_drag = sheet_list_drag = back_drag = false;
+  sheet.v = 0, sheet.target = 0;
+}
+
 // Сразу на циферблат (в Always On его и так уже видно одного): закрыть всё над ним, главный — в начало, а выход из
 // Always On — как с циферблата (сам циферблат из вида amb_v, без fade through)
 void halo_nav_home_now() {
   const HaloView hidden = {0, 0, 1, 0};
+  home_return = false;
   if (over_on) over_forget();
   over_drag = over_closing = false;
   if (has_face) {
@@ -488,7 +537,7 @@ static bool sheet_update(float dt) {
   // Вверх по циферблату (откуда угодно); с главного или открытого на нём экрана — его жест. Sideways (halo_nav_side):
   // to the left anywhere on the face; back from the main itself — also to the right from the left edge (a screen opened
   // on the main has that gesture as its own back: top_frame)
-  if (f.drag_start && here && !sheet_drag && !sheet_list_drag) {
+  if (f.drag_start && here && !home_return && !sheet_drag && !sheet_list_drag) {
     float dir = 0;
     bool ax = false;
     if (!f.horiz) {
@@ -513,7 +562,7 @@ static bool sheet_update(float dt) {
     }
   }
   if (cmd_face >= 0) {
-    if (here && !sheet_drag && !sheet_list_drag) {
+    if (here && !home_return && !sheet_drag && !sheet_list_drag) {
       if (sheet.x == sheet.target) {  // с места; в пути — тот же переход вперёд или назад
         sheet_in = cmd_face == 1;
         sheet_ax = nav_side;  // (sideways — by a command too)
@@ -562,22 +611,25 @@ static bool sheet_update(float dt) {
   }
   sheet_list_drag = f.down && pull > 0;
   if (!sheet_drag && !sheet_list_drag) {
+    if (home_return) home_step(sheet, dt);
+    else {
 #ifndef HALO_ROUND
     // Прямоугольник: остаток пути — по времени (своя доля SH_S) и кривой Material standard, без пружины и её хвоста
-    if (sh_restart || sheet.target != sh_tgt) sh_x0 = sheet.x, sh_t = 0, sh_tgt = sheet.target, sh_restart = false;
-    if (sheet.x != sheet.target) {
-      sh_t += dt / (SH_S * fmaxf(fabsf(sheet.target - sh_x0), 0.1f));
-      sheet.x = sh_t >= 1 ? sheet.target : sh_x0 + (sheet.target - sh_x0) * halo_ease(E_AXIS, sh_t);
-    }
-    sheet.v = 0;
+      if (sh_restart || sheet.target != sh_tgt) sh_x0 = sheet.x, sh_t = 0, sh_tgt = sheet.target, sh_restart = false;
+      if (sheet.x != sheet.target) {
+        sh_t += dt / (SH_S * fmaxf(fabsf(sheet.target - sh_x0), 0.1f));
+        sheet.x = sh_t >= 1 ? sheet.target : sh_x0 + (sheet.target - sh_x0) * halo_ease(E_AXIS, sh_t);
+      }
+      sheet.v = 0;
 #else
-    halo_spring_run(sheet, sheet.target > 0.5f ? K_OVER_IN : K_OVER_OUT, dt);  // те же, что у Fade
+      halo_spring_run(sheet, sheet.target > 0.5f ? K_OVER_IN : K_OVER_OUT, dt);
 #endif
+    }
     halo_spring_run(sheet_pull, K_PULL, dt);
   }
   // К циферблату: последний пиксель пути (его сдвиг 70·x, масштаб — в четверти пикселя) не ждём — иначе циферблат
   // брал палец только через ~0,55 с после свайпа, хотя к ~0,38 с на вид уже стоял
-  if (!sheet_drag && sheet.target == 0 && sheet.x > 0 && sheet.x < 0.015f) halo_spring_set(sheet, 0);
+  if (!home_return && !sheet_drag && sheet.target == 0 && sheet.x > 0 && sheet.x < 0.015f) halo_spring_set(sheet, 0);
   if (sheet.x > 0) main_seen = true;
   const bool rest = !sheet_drag && sheet.x == sheet.target;
   if (rest && sheet.x == 0) {
@@ -608,6 +660,7 @@ static void top_frame(float dt) {
 void halo_nav_update(float dt) {
   HaloFinger &f = halo_finger;
   const bool main_on = !has_face || (!over_update(dt) && sheet_update(dt));
+  if (home_return && halo_nav_on_face()) home_return = false;
   if (!main_on && !over_on) cmd_back = false;  // на циферблате «назад» некуда: не копить до следующего экрана
   if (main_on) switch (view) {
     case V_HOME:
@@ -765,6 +818,12 @@ void halo_nav_update(float dt) {
     const float p = sheet.x, T = 0.25f * OVER_TRAVEL, oy = sheet_dir * (1 - p) * T;  // sheet_dir < 0 — в зеркале
     if (p <= 0.0005f) {
       v_face = id, v_home = v_top = hidden;
+#ifdef HALO_ROUND
+    } else if (home_return && home_corner) {
+      v_face = home_corner_view(p);
+      const HaloView outgoing = home_corner_view(1 - p);
+      for (HaloView *v : {&v_home, &v_top}) view_under(*v, outgoing), v->over = false;
+#endif
     } else if (p >= 0.9995f) {
       v_face = hidden, (sheet_ax ? v_home.x : v_home.y) += oy, (sheet_ax ? v_top.x : v_top.y) += oy;
     } else {
@@ -783,6 +842,7 @@ void halo_nav_update(float dt) {
       const float kf = halo_clamp01(1 - p / 0.5f), km = halo_clamp01((p - 0.5f) / 0.5f);  // видно циферблат / главный
       float sf = sheet_in ? 0.92f + 0.08f * kf : 1 + 0.08f * (1 - kf);
       float sm = sheet_in ? 1 + 0.08f * (1 - km) : 0.92f + 0.08f * km;
+      if (home_return && home_from >= 0.98f) sf = sm = 1;
       if (fabsf(sf - 1) < 0.006f) sf = 1;  // последние доли процента масштаба не видны, а рисовать с ним дороже
       if (fabsf(sm - 1) < 0.006f) sm = 1;
       const float of = -sheet_dir * p * T;
@@ -791,6 +851,8 @@ void halo_nav_update(float dt) {
 #endif
     }
     if (p != sheet.target || sheet_drag || sheet_pull.x != 0) halo_subpixel = true, settle_frame = true;
+    // An interrupted app transition keeps its composition until the clock takes over.
+    if (home_return && v_face.a > 0) cover.alpha = 0, hide_under = false;
     if (over_on) {  // экран поверх циферблата (галерея в это время внизу)
       over_views(v_face, v_over);
       if (over_drag || over_q.x != over_q.target || over_pull.x != 0) halo_subpixel = true;

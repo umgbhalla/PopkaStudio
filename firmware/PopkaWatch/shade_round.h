@@ -372,6 +372,13 @@ static void shade_close() {
   vol_enter(sh_volume);
   halo_spring_set(sh_volume.screen, 0);
 }
+
+static void shade_dismiss() {
+  if (sh_px <= 0) return shade_close();
+  sh_drag = sh_slider = false;
+  sh_cmd = -1;
+  sh_tween(0, 176);
+}
 // The tween, the shapes, the brightness — also in the editor's still copies (no finger there)
 static void shade_anim(float dt) {
   const int i = shade_index(face_scr[0]);
