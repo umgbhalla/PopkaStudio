@@ -323,9 +323,10 @@ static void home_step(HaloSpring &path, float dt) {
 }
 
 #ifdef HALO_ROUND
-static HaloView home_corner_view(float away) {
-  const float shift = 50.0f * away;
-  return {shift, -shift, 1, halo_clamp01(1 - 2 * away)};
+static HaloView home_corner_view(float position) {
+  // Positive positions enter from the upper right. Negative positions exit toward the lower left.
+  const float shift = 50.0f * position;
+  return {shift, -shift, 1, halo_clamp01(1 - 2 * fabsf(position))};
 }
 #endif
 
@@ -387,7 +388,7 @@ static void over_views(HaloView &vf, HaloView &vo) {
   const float q = over_q.x, lift = 0.25f * over_pull.x;
 #ifdef HALO_ROUND
   if (home_return && home_corner) {
-    vf = home_corner_view(q), vo = home_corner_view(1 - q);
+    vf = home_corner_view(q), vo = home_corner_view(q - 1);
     over_cover.alpha = 0;
     return;
   }
@@ -821,7 +822,7 @@ void halo_nav_update(float dt) {
 #ifdef HALO_ROUND
     } else if (home_return && home_corner) {
       v_face = home_corner_view(p);
-      const HaloView outgoing = home_corner_view(1 - p);
+      const HaloView outgoing = home_corner_view(p - 1);
       for (HaloView *v : {&v_home, &v_top}) view_under(*v, outgoing), v->over = false;
 #endif
     } else if (p >= 0.9995f) {
