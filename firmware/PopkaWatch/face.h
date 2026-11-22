@@ -388,7 +388,11 @@ static inline void rd_part_free(FaceRun &) {}
 #include "pixelart.h"  // pixel art
 #if HAS_SHADE  // (shade_rect.h or shade_round.h, at the end of this file)
 static int shade_index(const FaceScreen &S);
+#ifdef HALO_ROUND
+static HaloView shade_under(int s, const FaceScreen &S, const HaloView &v, bool preview);
+#else
 static HaloView shade_under(int s, const FaceScreen &S, const HaloView &v);
+#endif
 static void shade_layout(int s, const FaceScreen &S, int i, const HaloView &v);
 static float shade_top_fade(int s, const FaceScreen &S, int i);
 static void shade_draw();
@@ -639,14 +643,18 @@ static bool face_over_others(const FaceScreen &S, int i) {
 // Screen s through the view v (a = 0 — hidden): every layer, bottom to top; the Weather screen's parts — on every page
 // of the screen's pager
 #if HAS_SHADE
-static void screen_layout(int s, const HaloView &v_in) {
+static void screen_layout(int s, const HaloView &v_in, bool shade_preview = false) {
 #else
 static void screen_layout(int s, const HaloView &v) {
 #endif
   if (s < 0 || s >= face_scr_n) return;
   FaceScreen &S = face_scr[s];
 #if HAS_SHADE
+#ifdef HALO_ROUND
+  const HaloView v = shade_under(s, S, v_in, shade_preview);
+#else
   const HaloView v = shade_under(s, S, v_in);  // (the rest under the panel: dimmed)
+#endif
   const HaloView &v_all = v;
 #endif
   if (!S.n) {  // empty (not the face): its name in the middle, as the stub of a card without a link
@@ -810,13 +818,17 @@ static void screen_layout(int s, const HaloView &v) {
   }
 #if HAS_SHADE
   const int sh = shade_index(S);
+#ifdef HALO_ROUND
+  if (shade_preview && sh >= 0) shade_layout(s, S, sh, v_in);
+#else
   if (sh >= 0) shade_layout(s, S, sh, v_in);  // the quick settings panel: over everything, the screen's own view
+#endif
 #endif
 }
 
 // Bottom to top; the Weather screen's paged parts — page by page, as HaloWatch draws its pages (at the place of the
 // first of them in the list)
-static void screen_draw(int s) {
+static void screen_draw(int s, bool shade_preview = false) {
   if (s < 0 || s >= face_scr_n) return;
   const FaceScreen &S = face_scr[s];
   if (!S.n) {
@@ -824,7 +836,11 @@ static void screen_draw(int s) {
     return;
   }
 #if HAS_SHADE
+#ifdef HALO_ROUND
+  const bool shade = shade_preview && shade_index(S) >= 0;
+#else
   const bool shade = shade_index(S) >= 0;
+#endif
   const HaloBand band = hb;
   const bool seen = !shade || shade_cut_under();  // (the rows a panel covers whole: not drawn; false — the band is all under it)
 #else

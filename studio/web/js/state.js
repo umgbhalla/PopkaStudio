@@ -104,7 +104,8 @@ export const KINDS = {
   // The quick settings panel of the home (App → Shade): a rectangle's (shade_rect.h, web/mockups/rect-quick.html), the
   // round board's (shade_round.h: Wear OS 6, web/mockups/round-quick3.html variant 23) — pulled down on the home:
   // brightness, switches; its look (SHADE_LOOKS) and accent (round: Wear's Lavender theme, as in Google's own video)
-  shade: { group: 'shade', fixed: true, name: 'Quick settings', sub: 'Pull down on the home: brightness, volume, switches', look: ROUND ? 'wear' : 'full',
+  shade: { group: 'shade', fixed: true, name: 'Quick settings', sub: ROUND ? 'Pull down from the top edge: brightness, volume, switches'
+    : 'Pull down on the home: brightness, volume, switches', look: ROUND ? 'wear' : 'full',
     color: ROUND ? '#CE97FD' : '#A8C7FA' },
   // PopkaStudio's clocks of sixteen looks (sclock.h; web/mockups/clocks.html): the look (CLOCK_LOOKS), its size and colors
   sclock: { group: 'clock', name: 'Clock', sub: 'A clock in one of sixteen looks', look: 'hairline', scale: 1, color: '#FFF8EE', color2: '#FF8A80', color3: '#5E5F64' },

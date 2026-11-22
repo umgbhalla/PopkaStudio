@@ -63,10 +63,14 @@ static void pinned_update(float dt) {
     const int pg = min(st_page, screen_pages(face_scr[st_pin]) - 1);
     if (face_scr[st_pin].pager.x != pg) halo_spring_set(face_scr[st_pin].pager, pg);
   }
+#if HAS_SHADE
+  screen_layout(st_pin, HaloView(), true);
+#else
   screen_layout(st_pin, HaloView());
+#endif
 }
 static void pinned_draw() {
-  screen_draw(st_pin);
+  screen_draw(st_pin, true);
 }
 
 extern "C" {

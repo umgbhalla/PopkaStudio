@@ -56,15 +56,32 @@ static void update(float dt) {
   face_tick(dt);         // the time, the date and the layers' animations, on every screen
   power_view();          // the whole interface's view on the way to Always On (after face_tick: its minute is fresh)
   gallery_tick();        // a card tapped in the last frame: open its screen (face.h)
+#if HAS_SHADE && defined(HALO_ROUND)
+  const bool shade_was_visible = sh_px > 0;
+#endif
 #if HAS_SHADE
   shade_tick(dt, pw_mode == PW_ACTIVE && pw_amb.x == 0 && !pw_locked);  // the quick settings panel: its finger first
 #endif
+#if HAS_SHADE && defined(HALO_ROUND)
+  const HaloFinger finger = halo_finger;
+  // Block app input through the final frame of dismissal and through release of a shade gesture.
+  const bool shade_owns_finger = shade_was_visible || sh_px > 0 || finger.owner == &sh_owner;
+  if (shade_owns_finger) halo_finger = {};
+#endif
   halo_nav_update(dt);   // the face, the gallery, the screens open over them, the transitions, the ways back
+#if HAS_SHADE && defined(HALO_ROUND)
+  if (shade_owns_finger) halo_finger = finger;
+  shade_layout(0, face_scr[0], shade_index(face_scr[0]), HaloView());
+#endif
   power_lock_layout();   // the lock at the top — over everything
 }
 
 static void draw() {  // both cores, each its part of a band
+#if HAS_SHADE && defined(HALO_ROUND)
+  shade_overlay_draw();
+#else
   halo_nav_draw();
+#endif
   power_lock_draw();
 }
 

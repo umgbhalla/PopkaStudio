@@ -162,6 +162,9 @@ static void pw_locked_display(bool on) {
 // A button pressed (1 — BOOT, 2 — PWR; held — its long press) with what it does
 static void pw_button(int btn, int fn, bool held, int64_t now) {
   if (fn == FN_HOME && !held && (!pw_locked || btn == 2)) {
+#if HAS_SHADE && defined(HALO_ROUND)
+    shade_close();
+#endif
     halo_nav_home_now();
     if (!pw_locked) pw_wake(0);
     return;

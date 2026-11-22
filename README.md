@@ -36,7 +36,8 @@ what the watch shows, pixel for pixel — the same fonts, the same animations, t
   heart, the song that's playing. On the round watch — an equalizer of rays along the edge that dances to the real
   sound, and a screen made of layers you can move, recolor, resize or hide; on the 7″ board — one screen with two
   knobs like a real receiver, volume and tuning; on the 4″ square — a tall tuning window and big buttons.
-- **Quick settings** — swipe down on the home screen: brightness, volume, Wi-Fi, Always On, lock, screen off — all
+- **Quick settings** — swipe down from the top edge on any screen of a round watch, or swipe down on the home screen
+  of a rectangular board. Brightness, volume, Wi-Fi, Always On, lock, screen off — all
   real. One look on the round watch, four on the 7″ board, with app shortcuts and the player, a strip on the 4″ square.
 - **Video** (7″ board) — clips from a microSD card, decoded in hardware, or straight from your computer over Wi-Fi with
   **Stream**. Add a clip with **+**: PopkaStudio converts it (needs [ffmpeg](https://ffmpeg.org)) and writes it to the
