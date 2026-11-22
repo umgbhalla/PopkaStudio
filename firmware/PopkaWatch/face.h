@@ -1069,6 +1069,9 @@ static HaloScreen level(int d, uint8_t home) {
 // The gallery — lib/Halo's main screen (none — the face is alone: a swipe up on it leads nowhere)
 static void gallery_begin() {
   if (nav_scr[0] <= 0 || nav_scr[0] >= face_scr_n) return;
+#ifdef HALO_ROUND
+  gal_rebuild(face_scr[nav_scr[0]]);
+#endif
   HaloScreen gallery = level(0, 0);
 #ifdef HALO_ROUND
   gallery.main_list = []() -> const HaloList * {
@@ -1079,6 +1082,10 @@ static void gallery_begin() {
 #endif
   halo_nav_begin(gallery);
 }
+
+#ifdef HALO_ROUND
+static void power_confirm_open();
+#endif
 
 // A tap on a card or on the button (gal_update, the frame before): open its screen over the one it is on — as HaloWatch
 // opens a card's screen (open_req: from the gallery only once it is in place). A screen already in the stack is not
@@ -1097,7 +1104,7 @@ static void gallery_tick() {
   if (gl_req_depth == 0 ? !halo_nav_at_home() : d != gl_req_depth) return;
 #ifdef HALO_ROUND
   if (gal_edge_back(*L)) {
-    if (d == 0) halo_nav_to_face(true);
+    if (d == 0) power_confirm_open();
     else halo_nav_back();
     return;
   }

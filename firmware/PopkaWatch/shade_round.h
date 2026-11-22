@@ -7,11 +7,9 @@
 // it dims by 35 %). Let go past a third of the way or flicked faster than 700 px/s — it goes on to the end, else back:
 // the rest by time (260 ms open, 220 ms back, scaled by what is left) along Material's standard curve. Up — closes.
 //
-// On it, as on Wear OS 6: Wear's brightness slider at the top hugging the round edge (a pill: "−", eight segments, "+";
-// a drag along the segments, a tap on "−"/"+"), two rows of three big pill buttons — Wi-Fi, Mute, Always On / Screen
-// off, Lock, Volume — and a small status chip at the bottom (the battery's percent, Wi-Fi). A button on is filled with
-// the accent and its shape glides from a pill to a rounded square. Volume opens HaloWatch's volume screen (volume.h, the
-// player's own: "+" at the top, "−" at the bottom, the level along the left edge; a tap elsewhere or 3 s idle — back).
+// Two rows of three buttons: Wi-Fi, Brightness, Always On / Screen off, Volume, Lock. Volume taps mute or restore
+// the last audible level. Brightness taps cycle through three presets. Holding either control opens a temporary
+// slider on its row. The same finger can then adjust the level horizontally, and release closes the slider.
 // The colours: the layer's color is the accent (Wear's theme); the buttons' container — the accent deep in black, as in
 // Wear's dark scheme; the icons on it — white touched by the accent.
 //
@@ -30,15 +28,12 @@
 #define SH_MAX 40         // items in the pool
 #define SH_BW 122.0f      // a button: Google's grid — 3 × 122 + 2 × 8, rows of 102
 #define SH_BH 102.0f
-#define SH_SEGS 8         // the slider's segments (Display's steps)
-// What a button is (also a hit's "what"); "−", "+" and the slider itself
-enum : uint8_t { SI_WIFI, SI_MUTE, SI_AOD, SI_OFF, SI_LOCK, SI_VOL, SI_N, SI_BMINUS = 50, SI_BPLUS, SL_BRIGHT = 100 };
-// Font Awesome (gl_shr_ic30): wifi, volume-xmark, clock, power-off, lock, volume-high; minus, plus. The chip
-// (gl_shr_ic20): battery-full, wifi
-static const char *const SI_ICON[SI_N] = {"\xEF\x87\xAB", "\xEF\x9A\xA9", "\xEF\x80\x97", "\xEF\x80\x91", "\xEF\x80\xA3",
-                                          "\xEF\x80\xA8"};
-static const char SH_IC_MINUS[] = "\xEF\x81\xA8", SH_IC_PLUS[] = "\xEF\x81\xA7", SH_IC_BAT[] = "\xEF\x89\x80",
-                  SH_IC_WIFI[] = "\xEF\x87\xAB";
+#define SH_SEGS 8
+static constexpr float SH_ROW_TOP = 116, SH_ROW_STEP = 110, SH_SLIDE_PX = 140;
+enum : uint8_t { SI_WIFI, SI_BRIGHT, SI_AOD, SI_OFF, SI_VOL, SI_LOCK, SI_N, SI_MUTED = SI_N };
+static const char *const SI_ICON[] = {"\xEF\x87\xAB", "\xEF\x86\x85", "\xEF\x80\x97", "\xEF\x80\x91",
+                                     "\xEF\x80\xA8", "\xEF\x80\xA3", "\xEF\x9A\xA9"};
+static const char SH_IC_BAT[] = "\xEF\x89\x80", SH_IC_WIFI[] = "\xEF\x87\xAB";
 extern const HaloFont gl_shr_ic30, gl_shr_ic20, gl_shr_n18;
 
 #define SH_VOL 1  // the speaker's volume (volume.h: settings.h brings it in with the panel)
@@ -59,15 +54,16 @@ static float sh_px;               // the live panel: how far it is out (finger t
 static float sh_px0, sh_y0;       // the drag: where it started
 static bool sh_drag;
 static float sh_tw_from, sh_tw_to = -1, sh_tw_t, sh_tw_dur;  // the tween after the finger (to < 0 — none)
-static bool sh_slider;            // the finger is on the slider
-static uint8_t sh_owner;          // (halo_finger_claim)
-static VolPanel sh_volume;
-static bool sh_vol_live, sh_vol_was;  // the shade's volume screen laid out this frame / the last
+static uint8_t sh_owner, sh_armed = SI_N, sh_expanded = SI_N;
+static HaloSpring sh_expand;
+static HaloSpringK K_SH_EXPAND;
+static float sh_hold_x;
+static int sh_hold_value, sh_last_volume = 6;
 static float sh_cover_y = -1;     // the rows above it are all under the disc (it is opaque): the face isn't drawn there
 static HaloEase sh_ease;
 static HaloSpringK K_SH_MORPH;
 static HaloSpring sh_on[SI_N];    // a button's shape: 0 — off (a pill), 1 — on (a rounded square in the accent)
-static float sh_mid_ic[SI_N + 2], sh_mid_chip[2], sh_mid_n18;
+static float sh_mid_ic[SI_N + 1], sh_mid_chip[2], sh_mid_n18;
 static volatile int sh_cmd = -1;  // shade open|close (1, 0), shade alone (2)
 static volatile int sh_bat = -1;  // the battery's percent (−1 — not known)
 static char sh_pct[8];
@@ -75,7 +71,7 @@ struct ShHit {
   float x0, y0, x1, y1;
   uint8_t what;
 };
-static ShHit sh_hits[12];
+static ShHit sh_hits[SI_N];
 static int sh_hit_n;
 
 // Brightness: Display's steps when the firmware has Display, else the panel's own (the same table and flash key)
@@ -142,7 +138,7 @@ static uint32_t sh_on_accent(uint32_t c) {  // the icon on the accent: the accen
 
 // ---------- The pool: items through a move (the disc's) and a fade, then the screen's view ----------
 static HaloView sh_v;
-static float sh_ty, sh_ta = 1;
+static float sh_ty;
 static HaloItem *sh_take() {
   if (!sh_it || sh_n >= SH_MAX) return nullptr;
   HaloItem *it = &sh_it[sh_n++];
@@ -150,8 +146,8 @@ static HaloItem *sh_take() {
   return it;
 }
 static void sh_commit(HaloItem *it) {
-  it->y += sh_ty, it->alpha *= sh_ta;
-  if (sh_ta < 0.999f) halo_subpixel = true;
+  it->y += sh_ty;
+  if (it->alpha < 0.999f) halo_subpixel = true;
   halo_view_commit(*it, sh_v);
 }
 static void sh_rrect(float x, float y, float w, float h, float r, uint32_t c, float a = 1) {
@@ -180,38 +176,40 @@ static void sh_hit(float x0, float y0, float x1, float y1, uint8_t what, bool li
 }
 
 // ---------- The parts ----------
-static bool sh_muted() {
-  return vol_level == 0;
-}
-static bool sh_state(uint8_t what) {  // a button on
+static bool sh_control(uint8_t what) { return what == SI_BRIGHT || what == SI_VOL; }
+static int sh_value(uint8_t what) { return what == SI_VOL ? vol_level : sh_bright(); }
+static int sh_max(uint8_t what) { return what == SI_VOL ? 10 : SH_SEGS; }
+static int sh_icon(uint8_t what) { return what == SI_VOL && vol_level == 0 ? (int)SI_MUTED : what; }
+
+static bool sh_state(uint8_t what) {
   switch (what) {
     case SI_WIFI: return sh_wifi;
     case SI_AOD: return shade_aod_is_on();
-    case SI_MUTE: return sh_muted();
+    case SI_BRIGHT: return sh_bright() >= 5;
+    case SI_VOL: return vol_level == 0;
   }
   return false;
 }
-// A button: a pill off; on — the accent, a rounded square (the shape glides on its spring)
-static void sh_button(uint8_t what, float x, float y, uint32_t acc, uint32_t on, uint32_t box, uint32_t ink, bool live) {
+
+static void sh_button(uint8_t what, float x, float y, uint32_t acc, uint32_t on, uint32_t box, uint32_t ink, bool live, float a) {
   const float s = sh_on[what].x, k = halo_clamp01(s);
-  sh_rrect(x, y, SH_BW, SH_BH, SH_BH / 2 + (SH_BH * 0.27f - SH_BH / 2) * s, sh_mix(box, acc, k));
-  const int ic = what == SI_VOL && sh_muted() ? SI_MUTE : what;  // (Volume while muted: the crossed speaker)
-  sh_text(gl_shr_ic30, sh_mid_ic[ic], SI_ICON[ic], x + SH_BW / 2, y + SH_BH / 2, sh_mix(ink, on, k));
+  sh_rrect(x, y, SH_BW, SH_BH, SH_BH / 2 + (SH_BH * 0.27f - SH_BH / 2) * s, sh_mix(box, acc, k), a);
+  const int ic = sh_icon(what);
+  sh_text(gl_shr_ic30, sh_mid_ic[ic], SI_ICON[ic], x + SH_BW / 2, y + SH_BH / 2, sh_mix(ink, on, k), 1, a);
   sh_hit(x, y, x + SH_BW, y + SH_BH, what, live);
 }
-// Wear OS 6's slider: a pill, "−" and "+" at its ends, the segments between them (lit — the steps up to the value)
-static void sh_slider_put(uint32_t acc, uint32_t box, uint32_t ink, bool live) {
-  const float x = 73, y = 52, w = 320, h = 78, cy = y + h / 2;
-  sh_rrect(x, y, w, h, h / 2, box);
-  sh_text(gl_shr_ic30, sh_mid_ic[SI_N], SH_IC_MINUS, x + 36, cy, ink);
-  sh_text(gl_shr_ic30, sh_mid_ic[SI_N + 1], SH_IC_PLUS, x + w - 36, cy, ink);
-  const float sx = x + 70, sw = w - 140, gap = 4, segw = (sw - gap * (SH_SEGS - 1)) / SH_SEGS;
-  const int lit = sh_bright();
-  const uint32_t off = sh_mix(box, 0xFFFFFF, 0.13f);
-  for (int i = 0; i < SH_SEGS; i++) sh_rrect(sx + i * (segw + gap), cy - 7, segw, 14, 7, i < lit ? acc : off);
-  sh_hit(x, y, sx, y + h, SI_BMINUS, live);
-  sh_hit(sx + sw, y, x + w, y + h, SI_BPLUS, live);
-  sh_hit(sx - 4, y - 8, sx + sw + 4, y + h + 8, SL_BRIGHT, live);
+
+static void sh_slider_put(uint8_t what, float k, uint32_t acc, uint32_t box, uint32_t ink) {
+  const float y = SH_ROW_TOP + (what == SI_VOL ? SH_ROW_STEP : 0), cy = y + SH_BH / 2;
+  const float w = SH_BW + (340 - SH_BW) * k, x = CX - w / 2;
+  sh_rrect(x, y, w, SH_BH, SH_BH / 2, box, k);
+  const int ic = sh_icon(what);
+  sh_text(gl_shr_ic30, sh_mid_ic[ic], SI_ICON[ic], x + 35, cy, ink, 1, k);
+  const float left = x + 70, track = w - 99;
+  const float level = track * sh_value(what) / sh_max(what);
+  sh_rrect(left, cy - 7, track, 14, 7, sh_mix(box, ink, 0.22f), k);
+  sh_rrect(left, cy - 7, level, 14, 7, acc, k);
+  sh_circle(left + level, cy, 11, acc, k);
 }
 // The status chip: the battery's percent and Wi-Fi
 static void sh_chip(uint32_t box, uint32_t ink) {
@@ -255,9 +253,9 @@ static float shade_top_fade(int, const FaceScreen &, int) {
 static void shade_layout(int s, const FaceScreen &S, int i, const HaloView &v) {
   const bool live = s == 0;
   const float p = i >= 0 ? shade_p(s) : 0;
-  sh_n = 0, sh_v = v, sh_ty = 0, sh_ta = 1;
+  sh_n = 0, sh_v = v, sh_ty = 0;
   if (live) sh_hit_n = 0;
-  sh_vol_live = false, sh_cover_y = -1;
+  sh_cover_y = -1;
   if (p > 0 && v.a > 0) {
 #ifdef __EMSCRIPTEN__
     if (sh_bat < 0) sh_bat = halo_battery().percent;  // (the page: the desk board's, full)
@@ -275,20 +273,15 @@ static void shade_layout(int s, const FaceScreen &S, int i, const HaloView &v) {
       if (a > 0.5f) sh_cover_y = (CY + dy) / 2 + (rd * rd - CX * CX) / (2 * a);
       else if (a > -0.5f && rd >= CX + 0.5f) sh_cover_y = HALO_H;
     }
-    // HaloWatch's volume screen over the panel: the panel's own parts fade through as it grows (volume.h)
-    if (live) {
-      HaloView vv = v;
-      vv.y += sh_ty;
-      sh_ta = vol_layout(vv, sh_volume), sh_vol_live = sh_vol_was = true;
+    const float expanded = live ? halo_clamp01(sh_expand.x) : 0;
+    static const uint8_t GRID[] = {SI_WIFI, SI_BRIGHT, SI_AOD, SI_OFF, SI_VOL, SI_LOCK};
+    for (int k = 0; k < SI_N; k++) {
+      const int row = k / 3;
+      const bool fading = expanded > 0 && row == (sh_expanded == SI_VOL ? 1 : 0);
+      sh_button(GRID[k], 42 + (k % 3) * 130, SH_ROW_TOP + row * SH_ROW_STEP, acc, on, box, ink, live, fading ? 1 - expanded : 1);
     }
-    sh_slider_put(acc, box, ink, live);
-    static const uint8_t GRID[6] = {SI_WIFI, SI_MUTE, SI_AOD, SI_OFF, SI_LOCK, SI_VOL};
-    for (int k = 0; k < 6; k++) sh_button(GRID[k], 42 + (k % 3) * 130, 140 + (k / 3) * 110, acc, on, box, ink, live);
+    if (expanded > 0) sh_slider_put(sh_expanded, expanded, acc, box, ink);
     sh_chip(box, ink);
-  } else if (live && sh_vol_was) {  // closed: the volume screen's items away once (their place repainted)
-    HaloView hidden = v;
-    hidden.a = 0;
-    vol_layout(hidden, sh_volume), sh_vol_was = false;
   }
   for (int k = sh_n; k < sh_n_was; k++) sh_it[k].alpha = 0, halo_item_commit(sh_it[k]);
   sh_n_was = sh_n;
@@ -312,11 +305,10 @@ static bool shade_cut_under() {
 
 static void shade_draw() {
   for (int k = 0; k < sh_n; k++) halo_item_draw(sh_it[k]);
-  if (sh_vol_live) vol_draw(sh_volume);
 }
 
 static void shade_overlay_draw() {
-  if (!sh_n && !sh_vol_live) return halo_nav_draw();
+  if (!sh_n) return halo_nav_draw();
   const HaloBand original = hb;
   if (shade_cut_under()) halo_nav_draw();
   hb = original;
@@ -336,13 +328,13 @@ static void shade_layer_build() {  // (face_build: once)
 #endif
   halo_ease_make(sh_ease, 0.2f, 0, 0, 1);  // Material standard
   K_SH_MORPH = halo_spring(0.3f, 0.8f);    // (the shape: a little past and back, as Wear OS 6's morph)
-  for (int i = 0; i < SI_N; i++) sh_mid_ic[i] = halo_text_mid(gl_shr_ic30, SI_ICON[i]);
-  sh_mid_ic[SI_N] = halo_text_mid(gl_shr_ic30, SH_IC_MINUS), sh_mid_ic[SI_N + 1] = halo_text_mid(gl_shr_ic30, SH_IC_PLUS);
+  K_SH_EXPAND = halo_spring(0.18f, 1);
+  for (int i = 0; i <= SI_N; i++) sh_mid_ic[i] = halo_text_mid(gl_shr_ic30, SI_ICON[i]);
   sh_mid_chip[0] = halo_text_mid(gl_shr_ic20, SH_IC_BAT), sh_mid_chip[1] = halo_text_mid(gl_shr_ic20, SH_IC_WIFI);
   sh_mid_n18 = halo_text_mid(gl_shr_n18, "0");
   for (int i = 0; i < SI_N; i++) halo_spring_set(sh_on[i], sh_state(i) ? 1 : 0);
   sh_bright_load();
-  vol_build();  // (the speaker's volume: Mute and the volume screen)
+  vol_build();
   halo_command("shade", [](const char *a) {  // shade open | close; alone — the other way; shade wifi on NAME | off (the page)
 #ifdef __EMSCRIPTEN__
     if (!strncmp(a, "wifi", 4)) {
@@ -361,21 +353,20 @@ static void shade_layer_build() {  // (face_build: once)
 static void sh_tween(float to, float ms) {
   const float left = fabsf(to - sh_px) / SH_TRAVEL;
   sh_tw_from = sh_px, sh_tw_to = to, sh_tw_t = 0, sh_tw_dur = ms / 1000 * fmaxf(0.45f, left);
-  if (to < sh_px) sh_volume.screen.target = 0;
+  if (to < sh_px) sh_armed = SI_N, sh_expand.target = 0;
 }
 
 static void shade_close() {
   if (sh_px > 0) halo_damage_all();
   sh_px = 0, sh_tw_to = -1, sh_cmd = -1;
-  sh_drag = sh_slider = false;
-  sh_volume.active = false;
-  vol_enter(sh_volume);
-  halo_spring_set(sh_volume.screen, 0);
+  sh_drag = false;
+  sh_armed = sh_expanded = SI_N;
+  halo_spring_set(sh_expand, 0);
 }
 
 static void shade_dismiss() {
   if (sh_px <= 0) return shade_close();
-  sh_drag = sh_slider = false;
+  sh_drag = false;
   sh_cmd = -1;
   sh_tween(0, 176);
 }
@@ -399,7 +390,8 @@ static void shade_anim(float dt) {
     sh_on[w].target = sh_state(w) ? 1 : 0;
     halo_spring_run(sh_on[w], K_SH_MORPH, dt);
   }
-  if (sh_px > 0) vol_panel_tick(sh_volume, dt);
+  halo_spring_run(sh_expand, K_SH_EXPAND, dt);
+  if (sh_expand.x <= 0 && sh_expand.target == 0) sh_expanded = SI_N;
   sh_bright_tick(dt);
 }
 
@@ -411,20 +403,27 @@ static void sh_act(uint8_t what) {
       shade_close();
       shade_power(what);
       break;
-    case SI_MUTE: {
-      static int before = 6;
-      if (vol_level > 0) before = vol_level, vol_set(0);
-      else vol_set(max(1, before));
+    case SI_VOL:
+      if (vol_level > 0) sh_last_volume = vol_level, vol_set(0, false);
+      else vol_set(sh_last_volume, false);
+      break;
+    case SI_BRIGHT: {
+      const int v = sh_bright();
+      sh_bright_set(v < 2 || v >= 8 ? 2 : v < 5 ? 5 : 8);
       break;
     }
-    case SI_VOL: vol_enter(sh_volume), vol_open(sh_volume); break;
-    case SI_BMINUS: sh_bright_set(sh_bright() - 1); break;
-    case SI_BPLUS: sh_bright_set(sh_bright() + 1); break;
   }
 }
 
-// The live panel: the finger, before the navigation takes it (a swipe up on the face is the gallery's). awake — the
-// screen is up, not going into Always On, not locked
+static uint8_t sh_hit_at(float x, float y) {
+  for (int k = 0; k < sh_hit_n; k++) {
+    const ShHit &h = sh_hits[k];
+    if (x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1) return h.what;
+  }
+  return SI_N;
+}
+
+// Handle the shade before navigation so a held slider keeps ownership of the same finger.
 static void shade_tick(float dt, bool awake) {
   const int i = shade_index(face_scr[0]);
   HaloFinger &f = halo_finger;
@@ -433,54 +432,52 @@ static void shade_tick(float dt, bool awake) {
     return shade_anim(dt);
   }
   const float T = SH_TRAVEL;
-  const bool open = sh_px >= T - 0.5f;
-  if (f.pressed && sh_px > 0.5f) halo_finger_claim(&sh_owner);  // out: every touch is the panel's
-  if (open && vol_screen_up(sh_volume)) {
-    vol_update(dt, sh_volume);
-    sh_drag = false, sh_slider = false;
+  const bool open = sh_px >= T - 0.5f && sh_tw_to < 0;
+  if (f.pressed && sh_px > 0.5f) halo_finger_claim(&sh_owner);
+  const bool mine = f.owner == &sh_owner;
+  if (f.pressed) sh_armed = open && mine ? sh_hit_at(f.x0, f.y0) : (uint8_t)SI_N;
+  if (open && mine && f.down && sh_control(sh_armed) && !f.dragging && halo_ms() - f.t0 >= 400 && sh_expand.target == 0) {
+    sh_expanded = sh_armed;
+    sh_expand.target = 1;
+    sh_hold_x = f.x;
+    sh_hold_value = sh_value(sh_expanded);
+    if (sh_expanded == SI_VOL && sh_hold_value > 0) sh_last_volume = sh_hold_value;
+  }
+  if (sh_expand.target > 0) {
+    if (mine && (f.down || f.released)) {
+      const int cap = sh_max(sh_expanded);
+      const int value = constrain(sh_hold_value + (int)lroundf((f.x - sh_hold_x) * cap / SH_SLIDE_PX), 0, cap);
+      if (value != sh_value(sh_expanded)) {
+        if (sh_expanded == SI_VOL) {
+          if (value > 0) sh_last_volume = value;
+          vol_set(value, false);
+        } else {
+          sh_bright_set(value);
+        }
+      }
+    }
+    if (!f.down || !mine) sh_armed = SI_N, sh_expand.target = 0;
     return shade_anim(dt);
   }
-  if (f.pressed && open && f.owner == &sh_owner) {
-    sh_slider = false;
-    for (int k = 0; k < sh_hit_n; k++) {
-      const ShHit &h = sh_hits[k];
-      if (h.what == SL_BRIGHT && f.x0 >= h.x0 && f.x0 <= h.x1 && f.y0 >= h.y0 && f.y0 <= h.y1) sh_slider = true;
-    }
-  }
-  if (f.drag_start && !f.horiz && !sh_slider && !sh_drag) {
-    const bool mine = f.owner == &sh_owner ||
-                      (sh_px == 0 && f.edge == HALO_EDGE_TOP && f.y > f.y0 && halo_finger_claim(&sh_owner));
-    if (mine) {
-      if (sh_px == 0) halo_heavy();  // (the disc leaves zero: the whole screen moves from now on)
+  if (f.drag_start && !f.horiz && !sh_drag) {
+    const bool opening = sh_px == 0 && f.edge == HALO_EDGE_TOP && f.y > f.y0 && halo_finger_claim(&sh_owner);
+    if (mine || opening) {
+      if (opening) halo_heavy();
       sh_drag = true, sh_px0 = sh_px, sh_y0 = f.y, sh_tw_to = -1;
     }
   }
-  if (sh_slider) {  // along the segments: the step under the finger (Display's)
-    if (f.dragging || f.tap)
-      for (int k = 0; k < sh_hit_n; k++) {
-        const ShHit &h = sh_hits[k];
-        if (h.what != SL_BRIGHT) continue;
-        const float u = halo_clamp01((f.x - h.x0 - 4) / fmaxf(1, h.x1 - h.x0 - 8));
-        sh_bright_set((int)ceilf(u * SH_SEGS - 0.15f));  // (the segment under the finger lights up)
-      }
-    if (!f.down) sh_slider = false;
-  } else if (sh_drag) {
+  if (sh_drag) {
     if (f.down && f.owner == &sh_owner) {
       sh_px = halo_clamp01((sh_px0 + f.y - sh_y0) / T) * T;
-    } else {  // let go: a flick faster than 700 px/s — where flicked, else past a third of the way from where it started
+    } else {
       sh_drag = false;
       const bool from_open = sh_px0 > T / 2;
       const bool go = f.vy > 700 || (f.vy > -700 && (from_open ? sh_px > T * 2 / 3 : sh_px > T / 3));
       sh_tween(go ? T : 0, go ? 260 : 220);
     }
-  } else if (f.released && f.owner == &sh_owner && f.tap && open) {
-    for (int k = 0; k < sh_hit_n; k++) {
-      const ShHit &h = sh_hits[k];
-      if (h.what < SL_BRIGHT && f.x >= h.x0 && f.x <= h.x1 && f.y >= h.y0 && f.y <= h.y1) {
-        sh_act(h.what);
-        break;
-      }
-    }
+  } else if (f.released && mine && f.tap && open && sh_hit_at(f.x, f.y) == sh_armed) {
+    sh_act(sh_armed);
   }
+  if (f.released) sh_armed = SI_N;
   shade_anim(dt);
 }

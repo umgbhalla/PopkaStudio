@@ -174,8 +174,8 @@ const SCREEN_CARDS = {
   fours: { name: 'Four sides', icon: 'whole', kind: 'foursides', sub: 'The clock, and the weekday, the date, the weather and the steps along the four sides — becomes the watch face in place of the one before' },
   fempty: { name: 'Empty', icon: 'empty', kind: 'blankface', sub: 'An empty watch face: nothing on it — put on it what you like (Layers) — in place of the one before' },
   fscreen: { name: 'Watch face', icon: 'clock', kind: 'face', sub: FACE_SUB },
-  gscreen: { name: 'Gallery', icon: 'gallery', kind: 'gallery', get sub() {  // (the project's swipes: up or to the left)
-    return ROUND ? `A new gallery: the title, the top clock, one card and More; ${swipeWords()} on the face opens it`
+  gscreen: { name: ROUND ? 'Apps' : 'Gallery', icon: 'gallery', kind: 'gallery', get sub() {  // (the project's swipes: up or to the left)
+    return ROUND ? `An app list with a title, clock and card. ${swipeWords()} on the face opens the main list.`
       : `A new gallery: the title, the time and a card; ${swipeWords()} on the home screen opens it`;
   } },
   empty: { name: 'Empty', icon: 'empty', kind: 'empty', sub: 'A blank screen' },
@@ -203,7 +203,7 @@ const SHELVES = {
     { name: 'Radio', icon: 'radio', items: ['rtime', 'rname', 'rsong', 'rbtn', 'rline', 'rrays', 'rplay'] },
   ],
   app: [
-    { name: 'Gallery', icon: 'gallery', items: ['gscreen', 'display', 'battery', 'charge', 'about'] },
+    { name: ROUND ? 'Apps' : 'Gallery', icon: 'gallery', items: ['gscreen', 'display', 'battery', 'charge', 'about'] },
     { name: 'Shade', icon: 'shade', items: ROUND ? ['shWear'] : ['shFull', 'shDual', 'shCorner', 'shStrip'] },  // (the home's quick settings: SHADES)
     { name: 'Media', icon: 'music', items: ['music', 'recorder', 'radio', 'video'] },
     { name: 'Info', icon: 'info', items: ['wxscreen', 'stepscreen'] },
@@ -792,6 +792,13 @@ export function addScreen(stage, linkFrom, kind = 'empty', opts = {}) {
   const s = kind === 'list' ? newList(layerById(linkFrom)) : newScreen(kind, opts);
   if (!linkFrom && kind === 'weather') linkFrom = home().layers.find((l) => l.type === 'weather' && !l.tap)?.id;
   const main = kind === 'gallery' && !mainScreen();
+  if (main && ROUND) {
+    s.name = 'Apps';
+    const title = s.layers.find((l) => l.type === 'title');
+    const footer = s.layers.find((l) => l.type === 'edge');
+    if (title) title.text = 'Apps';
+    if (footer) footer.name = footer.text = 'Power off';
+  }
   change((p) => {
     p.screens.push(s);
     const from = linkFrom && layerById(linkFrom);
@@ -801,8 +808,8 @@ export function addScreen(stage, linkFrom, kind = 'empty', opts = {}) {
   if (kind === 'weather') saved.note = `${s.name}: HaloWatch's Weather screen` + (linkFrom ? ` · ${layerById(linkFrom).name} on ${home().name} opens it` : '');
   if (kind === 'face') saved.note = `${s.name}: HaloWatch's watch face on a screen of its own (the home is ${home().name})`;
   if (kind === 'foursides') saved.note = `${s.name}: the clock and four curved lines (the home is ${home().name})`;
-  if (kind === 'gallery') saved.note = `${s.name}: the title, the top clock, a card and More` + (main ? ` · ${swipeWords()} on ${home().name} opens it` : '');
-  if (kind === 'list') saved.note = `${s.name}: the title, the top clock, a card and More · ${layerById(linkFrom).name} opens it`;
+  if (kind === 'gallery') saved.note = main ? `${swipeWords()} on ${home().name} opens ${s.name}` : s.name;
+  if (kind === 'list') saved.note = `${layerById(linkFrom).name} opens ${s.name}`;
   select(linkFrom && kind === 'empty' ? { type: 'link', id: linkFrom } : { type: 'screen', id: s.id });
   state.screen = s.id;
   emit('screen');
@@ -1659,7 +1666,7 @@ function iconPicker(get, set) {
 function onTap(stage, l) {
   const others = targetsFor(l), gallery = TAPS.has(l.type);
   const value = l.tap && others.some((s) => s.id === l.tap.to) ? l.tap.to : '';
-  const fallback = ROUND && l.type === 'edge' ? 'Back' : 'Nothing';
+  const fallback = ROUND && l.type === 'edge' ? (screenOf(l.id) === mainScreen() ? 'Power off' : 'Back') : 'Nothing';
   return h('div', { class: 'group' }, choice('Go to', value, [['', fallback], ...others.map((s) => [s.id, s.name]), ...newChoices(l)], (v) => {
     if (v === NEW) return addScreen(stage, l.id);
     if (v === NEW_LIST) return addScreen(stage, l.id, 'list');
@@ -1817,7 +1824,7 @@ function screenProps(stage, s) {
   name.addEventListener('change', () => emit('structure'));
   name.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') name.blur(); });
   return [
-    head(face ? ICON.home : main ? ICON.gallery : ICON.screen, name, face ? 'Home' : main ? 'Gallery' : 'Screen',
+    head(face ? ICON.home : main ? ICON.gallery : ICON.screen, name, face ? 'Home' : main ? (ROUND ? 'Apps' : 'Gallery') : 'Screen',
       face ? null : { title: 'Delete the screen', fn: () => removeScreen(s.id) }),
     face ? h('div', { class: 'group' }, mainChoice(stage), mainScreen() ? swipeWays(stage) : null) : null,
     !face && !main && !isGallery(s) && !s.layers.some((l) => KINDS[l.type]?.group === 'section')

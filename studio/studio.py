@@ -497,7 +497,7 @@ def is_square(board):
 ROUND_APP_FONTS = {
     # The quick settings panel (Wear OS 6): Font Awesome's wifi, volume-xmark, clock, power-off, lock, volume-high, minus,
     # plus at the buttons' size; the chip's battery-full and wifi; the battery's percent
-    "shade": ["font  gl_shr_ic30  fa-solid-900.ttf    30  0xf1eb 0xf6a9 0xf017 0xf011 0xf023 0xf028 0xf068 0xf067   # Shade: the buttons' icons",
+    "shade": ["font  gl_shr_ic30  fa-solid-900.ttf    30  0xf1eb 0xf185 0xf6a9 0xf017 0xf011 0xf023 0xf028   # Shade: the buttons' icons",
               "font  gl_shr_ic20  fa-solid-900.ttf    20  0xf240 0xf1eb   # Shade: the chip's icons",
               "font  gl_shr_n18   GoogleSansFlex.ttf  18  digits \"%\" @wght=660,ROND=100   # Shade: the battery's percent"],
 }
@@ -615,11 +615,24 @@ def migrate(project):
         project["format"] = "popkastudio/2"
     if is_rect(project.get("board")):  # (a rectangle's Radio is one screen of one layer: radio_rect.h)
         return project
+    main = project.get("main")
     for scr in project.get("screens", []):  # (a Radio screen of one layer, before 13 Nov 2026: its parts over it)
         layers = scr.get("layers") if isinstance(scr, dict) else None
         if isinstance(layers, list):
+            apps = bool(main) and scr.get("id") == main
+            if apps and scr.get("name") == "Gallery":
+                scr["name"] = "Apps"
             for layer in layers:
-                if isinstance(layer, dict) and layer.get("type") == "edge" and not layer.get("tap") and layer.get("text") == "More":
+                if not isinstance(layer, dict):
+                    continue
+                if apps and layer.get("type") == "title" and layer.get("text") == "Gallery":
+                    layer["text"] = "Apps"
+                if layer.get("type") != "edge" or layer.get("tap"):
+                    continue
+                if apps:
+                    layer["text"] = "Power off"
+                    layer["name"] = "Power off"
+                elif layer.get("text") == "More":
                     layer["text"] = "Back"
                     if layer.get("name") == "More button":
                         layer["name"] = "Back button"

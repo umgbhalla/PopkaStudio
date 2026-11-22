@@ -79,6 +79,7 @@ HaloBattery halo_battery();
 #ifdef HALO_ROUND
 enum { HALO_CHARGE_MIN = 80, HALO_CHARGE_MAX = 95, HALO_CHARGE_GAP = 10 };
 void halo_charge_limit_set(int percent);
+bool halo_power_off();
 #endif
 // Общая шина I2C (тач, AXP2101, кодек, датчик движения QMI8658 — 0x6B), 400 кГц: устройство на ней (nullptr — не
 // ответило или нет тача) и его регистры. Драйвер шины сам чередует задачи — звать можно из любой. Нужен тач (cfg.touch)

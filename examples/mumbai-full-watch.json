@@ -80,7 +80,7 @@
   },
   {
    "id": "gallery1",
-   "name": "Gallery",
+   "name": "Apps",
    "x": 0,
    "y": 726,
    "layers": [
@@ -93,7 +93,7 @@
      "dy": 0,
      "tap": null,
      "color": "#FFF8EE",
-     "text": "Gallery"
+     "text": "Apps"
     },
     {
      "id": "card2",
@@ -251,13 +251,13 @@
     {
      "id": "edge1",
      "type": "edge",
-     "name": "Back button",
+     "name": "Power off",
      "hidden": false,
      "dx": 0,
      "dy": 0,
      "tap": null,
      "color": "#2E3034",
-     "text": "Back"
+     "text": "Power off"
     },
     {
      "id": "arc1",

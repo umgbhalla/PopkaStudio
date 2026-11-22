@@ -51,6 +51,19 @@ static bool pmu_read(uint8_t reg, uint8_t &value) {
   return i2c_master_transmit_receive(pmu, &reg, 1, &value, 1, 20) == ESP_OK;
 }
 
+bool halo_power_off() {
+  if (!pmu) return false;
+  ht_bus_lock();
+  uint8_t id, control;
+  bool sent = false;
+  if (pmu_read(0x03, id) && id == 0x4A && pmu_read(0x10, control)) {
+    const uint8_t command[] = {0x10, (uint8_t)((control & ~0x02) | 0x01)};
+    sent = i2c_master_transmit(pmu, command, sizeof(command), 20) == ESP_OK;
+  }
+  ht_bus_unlock();
+  return sent;
+}
+
 static uint8_t pmu_reg(uint8_t r) {
   uint8_t v = 0;
   pmu_read(r, v);

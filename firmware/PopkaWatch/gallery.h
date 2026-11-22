@@ -42,6 +42,10 @@ static float gl_mid_back, gl_mid_back_arrow, gl_back_text_dx, gl_back_arrow_dx;
 static bool gal_edge_back(const FaceLayer &layer) {
   return layer.kind == FL_EDGE && (layer.tap <= 0 || layer.tap >= face_scr_n);
 }
+
+static bool gal_apps(const FaceScreen &screen) {
+  return nav_scr[0] > 0 && nav_scr[0] < face_scr_n && &screen == &face_scr[nav_scr[0]];
+}
 #endif
 
 struct Press {  // a press of a card (as Wear OS buttons: RoundButton.kt)
@@ -153,7 +157,8 @@ static void gal_rebuild(FaceScreen &S) {
   }
   // The bottom of the last card at the end of the list: with the button — the list's own gap (8 px) above it, as
   // between the cards (4 Nov, the user's wish; HaloWatch has 20 px: 333); without it — HaloWatch's 333
-  const uint8_t mode = edge < 0 || cards <= 1 ? EB_NONE : cards == 2 ? EB_STILL : EB_GROWS;
+  const bool power = edge >= 0 && gal_apps(S) && gal_edge_back(S.layers[edge]);
+  const uint8_t mode = edge < 0 || (!power && cards <= 1) ? EB_NONE : cards <= 2 ? EB_STILL : EB_GROWS;
   if (mode == EB_NONE) edge = -1;  // (no button: nothing to tap)
   const float end = edge >= 0 ? CX + EB_R - EB_FULL - 8 : 333;
   GalRun *g = S.gal;
@@ -311,9 +316,10 @@ static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       HaloItem &e = it[0];
       e.kind = HI_EDGE, e.x = CX, e.y = CX, e.r = EB_R, e.h = eh, e.w = EB_W, e.v = 48 + (32 - 48) * ep;
       e.scale = 1, e.color = L.color, e.alpha = eh > 1 ? e_bg * a : 0, e.on_black = true;
-      const bool back = gal_edge_back(L);
+      const bool unlinked = gal_edge_back(L), back = unlinked && !gal_apps(S);
+      const char *label = back ? "Back" : unlinked ? "Power off" : gl_str(L.text);
       const float y = e_top + fminf(eh, EB_FULL) * 0.4f, alpha = eh > 1 ? e_txt * a : 0;
-      gl_text_mid(it[1], gl_t24, back ? "Back" : gl_str(L.text), back ? gl_mid_back : R.mid,
+      gl_text_mid(it[1], gl_t24, label, unlinked ? gl_mid_back : R.mid,
                   CX + (back ? gl_back_text_dx : 0), y, 1, GL_TEXT, alpha, &e);
       gl_text_mid(it[2], gl_back_ic, GL_BACK_ARROW, gl_mid_back_arrow, CX - gl_back_arrow_dx, y, 1, GL_TEXT,
                   back ? alpha : 0, &e);

@@ -83,6 +83,9 @@ static volatile int pw_aod_shift = FN_AOD_SHIFT;
 static volatile int pw_boot = FN_BOOT, pw_pwr = FN_PWR;
 #ifdef HALO_ROUND
 static volatile bool pw_palm_lock = FN_PALM_LOCK;
+static constexpr int64_t PW_LOCK_DIM_US = 120000000;
+static int64_t pw_dim_until;
+static int pw_shutdown;
 #endif
 static int pw_boot_fn() {  // (settings.h: Display's hint)
   return pw_boot;
@@ -134,6 +137,9 @@ static void pw_wake(uint8_t w) {  // the screen where it was: back along the sam
 
 static void pw_lock_set(bool on, int btn) {
   pw_locked = on, pw_lock_btn = btn, pw_lock_ms = halo_ms();
+#ifdef HALO_ROUND
+  pw_dim_until = on ? esp_timer_get_time() + PW_LOCK_DIM_US : 0;
+#endif
   if (on) {
     if (pw_amb.x == 0 || !pw_aod_way || !halo_display_is_on()) halo_spring_set(pw_shift_amount, 0);
     else pw_shift_amount.target = 0;  // recenter smoothly if idle Always On had already shifted the face
@@ -144,6 +150,7 @@ static void pw_lock_set(bool on, int btn) {
 
 #ifdef HALO_ROUND
 static void pw_locked_display(bool on) {
+  pw_dim_until = on ? esp_timer_get_time() + PW_LOCK_DIM_US : 0;
   pw_mode = on ? PW_AOD : PW_DARK;
   pw_to_aod = pw_aod_way = on;
   halo_spring_set(pw_amb, 1);
@@ -163,9 +170,19 @@ static void pw_locked_display(bool on) {
 static void pw_button(int btn, int fn, bool held, int64_t now) {
   if (fn == FN_HOME && !held && (!pw_locked || btn == 2)) {
     const bool animate = !pw_locked && pw_mode == PW_ACTIVE && pw_amb.x == 0;
+#ifdef HALO_ROUND
+    bool open_apps = btn == 2 && animate && halo_nav_on_face();
+#if HAS_SHADE
+    open_apps = open_apps && sh_px <= 0;
+#endif
+#endif
 #if HAS_SHADE && defined(HALO_ROUND)
     if (animate) shade_dismiss();
     else shade_close();
+#endif
+#ifdef HALO_ROUND
+    if (open_apps) halo_nav_to_face(false);
+    else
 #endif
     if (animate) halo_nav_home(btn == 2);
     else halo_nav_home_now();
@@ -259,6 +276,9 @@ static void power_tick(float dt) {
   if (halo_finger_blocked() && pw_locked) pw_listen_us = now + PW_LISTEN_S * 1000000ll;
   if (boot || boot_held) pw_button(1, pw_boot, boot_held, now);
   if (pwr) pw_button(2, pw_pwr, pwr & HALO_PWR_LONG, now);
+#ifdef HALO_ROUND
+  if (pw_locked && pw_dim_until && now >= pw_dim_until) pw_locked_display(false);
+#endif
   switch (pw_mode) {
     case PW_ACTIVE:
       if (!pw_locked && (pw_cmd_sleep || (pw_aod_on && pw_idle_s && now - pw_active_us > pw_idle_s * 1000000ll)) &&
@@ -289,7 +309,13 @@ static void power_tick(float dt) {
       } else {
         if (w == HALO_WAKE_TIMER) fc_check = true;  // a new minute: face_tick sets the digits
         if (w && pw_locked) pw_listen_us = now + PW_LISTEN_S * 1000000ll;  // locked: up a while, for the button
-        if (!halo_asleep() && now >= pw_listen_us) pw_sleep(pw_ms_to_minute());  // until the next minute (or sooner)
+        if (!halo_asleep() && now >= pw_listen_us) {
+          uint32_t sleep_ms = pw_ms_to_minute();
+#ifdef HALO_ROUND
+          if (pw_locked && pw_dim_until > now) sleep_ms = min(sleep_ms, (uint32_t)((pw_dim_until - now + 999) / 1000));
+#endif
+          pw_sleep(sleep_ms);
+        }
       }
       break;
     case PW_DARK:
@@ -319,10 +345,67 @@ static void power_view() {
   halo_nav_ambient(k, view, pw_aod_way);
 }
 
+#ifdef HALO_ROUND
+static constexpr float PW_CHOICE_W = 286, PW_CHOICE_H = 70;
+static constexpr float PW_CHOICE_Y[] = {237, 321};
+static constexpr uint32_t PW_CHOICE_COLOR[] = {0x2E3034, 0xFFB4AB};
+static HaloItem pw_confirm_title, pw_confirm_box[2], pw_confirm_text[2];
+static float pw_confirm_mid, pw_confirm_label_mid[2];
+
+static void power_confirm_update(float) {
+  const HaloFinger &f = halo_finger;
+  if (!f.tap || f.owner || fabsf(f.x - CX) > PW_CHOICE_W / 2) return;
+  if (fabsf(f.y - PW_CHOICE_Y[0]) < PW_CHOICE_H / 2) halo_nav_back();
+  else if (fabsf(f.y - PW_CHOICE_Y[1]) < PW_CHOICE_H / 2 && __atomic_load_n(&pw_shutdown, __ATOMIC_RELAXED) != 1)
+    __atomic_store_n(&pw_shutdown, 1, __ATOMIC_RELAXED);
+}
+
+static void power_confirm_layout(const HaloView &v) {
+  const char *title = __atomic_load_n(&pw_shutdown, __ATOMIC_RELAXED) == 3 ? "Try again" : "Power off?";
+  gl_text_mid(pw_confirm_title, gl_title, title, pw_confirm_mid, CX, 144, 1, GL_TEXT, 1, &halo_black);
+  pw_confirm_title.on_black = true;
+  halo_view_commit(pw_confirm_title, v);
+  for (int i = 0; i < 2; i++) {
+    HaloItem &box = pw_confirm_box[i], &text = pw_confirm_text[i];
+    box.kind = HI_RRECT, box.x = CX, box.y = PW_CHOICE_Y[i], box.w = PW_CHOICE_W, box.h = PW_CHOICE_H;
+    box.r = PW_CHOICE_H / 2, box.color = PW_CHOICE_COLOR[i], box.alpha = 1, box.scale = 1, box.on_black = true;
+    gl_text_mid(text, gl_t24, i ? "Confirm" : "Back", pw_confirm_label_mid[i], CX, box.y, 1,
+                i ? 0x561E19 : GL_TEXT, 1, &box);
+    halo_view_commit(box, v), halo_view_commit(text, v);
+  }
+}
+
+static void power_confirm_draw() {
+  halo_item_draw(pw_confirm_title);
+  for (int i = 0; i < 2; i++) halo_item_draw(pw_confirm_box[i]), halo_item_draw(pw_confirm_text[i]);
+}
+
+static void power_confirm_open() {
+  __atomic_store_n(&pw_shutdown, 0, __ATOMIC_RELAXED);
+  nav_scr[1] = -1, nav_stub[1] = "Power off";
+  halo_nav_open({nullptr, power_confirm_update, power_confirm_layout, power_confirm_draw});
+}
+
+static void power_shutdown_poll() {
+  if (__atomic_load_n(&pw_shutdown, __ATOMIC_RELAXED) != 1) return;
+  LOG("power: shutdown confirmed\n");
+  const bool accepted = halo_power_off();
+  __atomic_store_n(&pw_shutdown, accepted ? 2 : 3, __ATOMIC_RELAXED);
+#ifdef __EMSCRIPTEN__
+  if (accepted) halo_display_on(false);
+#endif
+}
+#endif
+
 static void power_build() {  // after halo_begin: the motion sensor is on its I2C bus
   K_PW_IN = halo_spring(0.8f, 1);   // to Always On — calm: ~0.5 s most of the way
   K_PW_OUT = halo_spring(0.5f, 1);  // awake — quicker: ~0.3 s
   K_PW_SHIFT = halo_spring(0.3f, 1);
+#ifdef HALO_ROUND
+  pw_confirm_mid = halo_text_mid(gl_title, "Power off?");
+  pw_confirm_label_mid[0] = halo_text_mid(gl_t24, "Back");
+  pw_confirm_label_mid[1] = halo_text_mid(gl_t24, "Confirm");
+#endif
 #if FN_WAKE_RAISE || FN_STEPS || defined(__EMSCRIPTEN__)
   halo_motion_begin(150);  // (Raise off and no Steps — the motion sensor stays off)
 #endif

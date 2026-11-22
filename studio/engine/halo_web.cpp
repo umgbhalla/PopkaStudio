@@ -285,6 +285,7 @@ HaloBattery halo_battery() {
 }
 #ifdef HALO_ROUND
 void halo_charge_limit_set(int) {}
+bool halo_power_off() { return true; }
 #endif
 HaloI2c halo_i2c(uint8_t) {
   return nullptr;

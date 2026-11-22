@@ -144,4 +144,7 @@ void loop() {
 #if HAS_SHADE
   shade_poll();  // (the panel's own brightness, without Display)
 #endif
+#ifdef HALO_ROUND
+  power_shutdown_poll();
+#endif
 }

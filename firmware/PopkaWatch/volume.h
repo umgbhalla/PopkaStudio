@@ -40,11 +40,12 @@ static int vol_codec(int vol) {
   const float db = -40 + (vol - 1) * 46.0f / 9, reg = 0xBF + 2 * db;
   return (int)lroundf((reg + 1) * 100 / 256);
 }
-static void vol_set(int v) {
+static void vol_set(int v, bool show_indicator = true) {
   vol_level = constrain(v, 0, 10);
   halo_audio_volume(vol_codec(vol_level));
   vol_from = vol_lvl, vol_t = 0;
-  vol_show.target = 1, vol_hide_in = 2.5f;
+  if (show_indicator) vol_show.target = 1, vol_hide_in = 2.5f;
+  else vol_hide_in = -1, halo_spring_set(vol_show, 0);
 }
 static void vol_build() {
   if (vol_built) return;
