@@ -93,9 +93,7 @@ struct ScRun {
   float *wave;            // Liquid: the front and the back water line per column
   int wave_x0, wave_n;
   float last_sec;
-  // Solar: the glow's color by the distance from its middle (8-bit R, G, B, a radius a step), the wedge's light by how
-  // far round it is (0..255 of 0 … the hand) — made when its colors or the wedge change
-  uint8_t sol_rgb[3][256], sol_a[256];
+  // Solar: the colors its pictures were made with
   uint32_t sol_key;
   // Solar's light as pictures (PSRAM, the whole screen): the one shown and the one being made, a few rows a frame, when
   // the wedge moves — no frame pays for the per-pixel work, a transition only copies (sol_*)
@@ -388,55 +386,42 @@ static inline float sol_atan2(float y, float x) {
   if (x < 0) r = 3.14159274f - r;
   return y < 0 ? -r : r;
 }
-static const uint8_t SOL_BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
-// The band's part of the dial: d[0] ax, d[1] ay, d[2] R, d[3] the wedge's angle (radians from 12), d[4] the glow's middle y,
-// d[5] its reach; light — the wedge's color. Per pixel only lookups, a blend and the dither: the angle and the two
-// distances are worked out every 8 pixels and run straight between (they are smooth there; a step that jumps — near the
-// middle, across 6 o'clock — is worked out pixel by pixel). Measured on the 1.75: 162 ms a whole dial with them per
-// pixel (two roots, an atan, three divisions), now a few times less
-#define SOL_STEP 8
-static inline void sol_at(float dx, float dy, float gdy, float inv_reach, float inv_r, float &an, float &gi, float &rf) {
-  an = sol_atan2(dx, -dy);
-  if (an < 0) an += 2 * HALO_PI;
-  gi = fminf(255, halo_sqrt(dx * dx + gdy * gdy) * inv_reach);
-  rf = fminf(1, halo_sqrt(dx * dx + dy * dy) * inv_r);
-}
-static void sol_draw_bg(const ScRun &c, uint32_t light, float ax, float ay, float R, float wd) {
-  const float gy = ay - 0.3f * R, reach = 1.25f * R;
-  const int lr = light >> 16 & 255, lg = light >> 8 & 255, lb = light & 255;
-  const float inv_w = wd > 0.01f ? 255.0f / wd : 0, inv_reach = 255.0f / reach, inv_r = 1 / R;
+// The band's part of the dial, exact per pixel: the glow (a smoothstep from its middle above center out to deep at the
+// edge) and the wedge (clockwise from 12 to the hand, brighter toward the hand and the rim), in float, then to 565 with a
+// noise dither (interleaved gradient noise: no 4×4 grid to see). Only the pictures are made with it — a few rows a frame
+// (sol_make_rows), so it may cost. Measured with tools/banding.py: the 256-step tables it had made spokes in the wedge
+// (~5 px of arc a step at the rim) and the 4×4 pattern a mesh in the blue (12 % of the gradient off its trend)
+static void sol_draw_bg(const ScRun &c, uint32_t light, float ax, float ay, float R, float wd, uint32_t mid, uint32_t edge) {
+  (void)c;
+  const float gy = ay - 0.3f * R, reach = 1.25f * R, inv_r = 1 / R, inv_w = wd > 0.01f ? 1 / wd : 0;
+  const float mr = mid >> 16 & 255, mg = mid >> 8 & 255, mb = mid & 255;
+  const float er = edge >> 16 & 255, eg = edge >> 8 & 255, eb = edge & 255;
+  const float lr = light >> 16 & 255, lg = light >> 8 & 255, lb = light & 255;
   for (int y = max(hb.y, (int)(ay - R)); y < min(hb.y + hb.rows, (int)(ay + R) + 1); y++) {
     const float dy = y + 0.5f - ay, half = R * R - dy * dy;
     if (half <= 0) continue;
-    const float hw = halo_sqrt(half);
+    const float hw = sqrtf(half);
     const int x0 = max(hb.x0, (int)ceilf(ax - hw)), x1 = min(hb.x1, (int)floorf(ax + hw));
-    if (x0 > x1) continue;
     uint16_t *row = halo_row(y);
-    const uint8_t *t = SOL_BAYER[y & 3];
     const float gdy = y + 0.5f - gy;
-    float an1, gi1, rf1;
-    sol_at(x0 + 0.5f - ax, dy, gdy, inv_reach, inv_r, an1, gi1, rf1);
-    for (int xs = x0; xs <= x1; xs += SOL_STEP) {
-      const int xe = min(x1 + 1, xs + SOL_STEP), n = xe - xs;
-      const float an0 = an1, gi0 = gi1, rf0 = rf1;
-      sol_at(xe + 0.5f - ax, dy, gdy, inv_reach, inv_r, an1, gi1, rf1);
-      const bool exact = fabsf(an1 - an0) > 0.35f;  // (near the middle, or across 6 o'clock: angle by pixel)
-      const float da = (an1 - an0) / n, dg = (gi1 - gi0) / n, dr = (rf1 - rf0) / n;
-      float an = an0, gi = gi0, rf = rf0;
-      for (int x = xs; x < xe; x++, an += da, gi += dg, rf += dr) {
-        float a_px = an, g_px = gi, r_px = rf;
-        if (exact) sol_at(x + 0.5f - ax, dy, gdy, inv_reach, inv_r, a_px, g_px, r_px);
-        const int g8 = (int)g_px;
-        int r = c.sol_rgb[0][g8], g = c.sol_rgb[1][g8], b = c.sol_rgb[2][g8];
-        if (a_px <= wd) {  // the wedge: clockwise from 12 up to the hand, brighter toward the hand and the edge
-          const int A = c.sol_a[min(255, (int)(a_px * inv_w))] * (77 + (int)(178 * r_px)) >> 8;
-          r += (lr - r) * A >> 8, g += (lg - g) * A >> 8, b += (lb - b) * A >> 8;
+    for (int x = x0; x <= x1; x++) {
+      const float dx = x + 0.5f - ax;
+      const float u = fminf(1, sqrtf(dx * dx + gdy * gdy) / reach), e = u * u * (3 - 2 * u);
+      float r = mr + (er - mr) * e, g = mg + (eg - mg) * e, b = mb + (eb - mb) * e;
+      if (wd > 0) {
+        float an = sol_atan2(dx, -dy);
+        if (an < 0) an += 2 * HALO_PI;
+        if (an <= wd) {
+          const float rf = fminf(1, sqrtf(dx * dx + dy * dy) * inv_r), t = an * inv_w;
+          const float A = 0.843f * t * sqrtf(t) * (0.3f + 0.7f * rf);
+          r += (lr - r) * A, g += (lg - g) * A, b += (lb - b) * A;
         }
-        const int th = t[x & 3];  // (dithered to 565: r·31·16/255 ≈ r·497/256, g·63·16/255 ≈ g·1012/256)
-        const int r5 = min(31, ((r * 497 >> 8) + th) >> 4), g6 = min(63, ((g * 1012 >> 8) + th) >> 4),
-                  b5 = min(31, ((b * 497 >> 8) + th) >> 4);
-        row[x] = HALO_PX(r5 << 11 | g6 << 5 | b5);
       }
+      // (interleaved gradient noise, Jimenez 2014: a threshold 0..1 that does not repeat in a grid)
+      const float fx = 0.06711056f * x + 0.00583715f * y, n = 52.9829189f * (fx - floorf(fx)), th = n - floorf(n);
+      const int r5 = min(31, (int)(r * (31 / 255.0f) + th)), g6 = min(63, (int)(g * (63 / 255.0f) + th)),
+                b5 = min(31, (int)(b * (31 / 255.0f) + th));
+      row[x] = HALO_PX(r5 << 11 | g6 << 5 | b5);
     }
   }
 }
@@ -456,13 +441,14 @@ static bool sol_alloc(ScRun &c) {
     }
   return true;
 }
-static void sol_make_rows(ScRun &c, int back, int y0, int y1, uint32_t light, float ax, float ay, float R, float wd) {
+static void sol_make_rows(ScRun &c, int back, int y0, int y1, uint32_t light, float ax, float ay, float R, float wd,
+                          uint32_t mid, uint32_t edge) {
   const HaloBand saved = hb;
   for (int y = y0; y < y1; y += HALO_ROWS) {
     const int rows = min(HALO_ROWS, y1 - y);
     hb = {c.sol_buf[back] + y * HALO_W, y, rows, 0, HALO_W - 1, 0, HALO_W};
     memset(hb.buf, 0, rows * HALO_W * 2);
-    sol_draw_bg(c, light, ax, ay, R, wd);
+    sol_draw_bg(c, light, ax, ay, R, wd, mid, edge);
   }
   hb = saved;
 }
@@ -1284,29 +1270,19 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const float ha = floorf(((t.tm_hour % 12) + t.tm_min / 60.0f + sc_sec / 3600) * 30 / hq) * hq;
       // The glow and the wedge's ramp: made again when the colors change
       const uint32_t key = L.color * 31 + L.color2;
-      const bool fresh = c.sol_key != key;
-      if (fresh) {
-        const uint32_t mid = L.color, edge = sc_mix(L.color, 0x000000, 0.93f);  // (dark mode: deep at the edge)
-        for (int i = 0; i < 256; i++) {
-          const float u = i / 255.0f, e = u * u * (3 - 2 * u);  // (smoothstep: bright core, a long soft fall)
-          const uint32_t col = sc_mix(mid, edge, e);
-          c.sol_rgb[0][i] = col >> 16 & 255, c.sol_rgb[1][i] = col >> 8 & 255, c.sol_rgb[2][i] = col & 255;
-          c.sol_a[i] = (uint8_t)(215 * powf(u, 1.5f));  // (dark at 12, brightest at the hand: a saturated light, never white)
-        }
-        halo_damage_all();
-      }
+      if (c.sol_key != key) halo_damage_all();  // (new colors: the picture is made again below)
       // The light's pictures: none yet — the first made at once; the wedge moved — the next made a few rows a frame,
       // shown when whole. The minute hand goes with the picture shown, so its edge is always under the hand
       if (sol_alloc(c)) {
         if (c.sol_w[c.sol_front] < 0 || c.sol_key != key) {
-          sol_make_rows(c, c.sol_front, 0, HALO_H, L.color2, ax, ay, R, want);
+          sol_make_rows(c, c.sol_front, 0, HALO_H, L.color2, ax, ay, R, want, L.color, sc_mix(L.color, 0x000000, 0.93f));
           c.sol_w[c.sol_front] = want, c.sol_y = -1, c.sol_key = key;
         } else if (c.sol_y < 0 && c.sol_w[c.sol_front] != want) {
           c.sol_y = 0, c.sol_w[!c.sol_front] = want;
         }
         if (c.sol_y >= 0) {
           const int back = !c.sol_front, y1 = min(HALO_H, c.sol_y + SOL_ROWS);
-          sol_make_rows(c, back, c.sol_y, y1, L.color2, ax, ay, R, c.sol_w[back]);
+          sol_make_rows(c, back, c.sol_y, y1, L.color2, ax, ay, R, c.sol_w[back], L.color, sc_mix(L.color, 0x000000, 0.93f));
           c.sol_y = y1 < HALO_H ? y1 : -1;
           if (c.sol_y < 0) c.sol_front = back;  // (whole: shown from this frame)
         }
