@@ -6,6 +6,7 @@
 // black disc the size of the screen sliding down from above under the finger (its lower edge is an arc; the face under
 // it dims by 35 %). Let go past a third of the way or flicked faster than 700 px/s — it goes on to the end, else back:
 // the rest by time (260 ms open, 220 ms back, scaled by what is left) along Material's standard curve. Up — closes.
+// Open, a drag down once more — to the watch face (from any screen): the panel slides up off the face under it.
 //
 // Two rows of three buttons: Wi-Fi, Brightness, Always On / Screen off, Volume, Lock. Volume taps mute or restore
 // the last audible level. Brightness taps cycle through three presets. Holding either control opens a temporary
@@ -472,6 +473,14 @@ static void shade_tick(float dt, bool awake) {
     } else {
       sh_drag = false;
       const bool from_open = sh_px0 > T / 2;
+      // Open, and pulled down once more (it has no further to go): to the clock — the panel slides up off the face
+      // under it (the user's way: swipe down — the quick settings, swipe down again — the watch face)
+      if (from_open && sh_px >= T - 0.5f && (f.y - sh_y0 > 60 || f.vy > 700)) {
+        sh_tween(0, 260);
+        if (!halo_nav_on_face()) halo_nav_home_now();
+        halo_damage_all();
+        return shade_anim(dt);
+      }
       const bool go = f.vy > 700 || (f.vy > -700 && (from_open ? sh_px > T * 2 / 3 : sh_px > T / 3));
       sh_tween(go ? T : 0, go ? 260 : 220);
     }
