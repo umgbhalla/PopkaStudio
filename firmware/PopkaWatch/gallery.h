@@ -1,5 +1,5 @@
 // gallery.h — the gallery of projects/HaloWatch (HaloWatch.ino there: menu_*), one to one, made of layers: the title
-// at the top of the list, the cards, the button at the bottom edge ("More") and the scroll indicator; the clock along
+// at the top of the list, the cards, the button at the bottom edge and the scroll indicator; the clock along
 // the top edge (wxscreen.h) scrolls away on it, as on HaloWatch.
 //
 // On HaloWatch the gallery is one screen with five cards. Here each part is a layer of its own (a kind of FaceLayer),
@@ -9,7 +9,7 @@
 // the ends, a press squeezes a card's corners, the clock along the top edge scrolls away, the scroll indicator shows
 // while the list moves (and fades 2 s later), the button at the bottom edge grows as the list reaches its end. A tap on
 // a card or on the button opens its screen (face.h: lib/Halo's Android 16 transition; back — a swipe from the left
-// edge); one without a link opens a screen with its title in the middle, as HaloWatch's Alarm and More do.
+// edge). An unlinked card opens its title screen. An unlinked edge button goes back.
 //
 // The text is in HaloWatch's fonts (t_title, t24, t20, ic24 there; gl_* here — assets/halo.conf has them always): any
 // Latin text; the icons — Font Awesome, the ones gl_ic24 has. The places and sizes are HaloWatch's: a part of the
@@ -35,6 +35,14 @@ enum : uint8_t { EB_NONE, EB_STILL, EB_GROWS };
 
 static HaloSpringK K_M3_DEFAULT, K_PRESS, K_RELEASE, K_SC_VIS, K_EB;
 static float gl_mid_icon;  // all icons by one middle (the bell's, as on WearKit)
+#ifdef HALO_ROUND
+static constexpr char GL_BACK_ARROW[] = "\xef\x81\xa0";  // Font Awesome arrow-left
+static float gl_mid_back, gl_mid_back_arrow, gl_back_text_dx, gl_back_arrow_dx;
+
+static bool gal_edge_back(const FaceLayer &layer) {
+  return layer.kind == FL_EDGE && (layer.tap <= 0 || layer.tap >= face_scr_n);
+}
+#endif
 
 struct Press {  // a press of a card (as Wear OS buttons: RoundButton.kt)
   HaloSpring s;
@@ -182,6 +190,12 @@ static void gal_build() {
   K_SC_VIS = halo_spring(halo_stiff(400), 1);
   K_EB = halo_spring(halo_stiff(400), 1);
   gl_mid_icon = halo_text_mid(gl_ic24, "");
+#ifdef HALO_ROUND
+  gl_mid_back = halo_text_mid(gl_t24, "Back");
+  gl_mid_back_arrow = halo_text_mid(gl_back_ic, GL_BACK_ARROW);
+  gl_back_text_dx = (halo_text_width(gl_back_ic, GL_BACK_ARROW) + 10) / 2.0f;
+  gl_back_arrow_dx = (halo_text_width(gl_t24, "Back") + 10) / 2.0f;
+#endif
   for (int k = 0; k < face_scr_n; k++) gal_rebuild(face_scr[k]);
 }
 
@@ -226,7 +240,10 @@ static void gal_update(FaceScreen &S, float dt, int depth) {
   }
   if (f.dragging) g->armed = -1, g->eb_armed = false;
   if (f.tap && g->armed >= 0 && depth >= 0) gl_req = &S.layers[g->item[g->armed]], gl_req_depth = depth;
-  if (f.tap && g->eb_armed && depth >= 0) gl_req = &S.layers[g->edge], gl_req_depth = depth;
+  if (f.tap && g->eb_armed) {
+    const FaceLayer &edge = S.layers[g->edge];
+    if (depth >= 0 || gal_edge_back(edge)) gl_req = &edge, gl_req_depth = depth;
+  }
   for (int i = 0; i < menu.n; i++) press_update(g->press[i], i == g->armed && f.down, dt);
   press_update(g->eb_press, g->eb_armed && f.down, dt);
   if (!f.down) g->armed = -1, g->eb_armed = false;
@@ -294,9 +311,13 @@ static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       HaloItem &e = it[0];
       e.kind = HI_EDGE, e.x = CX, e.y = CX, e.r = EB_R, e.h = eh, e.w = EB_W, e.v = 48 + (32 - 48) * ep;
       e.scale = 1, e.color = L.color, e.alpha = eh > 1 ? e_bg * a : 0, e.on_black = true;
-      gl_text_mid(it[1], gl_t24, gl_str(L.text), R.mid, CX, e_top + fminf(eh, EB_FULL) * 0.4f, 1, GL_TEXT,
-                  eh > 1 ? e_txt * a : 0, &e);
-      halo_view_commit(it[0], v), halo_view_commit(it[1], v);
+      const bool back = gal_edge_back(L);
+      const float y = e_top + fminf(eh, EB_FULL) * 0.4f, alpha = eh > 1 ? e_txt * a : 0;
+      gl_text_mid(it[1], gl_t24, back ? "Back" : gl_str(L.text), back ? gl_mid_back : R.mid,
+                  CX + (back ? gl_back_text_dx : 0), y, 1, GL_TEXT, alpha, &e);
+      gl_text_mid(it[2], gl_back_ic, GL_BACK_ARROW, gl_mid_back_arrow, CX - gl_back_arrow_dx, y, 1, GL_TEXT,
+                  back ? alpha : 0, &e);
+      halo_view_commit(it[0], v), halo_view_commit(it[1], v), halo_view_commit(it[2], v);
       R.ax = CX, R.ay = CX + EB_R - EB_FULL / 2;
       break;
     }
@@ -326,7 +347,8 @@ static void gal_draw(const FaceScreen &S, int i) {
   if (S.layers[i].kind == FL_DEVCARD) return dc_draw(S, i);
   const HaloItem *it = S.run[i].g;
   if (!it) return;
-  const int n = S.layers[i].kind == FL_CARD ? 5 : S.layers[i].kind == FL_SCROLL ? 3 : S.layers[i].kind == FL_EDGE ? 2 : 1;
+  const uint8_t kind = S.layers[i].kind;
+  const int n = kind == FL_CARD ? 5 : kind == FL_SCROLL || kind == FL_EDGE ? 3 : 1;
   for (int j = 0; j < n; j++) halo_item_draw(it[j]);
 #ifndef HALO_ROUND
   if (S.run[i].txt) halo_roll_draw(S.run[i].roll);  // (the live card: its temperature)

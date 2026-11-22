@@ -1532,7 +1532,8 @@ function layerProps(stage, l) {
     groups.push(text('Text', !ROUND ? null : slider('Radius', () => l.radius, upd('radius'), { min: 100, max: 240, unit: 'px', key: 'radius' }),
       color('Color', () => l.color, upd('color'), 'color')));
   } else if (l.type === 'title' || l.type === 'edge') {
-    groups.push(h('div', { class: 'group' }, h('h3', {}, 'Text'), words('Text', 'text'),
+    const isBack = ROUND && l.type === 'edge' && !targetsFor(l).some((s) => s.id === l.tap?.to);
+    groups.push(h('div', { class: 'group' }, h('h3', {}, isBack ? 'Button' : 'Text'), isBack ? null : words('Text', 'text'),
       color(l.type === 'edge' ? 'Button' : 'Color', () => l.color, upd('color'), 'color')));
   } else if (l.type === 'rtime') {
     groups.push(text('Text', color('Color', () => l.color, upd('color'), 'color')));
@@ -1658,7 +1659,8 @@ function iconPicker(get, set) {
 function onTap(stage, l) {
   const others = targetsFor(l), gallery = TAPS.has(l.type);
   const value = l.tap && others.some((s) => s.id === l.tap.to) ? l.tap.to : '';
-  return h('div', { class: 'group' }, choice('Go to', value, [['', 'Nothing'], ...others.map((s) => [s.id, s.name]), ...newChoices(l)], (v) => {
+  const fallback = ROUND && l.type === 'edge' ? 'Back' : 'Nothing';
+  return h('div', { class: 'group' }, choice('Go to', value, [['', fallback], ...others.map((s) => [s.id, s.name]), ...newChoices(l)], (v) => {
     if (v === NEW) return addScreen(stage, l.id);
     if (v === NEW_LIST) return addScreen(stage, l.id, 'list');
     change(() => { l.tap = v ? { to: v, fx: gallery ? 'a16' : l.tap?.fx || 'fade' } : null; }, { structure: true });

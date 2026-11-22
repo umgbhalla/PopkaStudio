@@ -8,7 +8,7 @@
 //   along the edge: radius); the pills — scale (1 — as on HaloWatch), spacing, color (the pill), color2 (the text); the
 //   icon — scale; the dots — color (the current one), color2 (the others). dx, dy — moved from HaloWatch's place.
 //   tap (a layer of the watch face) — {to: screen id, fx: "fade" | "zoom" | "slide"} or null: a tap opens that screen.
-//   The gallery's parts (HaloWatch's title, cards, More button, scroll indicator) — HaloWatch's fonts and places (they
+//   The gallery's parts (HaloWatch's title, cards, Back button, scroll indicator) — HaloWatch's fonts and places (they
 //   don't move: the list places them), text, subtitle (a card's line under its title), icon (a key of ICONS), color,
 //   color2; a card's or the button's tap — {to, fx: "a16"}: the Android 16 transition (none — a screen with its title).
 // main — the screen a swipe up on the face opens (HaloWatch's gallery), or null.
@@ -94,7 +94,7 @@ export const KINDS = {
   // The gallery (HaloWatch.ino): fixed — the list places them, in HaloWatch's fonts; a new card — a plain one
   title: { group: 'gallery', fixed: true, name: 'Title', sub: 'The list\'s heading', text: 'Gallery', color: '#FFF8EE' },
   card: { group: 'gallery', fixed: true, name: 'Card', sub: 'Icon, title, a line under it; opens a screen', text: 'Card', subtitle: 'Description', icon: 'star', color: '#A8C7FA', color2: '#2E3034' },
-  edge: { group: 'gallery', fixed: true, name: 'More button', sub: 'At the bottom edge, grows at the list\'s end', text: 'More', color: '#2E3034' },
+  edge: { group: 'gallery', fixed: true, name: 'Back button', sub: 'Returns to the previous screen from the end of the list', text: 'Back', color: '#2E3034' },
   scroll: { group: 'gallery', fixed: true, name: 'Scroll indicator', sub: 'On the right while the list moves', color: '#C6C6C6', color2: '#333333' },
   // About (device.h; PopkaStudio's own — web/mockups/hardware.html, variant 2): a gallery card with a live value and a
   // small picture (what it shows — DEVS), a card's own screen; Power — variant 10's battery page

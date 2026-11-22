@@ -329,7 +329,7 @@ DEFAULTS = {
     "title": {"name": "Title", "text": "Gallery", "color": "#FFF8EE"},
     "card": {"name": "Card", "text": "Card", "subtitle": "Description", "icon": "star", "color": "#A8C7FA",
              "color2": "#2E3034", "live": False},  # (live: a rectangle's big weather card — gallery_rect.h)
-    "edge": {"name": "More button", "text": "More", "color": "#2E3034"},
+    "edge": {"name": "Back button", "text": "Back", "color": "#2E3034"},
     "scroll": {"name": "Scroll indicator", "color": "#C6C6C6", "color2": "#333333"},
     # Steps (not on HaloWatch: PopkaStudio's, face.h FL_STEPS): the pill, its number, the ring and the shoe; the goal
     "steps": {"name": "Steps", "scale": 1, "spacing": 0, "color": "#2D2F2F", "color2": "#F8F7F9", "color3": "#FF8A80",
@@ -386,6 +386,7 @@ GALLERY_FONTS = [
     "font  gl_t20    GoogleSansFlex.ttf  20  latin punct  @wght=620,wdth=104,ROND=100   # the line under a card's title",
     "font  gl_ic24   fa-solid-900.ttf    24  " + " ".join(f"0x{c:04x}" for c in ICONS.values())
     + " 0xf067 0xf068   # cards' icons; the player's + and −",
+    "font  gl_back_ic fa-solid-900.ttf    24  0xf060   # Back arrow",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
@@ -616,6 +617,12 @@ def migrate(project):
         return project
     for scr in project.get("screens", []):  # (a Radio screen of one layer, before 13 Nov 2026: its parts over it)
         layers = scr.get("layers") if isinstance(scr, dict) else None
+        if isinstance(layers, list):
+            for layer in layers:
+                if isinstance(layer, dict) and layer.get("type") == "edge" and not layer.get("tap") and layer.get("text") == "More":
+                    layer["text"] = "Back"
+                    if layer.get("name") == "More button":
+                        layer["name"] = "Back button"
         if not isinstance(layers, list) or not any(isinstance(l, dict) and l.get("type") == "radio" for l in layers) \
                 or any(isinstance(l, dict) and l.get("type") in RADIO_PARTS for l in layers):
             continue

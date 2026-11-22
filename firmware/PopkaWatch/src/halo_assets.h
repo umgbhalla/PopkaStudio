@@ -21,3 +21,4 @@ extern const HaloImage icons0_partly;  // icons0_partly.png, 63×64
 extern const HaloImage icons0_sun;  // icons0_sun.png, 57×57
 extern const HaloImage icons0_cloud;  // icons0_cloud.png, 63×60
 extern const HaloImage icons0_rain;  // icons0_rain.png, 57×60
+extern const HaloFont gl_back_ic;  // fa-solid-900.ttf 24 px, 1 букв, строка 26, базовая линия 22

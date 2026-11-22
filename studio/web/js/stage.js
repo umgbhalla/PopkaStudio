@@ -413,11 +413,11 @@ export class Stage {
   }
 
   // The selected part of the gallery in view: its screen's list (in its map copy) scrolled to it — a title or a card
-  // to the middle, the More button to the end
+  // to the middle, the edge button to the end
   reveal() {
     if (this.drag?.kind === 'list') return;  // (grabbed in its list: it stays where it is under the mouse)
     const l = selected(), s = l && screenOf(l.id), e = s && this.engineOf(s);
-    if (e && (LISTED.has(l.type) || l.type === 'edge')) e.scroll(screens().indexOf(s), s.layers.indexOf(l));  // (More: the list's end)
+    if (e && (LISTED.has(l.type) || l.type === 'edge')) e.scroll(screens().indexOf(s), s.layers.indexOf(l));
     // The quick settings panel: open on the home's copy while its layer is selected (shade_rect.h: the command shade)
     const he = this.engineOf(home()), open = l?.type === 'shade';
     if (he?.M && he.shadeOpen !== open) he.shadeOpen = open, he.command(open ? 'shade open' : 'shade close');

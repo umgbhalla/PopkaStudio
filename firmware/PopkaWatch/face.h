@@ -1030,7 +1030,7 @@ static const HaloScreen FACE = {nullptr, face_update, face_layout, face_draw};
 
 // ---------- The gallery and the screens opened on it (lib/Halo's main screen and its stack, as on HaloWatch) ----------
 // Each level of the stack shows one of the screens — or a stub (a card without a link): its title in the middle, as
-// HaloWatch's Alarm and More
+// HaloWatch's Alarm
 static const char *nav_stub[NAV_LEVELS];
 static float stub_mid[NAV_LEVELS];
 static HaloItem stub_it[NAV_LEVELS];
@@ -1087,8 +1087,21 @@ static void gallery_tick() {
   const FaceLayer *L = gl_req;
   gl_req = nullptr;
   if (!L) return;
+#ifdef HALO_ROUND
+  if (gl_req_depth < 0) {
+    if (gal_edge_back(*L) && halo_nav_over()) halo_nav_back();
+    return;
+  }
+#endif
   const int d = halo_nav_depth();
   if (gl_req_depth == 0 ? !halo_nav_at_home() : d != gl_req_depth) return;
+#ifdef HALO_ROUND
+  if (gal_edge_back(*L)) {
+    if (d == 0) halo_nav_to_face(true);
+    else halo_nav_back();
+    return;
+  }
+#endif
   if (d + 1 >= NAV_LEVELS) return;
   const int to = L->tap > 0 && L->tap < face_scr_n ? L->tap : -1;
   for (int k = 0; k <= d; k++)

@@ -251,13 +251,13 @@
     {
      "id": "edge1",
      "type": "edge",
-     "name": "More button",
+     "name": "Back button",
      "hidden": false,
      "dx": 0,
      "dy": 0,
      "tap": null,
      "color": "#2E3034",
-     "text": "More"
+     "text": "Back"
     },
     {
      "id": "arc1",
@@ -712,13 +712,13 @@
     {
      "id": "edge2",
      "type": "edge",
-     "name": "More button",
+     "name": "Back button",
      "hidden": false,
      "dx": 0,
      "dy": 0,
      "tap": null,
      "color": "#2E3034",
-     "text": "More"
+     "text": "Back"
     },
     {
      "id": "arc4",

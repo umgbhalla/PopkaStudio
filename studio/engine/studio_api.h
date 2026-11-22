@@ -398,7 +398,14 @@ EMSCRIPTEN_KEEPALIVE void studio_tap(int s, int i) {
   const FaceScreen &S = face_scr[s];
   const FaceLayer &L = S.layers[i];
   float x, y, w, h;
-  if (s > 0) return (void)(gl_req = &L, gl_req_depth = halo_nav_depth());
+  if (s > 0) {
+    gl_req = &L;
+    gl_req_depth = halo_nav_depth();
+#ifdef HALO_ROUND
+    if (gal_edge_back(L) && halo_nav_over()) gl_req_depth = -1;
+#endif
+    return;
+  }
   if (L.tap <= 0 || L.tap >= face_scr_n || !layer_rect(S, i, x, y, w, h)) return;
   face_over = L.tap;
   halo_nav_face_open(OVER, L.fx, x, y, w, h);
