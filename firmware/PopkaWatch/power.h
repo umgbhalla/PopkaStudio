@@ -181,7 +181,7 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
     else shade_close();
 #endif
 #ifdef HALO_ROUND
-    if (open_apps) halo_nav_to_face(false);
+    if (open_apps) halo_nav_open_apps();
     else
 #endif
     if (animate) halo_nav_home(btn == 2);

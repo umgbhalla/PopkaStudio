@@ -98,7 +98,7 @@ static bool nav_moving; // в прошлом кадре шёл переход (h
 // Циферблат под всем
 static HaloScreen face;
 static bool has_face, sheet_drag, sheet_list_drag;
-static bool home_return, home_corner;
+static bool home_return, home_corner, sheet_corner_open;
 static constexpr float HOME_SECONDS = 0.30f;
 static float home_from, home_time;
 static bool has_main;  // был halo_nav_begin: с циферблата есть куда уйти свайпом вверх (без него циферблат — один)
@@ -162,6 +162,7 @@ void halo_view_commit(HaloItem &it, const HaloView &v) {
 }
 
 void halo_nav_begin(const HaloScreen &h) {
+  sheet_corner_open = false;
   if (has_main) {  // главный меняют: прежний и открытые на нём — спрятать, на циферблат
     for (int d = depth; d >= 0; d--)
       if (scr[d].layout) scr[d].layout({0, 0, 1, 0});
@@ -316,10 +317,11 @@ float halo_nav_pull() {
   return fmaxf(0, over_on ? over_pull.x : sheet_pull.x);
 }
 
-static void home_step(HaloSpring &path, float dt) {
+static void button_step(HaloSpring &path, float dt) {
   home_time += dt;
-  const float t = halo_clamp01(home_time / (HOME_SECONDS * fmaxf(0.45f, home_from)));
-  path.x = home_from * (1 - t * t * (3 - 2 * t));
+  const float distance = path.target - home_from;
+  const float t = halo_clamp01(home_time / (HOME_SECONDS * fmaxf(0.45f, fabsf(distance))));
+  path.x = home_from + distance * t * t * (3 - 2 * t);
 }
 
 #ifdef HALO_ROUND
@@ -367,7 +369,7 @@ static bool over_update(float dt) {
     }
   }
   if (!over_drag) {
-    if (home_return) home_step(over_q, dt);
+    if (home_return) button_step(over_q, dt);
     else halo_spring_run(over_q, over_q.target > 0.5f ? K_OVER_IN : K_OVER_OUT, dt);
     halo_spring_run(over_pull, K_PULL, dt);
   }
@@ -491,11 +493,23 @@ void halo_nav_home(bool power_button) {
   sheet.v = 0, sheet.target = 0;
 }
 
+#ifdef HALO_ROUND
+void halo_nav_open_apps() {
+  if (!has_main || !halo_nav_on_face()) return;
+  sheet_corner_open = true;
+  home_time = home_from = 0;
+  cmd_back = false, cmd_face = -1;
+  sheet_in = true, sheet_ax = nav_side, sheet_dir = 1;
+  sheet.v = 0, sheet.target = 1;
+  if (halo_finger.down || halo_finger.released) halo_finger.owner = &sheet_owner;
+}
+#endif
+
 // Сразу на циферблат (в Always On его и так уже видно одного): закрыть всё над ним, главный — в начало, а выход из
 // Always On — как с циферблата (сам циферблат из вида amb_v, без fade through)
 void halo_nav_home_now() {
   const HaloView hidden = {0, 0, 1, 0};
-  home_return = false;
+  home_return = sheet_corner_open = false;
   if (over_on) over_forget();
   over_drag = over_closing = false;
   if (has_face) {
@@ -534,11 +548,11 @@ static bool sheet_update(float dt) {
   }
   const bool up = sheet.target > 0.5f;
   const bool here = view == V_HOME || view == V_TOP;  // не посреди перехода Android 16 между ними
-  const HaloList *list = up && view == V_HOME && scr[0].main_list ? scr[0].main_list() : nullptr;
+  const HaloList *list = up && !sheet_corner_open && view == V_HOME && scr[0].main_list ? scr[0].main_list() : nullptr;
   // Вверх по циферблату (откуда угодно); с главного или открытого на нём экрана — его жест. Sideways (halo_nav_side):
   // to the left anywhere on the face; back from the main itself — also to the right from the left edge (a screen opened
   // on the main has that gesture as its own back: top_frame)
-  if (f.drag_start && here && !home_return && !sheet_drag && !sheet_list_drag) {
+  if (f.drag_start && here && !home_return && !sheet_corner_open && !sheet_drag && !sheet_list_drag) {
     float dir = 0;
     bool ax = false;
     if (!f.horiz) {
@@ -563,7 +577,7 @@ static bool sheet_update(float dt) {
     }
   }
   if (cmd_face >= 0) {
-    if (here && !home_return && !sheet_drag && !sheet_list_drag) {
+    if (here && !home_return && !sheet_corner_open && !sheet_drag && !sheet_list_drag) {
       if (sheet.x == sheet.target) {  // с места; в пути — тот же переход вперёд или назад
         sheet_in = cmd_face == 1;
         sheet_ax = nav_side;  // (sideways — by a command too)
@@ -612,7 +626,9 @@ static bool sheet_update(float dt) {
   }
   sheet_list_drag = f.down && pull > 0;
   if (!sheet_drag && !sheet_list_drag) {
-    if (home_return) home_step(sheet, dt);
+    if (home_return || sheet_corner_open) {
+      if (sheet.x != sheet.target) button_step(sheet, dt);
+    }
     else {
 #ifndef HALO_ROUND
     // Прямоугольник: остаток пути — по времени (своя доля SH_S) и кривой Material standard, без пружины и её хвоста
@@ -633,11 +649,12 @@ static bool sheet_update(float dt) {
   if (!home_return && !sheet_drag && sheet.target == 0 && sheet.x > 0 && sheet.x < 0.015f) halo_spring_set(sheet, 0);
   if (sheet.x > 0) main_seen = true;
   const bool rest = !sheet_drag && sheet.x == sheet.target;
+  if (rest) sheet_corner_open = false;
   if (rest && sheet.x == 0) {
     face_arrived();
     if (face.update) face.update(dt);  // палец и пружины циферблата — только когда он на месте
   }
-  return !sheet_drag && sheet.target == 1;
+  return !sheet_drag && sheet.target == 1 && (!sheet_corner_open || sheet.x > 0.5f);
 }
 
 // Кадр верхнего экрана: жест назад от левого края — или его собственное обновление (может открыть ещё один поверх)
@@ -820,10 +837,11 @@ void halo_nav_update(float dt) {
     if (p <= 0.0005f) {
       v_face = id, v_home = v_top = hidden;
 #ifdef HALO_ROUND
-    } else if (home_return && home_corner) {
-      v_face = home_corner_view(p);
-      const HaloView outgoing = home_corner_view(p - 1);
-      for (HaloView *v : {&v_home, &v_top}) view_under(*v, outgoing), v->over = false;
+    } else if (sheet_corner_open || (home_return && home_corner)) {
+      const float direction = sheet_corner_open ? -1 : 1;
+      v_face = home_corner_view(direction * p);
+      const HaloView apps = home_corner_view(direction * (p - 1));
+      for (HaloView *v : {&v_home, &v_top}) view_under(*v, apps), v->over = false;
 #endif
     } else if (p >= 0.9995f) {
       v_face = hidden, (sheet_ax ? v_home.x : v_home.y) += oy, (sheet_ax ? v_top.x : v_top.y) += oy;

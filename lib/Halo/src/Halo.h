@@ -668,6 +668,9 @@ bool halo_nav_over();     // открыт экран поверх цифербл
 // возвращения в ноль. Звать перед halo_nav_update в каждом кадре (пример — power.h в projects/HaloWatch)
 void halo_nav_ambient(float k, const HaloView &v, bool face = true);
 void halo_nav_home(bool power_button);  // Animate to the clock for a hardware Home press.
+#ifdef HALO_ROUND
+void halo_nav_open_apps();  // Open Apps from the upper-right power button.
+#endif
 // Сразу на циферблат, без перехода: экран поверх него закрыт, стопка закрыта, главный — с начала (его enter). Звать
 // в Always On, когда на экране уже только циферблат (k дошёл до 1): выход из Always On тогда — сам циферблат из вида v,
 // как если бы туда ушли с него (power.h в PopkaStudio: «Back to watch face»). Без циферблата — на главный
