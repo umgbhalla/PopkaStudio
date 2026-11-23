@@ -319,9 +319,10 @@ static void up_draw() {
 // ---------- The audit (serial: upcheck) — what overlaps on the page in front, what comes near the rim ----------
 // Every two shown items whose boxes cross by more than 2 px, unless one is the other's ground (on) or holds it whole
 // (a text on its card); every text or shape whose box reaches past r 221 (12 px from the rim). Measured, not eyeballed
+static const UpPage *up_over;  // a page an app lays itself over its pages (a panel on top): upcheck audits it instead
 static void up_audit() {
-  if (!up_app || !up_pg) return (void)LOG("upcheck: no paged app open\n");
-  const UpPage &P = up_pg[up_page];
+  if (!up_over && (!up_app || !up_pg)) return (void)LOG("upcheck: no paged app open\n");
+  const UpPage &P = up_over ? *up_over : up_pg[up_page];
   int bad = 0;
   auto name = [&](const HaloItem &it) -> const char * {
     return it.kind == HI_TEXT && it.text ? it.text : it.kind == HI_RRECT ? "[card]" : it.kind == HI_CIRCLE ? "[disc]" : "[shape]";
@@ -361,7 +362,8 @@ static void up_audit() {
       if (ox > 2 && oy > 2) LOG("upcheck: \"%s\" overlaps \"%s\" (%.0f x %.0f px)\n", name(a), name(b), ox, oy), bad++;
     }
   }
-  LOG("upcheck: page %d — %d problem%s\n", up_page + 1, bad, bad == 1 ? "" : "s");
+  if (up_over) LOG("upcheck: the panel on top — %d problem%s\n", bad, bad == 1 ? "" : "s");
+  else LOG("upcheck: page %d — %d problem%s\n", up_page + 1, bad, bad == 1 ? "" : "s");
 }
 static void up_commands() {
   static bool done;
