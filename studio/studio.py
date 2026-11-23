@@ -413,6 +413,7 @@ ICONS = {"chevron": 0xF054, "bell": 0xF0F3, "music": 0xF001, "sun": 0xF185, "gea
          "stopwatch": 0xF2F2, "image": 0xF03E, "chat": 0xF086, "wrench": 0xF0AD, "lock": 0xF023, "menu": 0xF0C9,
          "tv": 0xF26C, "mic": 0xF130, "chip": 0xF2DB, "memory": 0xF538, "thermo": 0xF2C9,
          "reset": 0xF2F1, "plus": 0x002B, "xmark": 0xF00D, "pause": 0xF04C}
+MU_ACCENTS = '"àáâãäåæçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßœŒ’"'  # (muapp.h: Latin letters with accents, as tracks' tags have them)
 # HaloWatch's fonts of the gallery (its halo.conf: t_title, t24, t20, ic24) — in every PopkaWatch, as gl_*
 GALLERY_FONTS = [
     "font  gl_title  GoogleSansFlex.ttf  34  latin punct \"é\"  @wght=620,wdth=104,ROND=100   # the gallery: titles, stubs",
@@ -455,6 +456,17 @@ GALLERY_FONTS = [
     "font  gl_sg_ic28 fa-solid-900.ttf    28  0xf185 0xf017 0xf011   # open-to cards, power off",
     "font  gl_sg_ic29 fa-solid-900.ttf    29  0xf067 0xf068 0xf2ea   # level steps, restart",
     "font  gl_sg_ic66 fa-solid-900.ttf    66  0xf1eb   # Wi-Fi",
+    # Music on the round board (muapp.h; design/SPEC_music.md): tracks' names keep their accents (MU_ACCENTS)
+    "font  gl_mu_track GoogleSansFlex.ttf 35  latin digits punct " + MU_ACCENTS + " @wght=790,wdth=86,ROND=45,opsz=35   # Music: the track",
+    "font  gl_mu_queue GoogleSansFlex.ttf 35  latin digits punct " + MU_ACCENTS + " @wght=750,wdth=58,ROND=36,opsz=35   # Music: a queued track",
+    "font  gl_mu_opt  GoogleSansFlex.ttf  35  latin punct @wght=750,wdth=69,ROND=38,opsz=35   # Music: a setting",
+    "font  gl_mu_lab  GoogleSansFlex.ttf  15  latin digits punct " + MU_ACCENTS + " @wght=700,wdth=105,ROND=30,opsz=15   # Music: artists, labels",
+    "font  gl_mu_vol  GoogleSansFlex.ttf 154  digits @wght=900,wdth=105,ROND=47,opsz=128   # Music: the volume",
+    "font  gl_mu_pct  GoogleSansFlex.ttf  35  \"%\" @wght=790,wdth=93,ROND=44,opsz=35   # Music: the volume's %",
+    "font  gl_mu_ic31 fa-solid-900.ttf    31  0xf048 0xf051   # Music: previous, next",
+    "font  gl_mu_ic32 fa-solid-900.ttf    32  0xf068 0xf067   # Music: volume minus, plus",
+    "font  gl_mu_ic24 fa-solid-900.ttf    24  0xf028   # Music: the speaker",
+    "font  gl_mu_ic26 fa-solid-900.ttf    26  0xf0a0   # Music: the library's storage",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
@@ -1741,7 +1753,7 @@ def write_sketch(project, folder, meta=None):
                      "pixelart.h", "parrot.h", "bt.h", "wxfetch.h", "settings.h", "stepscreen.h", "widgets.h", "widgets_rect.h", "wxwidgets.h",
                      "music.h", "music_sd.h", "player.h", "pomodoro.h", "pomodoro_rect.h", "sound.h", "volume.h", "recorder.h", "radio.h", "radio_net.h", "radio_rect.h", "video.h", "video_hw.h", "video_net.h", "snake.h", "games.h", "game_dots.h",
                      "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
-                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h", "scene.h", "upager.h"):
+                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h", "scene.h", "upager.h", "muapp.h"):
             shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
     if any(layer["type"] == "scene" for scr in screens for layer in scr["layers"]):  # the Scene layer's pictures,
         # built from their SVGs (tools/scene_pack.py: generated, not in git)

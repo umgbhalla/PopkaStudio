@@ -49,6 +49,9 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #if HAS_RAPP
 #include "radioapp.h"  // the Radio as four pages: Station, Stations, Volume, Radio settings (upager.h)
 #endif
+#if HAS_MUSIC && defined(HALO_ROUND)
+#include "muapp.h"    // Music on the round board: Now playing, Volume, Queue, Music settings — paged (upager.h)
+#endif
 #if HAS_CLOCKS
 #include "clocks.h"   // Stopwatch, Timer, World clock — paged apps (upager.h)
 #endif
