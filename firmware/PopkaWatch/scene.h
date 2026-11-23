@@ -14,6 +14,19 @@
 #if HAS_SCENE
 #include "src/scenes.h"
 
+// The palette in the panel's order and as channels — made when the scene changes (layout), read by draw. Not on the
+// stack: the band is drawn by two tasks and the helper's stack is 4 KB (23 Nov 2026: 3.5 KB of tables there crashed the
+// first frame — the watch booted into safe mode)
+static uint16_t scene_px[256];
+static uint8_t scene_r[256], scene_g[256], scene_b[256];
+static int scene_pal_of = -1;
+static void scene_palette(int n) {
+  if (n == scene_pal_of) return;
+  const ScenePic &P = SCENE_PICS[n];
+  for (int k = 0; k < P.n; k++)
+    scene_px[k] = HALO_PX(P.pal[k]), scene_r[k] = P.pal[k] >> 11, scene_g[k] = (P.pal[k] >> 5) & 63, scene_b[k] = P.pal[k] & 31;
+  scene_pal_of = n;
+}
 static void scene_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
   const FaceLayer &L = S.layers[i];
   FaceRun &R = S.run[i];
@@ -34,6 +47,7 @@ static void scene_layout(const FaceScreen &S, int i, float a, const HaloView &v)
     }
     R.scn = want;
     for (int k = 0; k < 4; k++) R.scv[k] = nv[k];
+    if (want >= 0) scene_palette(want);
   }
   // (its place: the layers over it blend with it — face_over_others)
   if (want >= 0) R.box[0] = 0, R.box[1] = 0, R.box[2] = HALO_W - 1, R.box[3] = HALO_H - 1;
@@ -47,16 +61,11 @@ static void scene_draw(const FaceScreen &S, int i) {
   const float vx = R.scv[0], vy = R.scv[1], vs = R.scv[2], va = R.scv[3];
   const bool still = vx == 0 && vy == 0 && vs == 1, opaque = va >= 0.996f;
   const int A = (int)(va * 256);
-  uint16_t pal[256];
-  int pr[256], pg[256], pb[256];
-  for (int k = 0; k < P.n; k++) {
-    pal[k] = HALO_PX(P.pal[k]);
-    pr[k] = P.pal[k] >> 11, pg[k] = (P.pal[k] >> 5) & 63, pb[k] = P.pal[k] & 31;
-  }
+  if (scene_pal_of != R.scn) return;  // (its palette is made in layout)
   auto put = [&](uint16_t *px, int idx) {
     if (!P.pal[idx]) return;  // (black: transparent)
-    if (opaque) *px = pal[idx];
-    else halo_blend(px, pr[idx], pg[idx], pb[idx], A);
+    if (opaque) *px = scene_px[idx];
+    else halo_blend(px, scene_r[idx], scene_g[idx], scene_b[idx], A);
   };
   const int x0 = hb.x0, x1 = hb.x1;
   if (still) {  // at rest: the runs straight into the band

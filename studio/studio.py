@@ -421,7 +421,9 @@ GALLERY_FONTS = [
     + " 0xf067 0xf068   # cards' icons; the player's + and −",
     "font  gl_back_ic fa-solid-900.ttf    24  0xf060   # Back arrow",
     "font  gl_cf_ic  fa-solid-900.ttf    30  0xf00d 0xf00c 0xf011 0xf1f8 0xf2f1   # the confirm (confirm.h): x, check, badges",
-    "font  gl_ck_n72  GoogleSansFlex.ttf  72  digits \":.\" @wght=500,ROND=100   # the clock apps' big time (clocks.h)",
+    "font  gl_up_n96  GoogleSansFlex.ttf  96  digits \":\" @wght=560,ROND=100   # paged apps: the big time (upager.h)",
+    "font  gl_up_n36  GoogleSansFlex.ttf  36  digits \".\" @wght=620,ROND=100   # paged apps: hundredths, chips",
+    "font  gl_up_ic40 fa-solid-900.ttf    40  0xf04b 0xf04c 0xf024 0xf2f1 0x2b 0xf00d 0xf185 0xf186 0xf0ac   # paged apps: the buttons' icons",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
@@ -1696,7 +1698,7 @@ def write_sketch(project, folder, meta=None):
                      "pixelart.h", "parrot.h", "bt.h", "wxfetch.h", "settings.h", "stepscreen.h", "widgets.h", "widgets_rect.h", "wxwidgets.h",
                      "music.h", "music_sd.h", "player.h", "pomodoro.h", "pomodoro_rect.h", "sound.h", "volume.h", "recorder.h", "radio.h", "radio_net.h", "radio_rect.h", "video.h", "video_hw.h", "video_net.h", "snake.h", "games.h", "game_dots.h",
                      "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
-                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h", "scene.h"):
+                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h", "scene.h", "upager.h"):
             shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
     if any(layer["type"] == "scene" for scr in screens for layer in scr["layers"]):  # the Scene layer's pictures,
         # built from their SVGs (tools/scene_pack.py: generated, not in git)

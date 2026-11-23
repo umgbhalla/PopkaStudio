@@ -150,7 +150,8 @@ struct Command {
   const char *name;
   void (*fn)(const char *args);
 };
-static Command commands[48];
+#define HC_COMMANDS 96  // (48 filled up on 23 Nov 2026: the last ones — shot — were dropped without a word)
+static Command commands[HC_COMMANDS];
 static int command_count;
 
 void halo_command(const char *name, void (*fn)(const char *args)) {
@@ -159,7 +160,8 @@ void halo_command(const char *name, void (*fn)(const char *args)) {
       commands[i].fn = fn;
       return;
     }
-  if (command_count < 48) commands[command_count++] = {name, fn};
+  if (command_count < HC_COMMANDS) commands[command_count++] = {name, fn};
+  else Serial.printf("halo_command: no room for '%s' (HC_COMMANDS)\n", name);
 }
 
 static int hc_command_names(const char **out, int max) {

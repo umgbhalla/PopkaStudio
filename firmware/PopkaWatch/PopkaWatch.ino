@@ -47,7 +47,8 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #include "wxapp.h"    // Weather: one long page on the kit — hero, 12 hours, 7 days, details, location
 #endif
 #if HAS_CLOCKS
-#include "clocks.h"   // Stopwatch, Timer, World clock — Wear OS's clock apps on the kit
+#include "upager.h"   // paged app screens: left and right pages, big icon buttons, pickers (Wear OS, M3 Expressive)
+#include "clocks.h"   // Stopwatch, Timer, World clock — paged apps (upager.h)
 #endif
 #include "steps.h"    // today's steps (only with a Steps layer)
 #include "bt.h"       // Bluetooth (only when it is on)
