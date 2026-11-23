@@ -9,7 +9,7 @@
 //   UiPage p = {"Display", {ur_slider(...), ur_toggle(...), ...}, n, accent};   ui_open(&p) — over the screen on top
 // The first user: the Settings app (sysset.h). Included from sysset.h.
 #ifdef HALO_ROUND
-enum : uint8_t { UR_HEAD, UR_NAV, UR_TOGGLE, UR_SLIDER, UR_CHOICE, UR_INFO, UR_ACTION };
+enum : uint8_t { UR_HEAD, UR_NAV, UR_TOGGLE, UR_SLIDER, UR_CHOICE, UR_INFO, UR_ACTION, UR_CUSTOM };
 #define UI_ROWS 14
 #define UI_LEVELS 3  // pages open at once: a root and two deep (lib/Halo's stack has 4 over the gallery)
 #define UI_SURF 0x2E3034  // the rows' tonal surface (the gallery's cards')
@@ -27,6 +27,10 @@ struct UiRow {
   const UiPage *page;                  // NAV: what it opens
   void (*act)();                       // ACTION; NAV with no page
   uint32_t accent;                     // the chip and the controls (0 — the page's)
+  // CUSTOM: a row the app draws itself — its height; layout: where it is now (it damages what changed), draw: in the band
+  float ch;
+  void (*clay)(float x0, float y0, float w, float h, float s, float a, const HaloView &v);
+  void (*cdraw)();
 };
 struct UiPage {
   const char *title;
@@ -73,8 +77,15 @@ static inline UiRow ur_action(const char *title, void (*act)(), uint32_t accent 
   return r;
 }
 
+static inline UiRow ur_custom(float h, void (*clay)(float, float, float, float, float, float, const HaloView &),
+                              void (*cdraw)()) {
+  UiRow r = {};
+  r.kind = UR_CUSTOM, r.ch = h, r.clay = clay, r.cdraw = cdraw;
+  return r;
+}
+
 static float ur_height(const UiRow &r) {
-  return r.kind == UR_HEAD ? 52 : r.kind == UR_SLIDER ? 132 : r.kind == UR_ACTION ? 88 : GL_ITEM_H;
+  return r.kind == UR_CUSTOM ? r.ch : r.kind == UR_HEAD ? 52 : r.kind == UR_SLIDER ? 132 : r.kind == UR_ACTION ? 88 : GL_ITEM_H;
 }
 
 // ---------- A page on screen ----------
@@ -177,7 +188,9 @@ static void ui_layout(int k, const HaloView &v) {
     for (int j = 0; j < UI_IT; j++) it[j].alpha = 0;
     char *buf = R.buf[i];
     buf[0] = 0;
-    if (r.kind == UR_HEAD) {  // a section's label: small, dim, centered — not in a pill
+    if (r.kind == UR_CUSTOM) {  // (the app's own: it is told where, it draws)
+      if (r.clay) r.clay(x0, y0, w, h, s, ac, v);
+    } else if (r.kind == UR_HEAD) {  // a section's label: small, dim, centered — not in a pill
       ui_text(it[3], gl_t20, r.title, ui_mid_t20, CX, cy, s, 1, GL_DIM, ac, &halo_black);
       it[3].on_black = true;
     } else if (r.kind == UR_ACTION) {  // a pill of its own: pastel with a dark label (the primary action)
@@ -228,8 +241,10 @@ static void ui_draw(int k) {
   if (!ui_run || !ui_run[k].pg) return;
   const UiRun &R = ui_run[k];
   halo_item_draw(R.clock), halo_item_draw(R.title);
-  for (int i = 0; i < R.pg->n; i++)
+  for (int i = 0; i < R.pg->n; i++) {
     for (int j = 0; j < UI_IT; j++) halo_item_draw(R.it[i][j]);
+    if (R.pg->rows[i].kind == UR_CUSTOM && R.pg->rows[i].cdraw) R.pg->rows[i].cdraw();
+  }
 }
 
 static void ui_open(const UiPage *pg);

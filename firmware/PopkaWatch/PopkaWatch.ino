@@ -43,6 +43,9 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #include "confirm.h"  // one confirm for the whole watch (Material 3 for Wear OS): power off first
 #include "power.h"    // the Functions: Always On, the BOOT and PWR buttons
 #include "sysset.h"   // Settings: one place for the watch's settings, many levels (on the UI kit, ui.h)
+#if HAS_WXAPP
+#include "wxapp.h"    // Weather: one long page on the kit — hero, 12 hours, 7 days, details, location
+#endif
 #include "steps.h"    // today's steps (only with a Steps layer)
 #include "bt.h"       // Bluetooth (only when it is on)
 #include "live.h"     // Live: the layers' looks from the editor over USB, at once (no Load)
@@ -59,6 +62,9 @@ static void update(float dt) {
   power_view();          // the whole interface's view on the way to Always On (after face_tick: its minute is fresh)
   gallery_tick();        // a card tapped in the last frame: open its screen (face.h)
   ui_tick();             // what the apps asked to show: a result over the screen (confirm.h)
+#if HAS_WXAPP
+  wa_keep_location();    // Weather: a location just found — kept
+#endif
 #if HAS_SHADE && defined(HALO_ROUND)
   const bool shade_was_visible = sh_px > 0;
 #endif
@@ -113,6 +119,9 @@ void setup() {
   power_build();         // the motion sensor (it wakes the board when picked up) and the commands aod, idle, sleep
 #if HAS_SETTINGS
   sysset_begin();        // Settings: what was kept (Always On, how it wakes, 12/24 h, the volume)
+#endif
+#if HAS_WXAPP
+  wxapp_begin();         // Weather: the location kept (Use my location) — before Wi-Fi's first fetch
 #endif
   steps_build();         // the chip's pedometer, today's steps from flash
   live_build();          // the command live (the editor's Live)

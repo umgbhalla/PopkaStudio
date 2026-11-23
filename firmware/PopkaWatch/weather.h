@@ -10,7 +10,14 @@
 #define WX_DAYS 7    // days of forecast kept, today first (the weather widgets' Week ahead: wxwidgets.h; 5 on the watch)
 // The weather widgets' numbers (wxwidgets.h): only in a firmware with one of them (FN_WXW, config.h), always in the
 // page's engines (both boards: the 7-inch one has them since 15 Nov 2026) — another firmware's weather stays as it was
-#if defined(__EMSCRIPTEN__) || (defined(FN_WXW) && FN_WXW)
+// The Weather app (wxapp.h, on the UI kit): the days, the hours' temperatures, and its own — humidity, wind, UV, sunrise,
+// sunset; in a firmware with it (FN_WXAPP, config.h) and in the page's engine
+#if defined(__EMSCRIPTEN__) || (defined(FN_WXAPP) && FN_WXAPP)
+#define WX_APP 1
+#else
+#define WX_APP 0
+#endif
+#if defined(__EMSCRIPTEN__) || (defined(FN_WXW) && FN_WXW) || WX_APP
 #define WX_MORE 1
 #else
 #define WX_MORE 0
@@ -46,7 +53,20 @@ struct WxCity {
   int16_t dhi[WX_DAYS], dlo[WX_DAYS];
   uint8_t dsnow;
 #endif
+#if WX_APP
+  // The Weather app's (wxapp.h): humidity (%), wind (km/h, mph in Fahrenheit), today's UV (× 10), sunrise and sunset
+  // (unix time; 0 — not known)
+  uint8_t hum;
+  int16_t wind;
+  uint8_t uv10;
+  uint32_t rise, set;
+#endif
 };
+#if WX_APP
+static uint32_t wx_fetched_ms;           // when fresh weather came last (halo_ms; 0 — not since start)
+static volatile bool wx_geo_req;         // "Use my location": the next fetch asks where the watch is first (ip-api.com)
+static volatile bool wx_geo_done;        // it did: the first city is there now (wxapp.h keeps it)
+#endif
 
 // HaloWatch's fictional days (demo, wx N)
 static const WxDay WX_DEMO[] = {

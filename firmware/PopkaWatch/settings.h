@@ -52,6 +52,16 @@ static void sysset_draw();
 #else
 #define HAS_SETTINGS 0
 #endif
+// Weather (wxapp.h, on the kit): the round board's, with the app (WX_APP: weather.h)
+#if defined(HALO_ROUND) && WX_APP
+#define HAS_WXAPP 1
+static void wxapp_enter();
+static void wxapp_update(float dt);
+static void wxapp_layout(const HaloView &v);
+static void wxapp_draw();
+#else
+#define HAS_WXAPP 0
+#endif
 
 // The Radio (radio.h; a rectangle's screen — radio_rect.h): in a firmware with it and in the page
 #if defined(__EMSCRIPTEN__) || (defined(FN_RADIO) && FN_RADIO)
@@ -961,6 +971,9 @@ static void settings_enter(const FaceScreen &S) {
 #if HAS_SETTINGS
   if (st_has(S, FL_SETTINGS)) sysset_enter();
 #endif
+#if HAS_WXAPP
+  if (st_has(S, FL_WXAPP)) wxapp_enter();
+#endif
 #if HAS_RADIO
   if (st_has(S, FL_RADIO)) radio_enter();
 #ifdef HALO_ROUND  // (the round board's other Radio screens)
@@ -992,6 +1005,9 @@ static void settings_update(const FaceScreen &S, float dt) {
 #if HAS_SETTINGS
   if (st_has(S, FL_SETTINGS)) sysset_update(dt);
 #endif
+#if HAS_WXAPP
+  if (st_has(S, FL_WXAPP)) wxapp_update(dt);
+#endif
 #if HAS_RADIO
   if (st_has(S, FL_RADIO)) radio_update(S, dt);
 #ifdef HALO_ROUND
@@ -1022,6 +1038,9 @@ static void settings_layout(FaceRun &R, uint8_t kind, const HaloView &v) {
 #endif
 #if HAS_SETTINGS
   if (kind == FL_SETTINGS) sysset_layout(v);
+#endif
+#if HAS_WXAPP
+  if (kind == FL_WXAPP) wxapp_layout(v);
 #endif
 #if HAS_RADIO
   if (kind == FL_RADIO) radio_layout(v);
@@ -1062,6 +1081,9 @@ static void settings_draw(uint8_t kind) {
 #endif
 #if HAS_SETTINGS
   if (kind == FL_SETTINGS) sysset_draw();
+#endif
+#if HAS_WXAPP
+  if (kind == FL_WXAPP) wxapp_draw();
 #endif
 #if HAS_RADIO
   if (kind == FL_RADIO) radio_draw();  // (round: its parts draw themselves, the volume screen goes over them: face.h)

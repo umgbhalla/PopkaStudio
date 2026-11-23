@@ -101,7 +101,8 @@ enum : uint8_t {
   // line, a barometer, what to wear, a buddy, pixel weather, the next five days
   FL_WXDIGITS, FL_WXCURVE, FL_WXBARO, FL_WXWEAR, FL_WXBUDDY, FL_WXPIXEL, FL_WXWEEK,
   FL_POMODORO,  // Pomodoro: focus intervals and breaks, a screen of its own (settings.h, pomodoro.h)
-  FL_SETTINGS   // Settings: the watch's settings, many levels — the UI kit's first app (sysset.h, ui.h)
+  FL_SETTINGS,  // Settings: the watch's settings, many levels — the UI kit's first app (sysset.h, ui.h)
+  FL_WXAPP      // Weather: one long page on the UI kit — hero, 12 hours, 7 days, details, location (wxapp.h)
 };
 static inline bool fl_wxw(uint8_t k) {  // a weather widget (wxwidgets.h)
   return k >= FL_WXDIGITS && k <= FL_WXWEEK;
@@ -506,6 +507,9 @@ static inline bool fl_section(uint8_t k) {
 #endif
 #if HAS_SETTINGS
          || k == FL_SETTINGS
+#endif
+#if HAS_WXAPP
+         || k == FL_WXAPP
 #endif
       ;
 }

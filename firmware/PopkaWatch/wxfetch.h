@@ -15,8 +15,28 @@ static inline int16_t wx_round(JsonVariantConst v) {
   return v.is<float>() ? (int16_t)lroundf(v.as<float>()) : (int16_t)WX_NONE;
 }
 
+#if WX_APP
+// Where the watch is, by its internet address (ip-api.com, plain HTTP): the first city becomes it
+static void wx_geo() {
+  JsonDocument doc(HaloPsram::instance());
+  if (!halo_http_get_json("ip-api.com", "/json/?fields=status,city,lat,lon", doc) || strcmp(doc["status"] | "", "success")) {
+    LOG("weather: where the watch is — not known\n");
+    return;
+  }
+  portENTER_CRITICAL(&wx_mux);
+  strlcpy(wx_city[0].name, doc["city"] | "Here", sizeof(wx_city[0].name));
+  wx_city[0].lat = doc["lat"] | 0.0f, wx_city[0].lon = doc["lon"] | 0.0f;
+  portEXIT_CRITICAL(&wx_mux);
+  wx_geo_done = true;
+  LOG("weather: the watch is in %s (%.3f, %.3f)\n", wx_city[0].name, wx_city[0].lat, wx_city[0].lon);
+}
+#endif
+
 static void wx_fetch() {
-  static char path[700];
+  static char path[760];
+#if WX_APP
+  if (wx_geo_req) wx_geo_req = false, wx_geo();
+#endif
   const int n = wx_pages;
   int k = snprintf(path, sizeof(path), "/v1/forecast?latitude=");
   for (int i = 0; i < n; i++) k += snprintf(path + k, sizeof(path) - k, "%s%.4f", i ? "," : "", wx_city[i].lat);
@@ -24,10 +44,11 @@ static void wx_fetch() {
   for (int i = 0; i < n; i++) k += snprintf(path + k, sizeof(path) - k, "%s%.4f", i ? "," : "", wx_city[i].lon);
 #if WX_MORE  // (the weather widgets': the pressure, the next days)
   snprintf(path + k, sizeof(path) - k,
-           "&current=temperature_2m,apparent_temperature,weather_code,pressure_msl"
-           "&hourly=weather_code,temperature_2m,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min"
+           "&current=temperature_2m,apparent_temperature,weather_code,pressure_msl%s"
+           "&hourly=weather_code,temperature_2m,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min%s"
            "&timezone=auto&forecast_days=%d&forecast_hours=%d&timeformat=unixtime%s",
-           WX_DAYS, WX_AHEAD, wx_fahr ? "&temperature_unit=fahrenheit" : "");
+           WX_APP ? ",relative_humidity_2m,wind_speed_10m" : "", WX_APP ? ",uv_index_max,sunrise,sunset" : "",
+           WX_DAYS, WX_AHEAD, wx_fahr ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
 #else
   snprintf(path + k, sizeof(path) - k,
            "&current=temperature_2m,apparent_temperature,weather_code&hourly=weather_code,temperature_2m"
@@ -43,6 +64,10 @@ static void wx_fetch() {
   f["daily"]["temperature_2m_max"] = f["daily"]["temperature_2m_min"] = true;
 #if WX_MORE
   f["current"]["pressure_msl"] = f["hourly"]["pressure_msl"] = f["daily"]["weather_code"] = true;
+#endif
+#if WX_APP
+  f["current"]["relative_humidity_2m"] = f["current"]["wind_speed_10m"] = true;
+  f["daily"]["uv_index_max"] = f["daily"]["sunrise"] = f["daily"]["sunset"] = true;
 #endif
   if (!halo_http_get_json("api.open-meteo.com", path, doc, &filter)) return;
   for (int i = 0; i < n; i++) {
@@ -75,6 +100,12 @@ static void wx_fetch() {
       w.dhi[j] = wx_round(e["daily"]["temperature_2m_max"][j]), w.dlo[j] = wx_round(e["daily"]["temperature_2m_min"][j]);
     }
 #endif
+#if WX_APP
+    w.hum = (uint8_t)constrain(wx_round(e["current"]["relative_humidity_2m"]), 0, 100);
+    w.wind = wx_round(e["current"]["wind_speed_10m"]);
+    w.uv10 = (uint8_t)constrain((int)lroundf((e["daily"]["uv_index_max"][0] | 0.0f) * 10), 0, 255);
+    w.rise = e["daily"]["sunrise"][0] | 0u, w.set = e["daily"]["sunset"][0] | 0u;
+#endif
   }
   portENTER_CRITICAL(&wx_mux);
   wx_fresh = true;
@@ -90,6 +121,9 @@ static void wx_poll() {
   memcpy(wx_city, wx_got, sizeof(WxCity) * wx_pages);
   wx_fresh = false;
   portEXIT_CRITICAL(&wx_mux);
+#if WX_APP
+  wx_fetched_ms = halo_ms() | 1;
+#endif
   if (wx_demo < 0) face_weather_show(true);
 }
 
