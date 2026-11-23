@@ -190,30 +190,96 @@ static uint32_t ck_mask = 0x1 | 0x2 | 0x8 | 0x10;  // London, New York, Tokyo, D
 static char ck_line[CK_N][28], ck_here[28];
 static int ck_min_was = -1;
 static Preferences ck_prefs;
-// Once a minute: each city's time and how far from here (the time zone is set for a moment, then back)
+// A POSIX TZ string ("EST5EDT,M3.2.0,M11.1.0", "<+04>-4", "IST-5:30") evaluated here — the same on the watch and on
+// the page (the page's C library ignores TZ: every city came out as "same time"); no setenv / tzset churn either
+static const char *ck_tz_name(const char *p) {  // past a zone's name: letters, or <…>
+  if (*p == '<') {
+    while (*p && *p != '>') p++;
+    return *p ? p + 1 : p;
+  }
+  while ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z')) p++;
+  return p;
+}
+static const char *ck_tz_hms(const char *p, long &sec) {  // [+-]h[:mm[:ss]] → seconds
+  int sg = 1;
+  if (*p == '+' || *p == '-') sg = *p == '-' ? -1 : 1, p++;
+  long v = 0, part = 0;
+  int k = 0;
+  for (;;) {
+    part = 0;
+    while (*p >= '0' && *p <= '9') part = part * 10 + (*p++ - '0');
+    v += part * (k == 0 ? 3600 : k == 1 ? 60 : 1);
+    if (*p != ':' || k == 2) break;
+    p++, k++;
+  }
+  sec = sg * v;
+  return p;
+}
+static long ck_days(int y, int m, int d) {  // days from 1970-01-01 (m 1 … 12)
+  y -= m <= 2;
+  const long era = (y >= 0 ? y : y - 399) / 400;
+  const long yoe = y - era * 400, doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1, doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + doe - 719468;
+}
+static const char *ck_tz_rule(const char *p, int year, long &at) {  // Mm.w.d[/time] → seconds from 1970 (local wall)
+  int m = 3, w = 1, d = 0;
+  long t = 7200;
+  if (*p == 'M') sscanf(p + 1, "%d.%d.%d", &m, &w, &d);
+  while (*p && *p != '/' && *p != ',') p++;
+  if (*p == '/') p = ck_tz_hms(p + 1, t);
+  const long first = ck_days(year, m, 1), wd1 = ((first % 7) + 11) % 7;  // weekday of the 1st (0 — Sunday)
+  long day = first + (d - wd1 + 7) % 7 + (w - 1) * 7;
+  const long next = m == 12 ? ck_days(year + 1, 1, 1) : ck_days(year, m + 1, 1);
+  while (day >= next) day -= 7;  // (week 5: the last)
+  at = day * 86400 + t;
+  return p;
+}
+static void ck_tz_local(const char *tz, time_t now, struct tm &out) {
+  long std = 0, dst;
+  const char *p = ck_tz_hms(ck_tz_name(tz), std);  // (POSIX: west of Greenwich is positive)
+  dst = std - 3600;
+  long off = -std;
+  if (*p && *p != ',') {  // a summer time
+    p = ck_tz_name(p);
+    if (*p && *p != ',') p = ck_tz_hms(p, dst);
+    if (*p == ',') {
+      struct tm u;
+      gmtime_r(&now, &u);
+      long a, b;
+      p = ck_tz_rule(p + 1, u.tm_year + 1900, a);
+      if (*p == ',') ck_tz_rule(p + 1, u.tm_year + 1900, b);
+      else b = a;
+      const long ws = (long)now - std, wd = (long)now - dst;  // the wall clock in standard and in summer time
+      const bool summer = a < b ? ws >= a && wd < b : !(wd >= b && ws < a);  // (south: the summer spans the new year)
+      if (summer) off = -dst;
+    }
+  }
+  const time_t t = now + off;
+  gmtime_r(&t, &out);
+}
+
+// Once a minute: each city's time and how far from here
 static void ck_world_times() {
   const time_t now = time(nullptr);
   struct tm here;
-  localtime_r(&now, &here);
+  ck_tz_local(TZ, now, here);
   if (here.tm_min == ck_min_was) return;
   ck_min_was = here.tm_min;
   const int hm = here.tm_yday * 1440 + here.tm_hour * 60 + here.tm_min;
   snprintf(ck_here, sizeof(ck_here), fc_h24 ? "%02d:%02d" : "%d:%02d", fc_h24 ? here.tm_hour : (here.tm_hour + 11) % 12 + 1, here.tm_min);
   for (int i = 0; i < CK_N; i++) {
     if (!(ck_mask >> i & 1)) continue;
-    setenv("TZ", CK_CITIES[i].tz, 1), tzset();
     struct tm t;
-    localtime_r(&now, &t);
+    ck_tz_local(CK_CITIES[i].tz, now, t);
     int d = t.tm_yday * 1440 + t.tm_hour * 60 + t.tm_min - hm;
     if (d > 720 * 2) d -= 365 * 1440;
     if (d < -720 * 2) d += 365 * 1440;
     char off[12];
     if (!d) strlcpy(off, "same time", sizeof(off));
-    else snprintf(off, sizeof(off), d % 60 ? "%+dh %02dm" : "%+dh", d / 60, abs(d % 60));
+    else snprintf(off, sizeof(off), d % 60 ? "%c%dh %02dm" : "%c%dh", d < 0 ? '-' : '+', abs(d) / 60, abs(d) % 60);
     const int hh = fc_h24 ? t.tm_hour : (t.tm_hour + 11) % 12 + 1;
     snprintf(ck_line[i], sizeof(ck_line[i]), fc_h24 ? "%02d:%02d · %s" : "%d:%02d · %s", hh, t.tm_min, off);
   }
-  setenv("TZ", TZ, 1), tzset();
 }
 template <int I> static void ck_city_line(char *o, int n) { strlcpy(o, ck_line[I], n); }
 static void ck_here_line(char *o, int n) { strlcpy(o, ck_here, n); }
