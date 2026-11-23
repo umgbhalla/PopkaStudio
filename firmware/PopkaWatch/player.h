@@ -21,6 +21,9 @@
 // PopkaStudio: HaloWatch's player as it is, as a section — a layer that fills its screen behind a gallery card
 // (FL_MUSIC; the hooks — settings.h: player_tick every frame, update while it is on top, layout, draw); the volume
 // level and the like live while the board runs. Included from settings.h after music.h.
+// The round board (23 Nov 2026): its screen is four paged screens instead — Now playing, Volume, Queue, Music settings
+// (muapp.h on upager.h, Codex's design); this file keeps the sound, the tracks, the tick and the settings they use, and
+// the wave button above stays the rectangles' (player_rect.h).
 
 #define PL_PRIMARY 0xE9DDFF      // the big button
 #define PL_PRIMARY_DIM 0xD0BCFF  // the side buttons
@@ -55,6 +58,13 @@ static void pr_build();
 
 static int pl_cur, pl_prev;
 static bool pl_playing, pl_active, pl_liked;
+// Music settings (kept): Repeat track — a track that runs out starts again (Previous and Next still skip);
+// Background — off: leaving the Music screen pauses it (muapp.h)
+static bool pl_repeat, pl_bg = true;
+static Preferences pl_prefs;
+#ifdef HALO_ROUND
+static void mu_tick(float dt);  // (muapp.h: Background, and the page's stand-in for the sound)
+#endif
 static float pl_len[MU_MAX], pl_tw[MU_MAX], pl_aw[MU_MAX], pl_elapsed;
 static Press pl_grp[3], pl_center, pl_small[2];
 static int pl_armed = -1, pl_last = 1, pl_small_armed = -1;
@@ -446,17 +456,6 @@ static void pl_change_track(int dir) {
   mu_cmd = pl_cur;  // from its beginning; plays if playing
 }
 
-#ifdef HALO_ROUND
-// The row's cells (ButtonGroup): widths from the press springs
-static void pl_cells(float w[3], float x[3]) {
-  w[0] = 153, w[1] = 160, w[2] = 153;
-  const float gl = pl_grp[0].s.x * 24, gr = pl_grp[2].s.x * 24, gm = pl_grp[1].s.x * 12;
-  w[0] += gl, w[1] -= gl;
-  w[2] += gr, w[1] -= gr;
-  w[1] += 2 * gm, w[0] -= gm, w[2] -= gm;
-  x[0] = w[0] / 2 + 10, x[1] = w[0] + w[1] / 2, x[2] = w[0] + w[1] + w[2] / 2 - 10;
-}
-#endif
 
 // ---------- Build, tick (every frame), update (the finger, only while the screen is up) ----------
 static void player_build() {
@@ -466,6 +465,9 @@ static void player_build() {
   halo_ease_make(EASE_PL_SKIP_IN, 0.632f, 0, 0.478f, 1);
   halo_ease_make(EASE_PL_STD, 0.2f, 0, 0, 1);
   halo_ease_make(EASE_PL_SHARP, 0, 0, 0, 1);
+  pl_prefs.begin("music", false);
+  pl_repeat = pl_prefs.getBool("repeat", false), pl_bg = pl_prefs.getBool("bg", true);
+#ifndef HALO_ROUND  // (the round board's pages draw no masks: muapp.h)
   poly_make(play_half[0], PLAY_V[0]), poly_make(play_half[1], PLAY_V[1]);
   const size_t CV = PL_IC * PL_IC;  // the coverage canvas: only while the masks are made (PSRAM, not static internal RAM)
   if (uint8_t *cv = (uint8_t *)heap_caps_malloc(CV, MALLOC_CAP_SPIRAM)) {
@@ -474,6 +476,7 @@ static void player_build() {
       for (int f = 0; f <= 30; f++) memset(cv, 0, CV), cv_skip(cv, f < 30 ? f / 60.0f : 9, d == 0), cv_mask(pl_m_skip[d][f], cv);
     free(cv);
   }
+#endif
   for (int i = 0; i < mu_n; i++) {
     pl_len[i] = fmaxf(0.1f, mu_tracks[i].samples / (float)mu_rate);
     pl_tw[i] = halo_text_width(PL_F_TITLE, mu_tracks[i].title), pl_aw[i] = halo_text_width(PL_F_ARTIST, mu_tracks[i].artist);
@@ -487,7 +490,14 @@ static void player_build() {
 }
 
 static void player_tick(float dt) {
-  if (mu_ended) mu_ended = false, pl_change_track(1);  // the track ran out — the next one
+  if (mu_ended) {  // the track ran out — the next one (Repeat track: this one again, from its beginning)
+    mu_ended = false;
+    if (pl_repeat && mu_n) mu_cmd = pl_cur;
+    else pl_change_track(1);
+  }
+#ifdef HALO_ROUND
+  mu_tick(dt);
+#endif
   pl_elapsed = mu_cur == pl_cur ? mu_pos / (float)mu_rate : 0;
   const HaloFinger &f = halo_finger;
   const bool vs = vol_screen_up(), held = f.down && pl_active && !vs;
@@ -516,32 +526,6 @@ static void player_tick(float dt) {
   }
 }
 
-#ifdef HALO_ROUND
-static void player_update(float dt) {
-  HaloFinger &f = halo_finger;
-  pl_active = true;
-  if (vol_update(dt)) return;  // the volume screen: "+", "−"; a tap elsewhere or 3 s idle — closed (volume.h)
-  float w[3], x[3];
-  pl_cells(w, x);
-  if (f.pressed && !f.owner) {
-    pl_armed = pl_small_armed = -1;
-    if (fabsf(f.y0 - CX) < 80)
-      for (int i = 0; i < 3; i++)
-        if (fabsf(f.x0 - x[i]) < w[i] / 2) pl_armed = i;
-    for (int i = 0; i < 2; i++)
-      if (fabsf(f.x0 - (i ? 315.5f : 150.5f)) < 50 && fabsf(f.y0 - PL_SMALL_Y) < 38) pl_small_armed = i;
-  }
-  if (f.dragging) pl_armed = pl_small_armed = -1;
-  if (f.tap && pl_armed >= 0) {
-    if (pl_armed == 1) pl_set_playing(!pl_playing);
-    else pl_change_track(pl_armed == 2 ? 1 : -1), pl_skip_t[pl_armed == 2] = 0;
-  }
-  if (f.tap && pl_small_armed == 0) vol_open();
-  if (f.tap && pl_small_armed == 1) pl_liked = !pl_liked;
-  if (pl_armed >= 0) pl_last = pl_armed;
-  if (!f.down) pl_armed = pl_small_armed = -1;
-}
-#endif
 
 // ---------- Layout and drawing ----------
 static struct {
@@ -576,85 +560,6 @@ static void pl_ring_shape(ShapeK &k, bool ring, float w_pill, float h_pill, floa
   k.pw = w_pill / 2 * s, k.ph = h_pill / 2 * s, k.m = halo_clamp01(pl_center.s.x);
 }
 
-#ifdef HALO_ROUND
-static void player_enter() {
-  pl_armed = pl_small_armed = -1;
-  vol_enter();
-}
-
-static void player_layout(const HaloView &v) {
-  pl_v = v;
-  const float s = v.s, f_pl = vol_layout(v), pa = f_pl;  // the volume screen and the level at the edge (volume.h): fade through
-  float w[3], x[3];
-  pl_cells(w, x);
-  // Side buttons: capsules (cell − 48) × 108, primaryDim; their icons — masks of the skip animation
-  for (int i = 0; i < 2; i++) {
-    const int c = i ? 2 : 0;
-    HaloItem &b = pl_side[i];
-    b.kind = HI_RRECT, b.x = x[c], b.y = CX, b.w = w[c] - 48, b.h = PL_SIDE_H, b.r = PL_SIDE_H / 2, b.scale = 1;
-    b.color = PL_PRIMARY_DIM, b.alpha = pa, b.on_black = true;
-    halo_view_commit(b, v);
-    HaloItem &ic = pl_side_ic[i];
-    const float t = pl_skip_t[i];
-    ic.kind = HI_MASK, ic.mask = &pl_m_skip[i][t >= 0.5f ? 30 : min(29, (int)(t * 60))];  // [0] — previous (mirrored)
-    ic.x = x[c], ic.y = CX, ic.scale = 1, ic.color = PL_ON_PRIMARY, ic.alpha = pa, ic.on_black = false, ic.on = &b;
-    halo_view_commit(ic, v);
-  }
-  // The big button: shapes, ring sectors and caps — once a frame (drawn in player_draw)
-  const bool mid = pl_last == 1;
-  pl_ring_shape(BK.kb, false, mid ? 152 : 104, 128, s);
-  pl_ring_shape(BK.kr, true, mid ? 176 : 128, 152, s);
-  BK.cx = halo_view_x(v, x[1]), BK.cy = halo_view_y(v, CX);
-  const ShapeK &r = BK.kr, &k = BK.kb;
-  const bool pr = r.m > 0.001f;
-  BK.rk.hw = PL_RING_HW * s;
-  BK.r_in = (pr ? fminf(r.a - r.b, fminf(r.pw, r.ph)) : r.a - r.b) - BK.rk.hw - 1;
-  BK.r_out = (pr ? fmaxf(r.a + r.b, fmaxf(r.pw, r.ph)) : r.a + r.b) + BK.rk.hw + 1;
-  BK.b_in = (pr ? fminf(k.a - k.b, fminf(k.pw, k.ph)) : k.a - k.b) - 1;
-  BK.b_out = (pr ? fmaxf(k.a + k.b, fmaxf(k.pw, k.ph)) : k.a + k.b) + 1;
-  const float prog = mu_n ? halo_clamp01(pl_elapsed / pl_len[pl_cur]) * 2 * HALO_PI : 0, gap = 4.05f * HALO_PI / 180;
-  const float ends[4] = {gap, prog - gap, prog + gap, 2 * HALO_PI - gap};
-  BK.rk.fill = sector_make(ends[0], ends[1]), BK.rk.track = sector_make(ends[2], ends[3]);
-  for (int e = 0; e < 4; e++) {  // the ends' centers — on the ring's middle line
-    const float ux = sinf(ends[e]), uy = -cosf(ends[e]);
-    float rr = 76 * s;
-    for (int it = 0; it < 3; it++) rr -= shape_dist(BK.kr, ux * rr, uy * rr);
-    BK.rk.cap[e][0] = BK.cx + ux * rr, BK.rk.cap[e][1] = BK.cy + uy * rr;
-  }
-  const float ka = pa * v.a;
-  BK.rk.c_fill = halo_dim(PL_RING, (int)(ka * 256)), BK.rk.c_track = halo_dim(PL_RING_TRACK, (int)(ka * 256));
-  BK.c_btn = halo_dim(PL_PRIMARY, (int)(ka * 256));
-  uint32_t h = 2166136261u;
-  for (float q : {BK.cx, BK.cy, s, r.a, r.b, r.m, r.pw, k.pw, prog * 20, pl_rot * 400, ka}) h = pl_mix(h, q);
-  pl_damage(pl_dmg_big, ka > 0.004f ? h | 1 : 1, BK.cx - BK.r_out - 2, BK.cy - BK.r_out - 2, BK.cx + BK.r_out + 2,
-            BK.cy + BK.r_out + 2);
-  HaloItem &bi = pl_big_ic;  // "play/pause": masks of the morph by tenths
-  bi.kind = HI_MASK, bi.mask = &pl_m_pp[(int)lroundf(halo_clamp01(pl_pp.x) * 10)], bi.x = x[1], bi.y = CX, bi.scale = 1;
-  bi.color = PL_ON_PRIMARY, bi.alpha = pa, bi.on_black = false, bi.on = nullptr;
-  halo_view_commit(bi, v);
-  // The small buttons: volume and like (pressed — corners 32 → 16)
-  for (int i = 0; i < 2; i++) {
-    const float p = halo_clamp01(pl_small[i].s.x), cx = i ? 315.5f : 150.5f;
-    HaloItem &b = pl_sm[i];
-    b.kind = HI_RRECT, b.x = cx, b.y = PL_SMALL_Y, b.w = 88, b.h = 64, b.r = 32 + (16 - 32) * p, b.scale = 1;
-    b.color = PL_SMALL, b.alpha = pa, b.on_black = true;
-    halo_view_commit(b, v);
-    const float lm = halo_clamp01(pl_like_m.x), bounce = i ? 1 + 0.15f * fmaxf(0, pl_like_m.x - 1) * 4 : 1;
-    gl_text_mid(pl_sm_ic[i], gl_ic24, i ? "" : "", pl_mid_i, cx, PL_SMALL_Y, bounce,
-             i ? pl_mix_rgb(PL_ON_SURFACE, PL_LIKE, lm) : PL_ON_SURFACE, pa, bounce == 1 ? &b : nullptr);
-    halo_view_commit(pl_sm_ic[i], v);
-  }
-  // Texts: drawn in player_draw (the marquee is clipped) — their area is redrawn when they change
-  uint32_t ht = 2166136261u;
-  for (float q : {(float)pl_cur, (float)pl_prev, pl_change_t < 0.45f ? pl_change_t : 9.0f, pl_marquee_x, pa * v.a,
-                  v.x, v.y, s})
-    ht = pl_mix(ht, q);
-  const float tx0 = halo_view_x(v, CX - 200), tx1 = halo_view_x(v, CX + 200);
-  pl_damage(pl_dmg_text, pa * v.a > 0.004f ? ht | 1 : 1, tx0, halo_view_y(v, PL_TITLE_Y - 30), tx1,
-            halo_view_y(v, PL_ARTIST_Y + 22));
-  if (pl_marquee_x > 0 || pl_change_t < 0.45f || pl_playing) halo_subpixel = true;
-}
-#endif
 
 // A title or an artist line, clipped to [xa, xb] (the marquee) — this task's half of the band narrowed meanwhile
 static void pl_text(const HaloFont &f, const char *s, float x, float top, float sc, uint32_t color, float xa, float xb) {
@@ -670,61 +575,12 @@ static void pl_fade_col(int x, float k, int y0, int y1) {  // the marquee's soft
 }
 
 #ifdef HALO_ROUND
-static void pl_texts(float alpha) {
-  const HaloView &v = pl_v;
-  if (!mu_n) {
-    halo_text(gl_title, "No music", halo_view_x(v, CX), halo_view_y(v, PL_TITLE_Y) - pl_mid_t * v.s,
-              halo_dim(PL_ON_SURFACE, (int)(alpha * 256)), 1, 1, v.s, 0, 0);
-#ifdef HALO_SD_CS
-#define PL_NO_MUSIC "MP3 / WAV in /music on microSD"
-#else
-#define PL_NO_MUSIC "tools/halo_music.py --flash"
-#endif
-    halo_text(gl_t24, PL_NO_MUSIC, halo_view_x(v, CX), halo_view_y(v, PL_ARTIST_Y) - pl_mid_a * v.s,
-              halo_dim(GL_DIM, (int)(alpha * 256)), 1, 1, v.s, 0, 0);
-    return;
-  }
-  // A new track: the old lines slide out and fade, the new ones slide in (±12.5 % of the width, 300 ms; delays
-  // 0 / 60 ms for the title, 30 / 90 ms for the artist)
-  for (int line = 0; line < 2; line++) {
-    const float y = line ? PL_ARTIST_Y : PL_TITLE_Y, mid = line ? pl_mid_a : pl_mid_t, wmax = line ? 331 : PL_TITLE_W;
-    const float d_out = line ? 0.03f : 0, d_in = line ? 0.09f : 0.06f, sh = 0.125f * wmax * pl_change_dir;
-    const HaloFont &f = line ? gl_t24 : gl_title;
-    for (int which = 0; which < 2; which++) {
-      if (!which && pl_change_t >= 0.3f + d_out) continue;
-      const int t = which ? pl_cur : pl_prev;
-      const float p = halo_ease(EASE_PL_EMPH, (pl_change_t - (which ? d_in : d_out)) / 0.3f);
-      const float a = (which ? p : 1 - p) * alpha, off = which ? -sh * (1 - p) : sh * p;
-      if (a <= 0.01f) continue;
-      const char *s = line ? mu_tracks[t].artist : mu_tracks[t].title;
-      const float tw = line ? pl_aw[t] : pl_tw[t], top = halo_view_y(v, y) - mid * v.s;
-      const uint32_t c = halo_dim(PL_ON_SURFACE, (int)(a * 256));
-      const float xa = halo_view_x(v, CX - wmax / 2), xb = halo_view_x(v, CX + wmax / 2);
-      if (!line && tw > wmax) {  // the marquee: two copies 96 dp apart, the edges fade over 8 dp
-        const float x0 = halo_view_x(v, CX - wmax / 2 - (which ? pl_marquee_x : 0) + off);
-        pl_text(f, s, x0, top, v.s, c, xa, xb);
-        pl_text(f, s, x0 + (tw + 96 * DP) * v.s, top, v.s, c, xa, xb);
-        const int y0 = (int)top, y1 = (int)(top + f.line * v.s);
-        for (int e = 0; e < 16; e++) pl_fade_col((int)xa + e, e / 16.0f, y0, y1), pl_fade_col((int)xb - 1 - e, e / 16.0f, y0, y1);
-      } else {
-        halo_text(f, s, halo_view_x(v, CX - tw / 2 + off), top, c, 1, 0, v.s, 0, 0);
-      }
-    }
-  }
-}
-
-static void player_draw() {
-  const float vs = halo_clamp01(vol_screen.x), pa = halo_clamp01(1 - vs / 0.4f) * pl_v.a;
-  if (pa > 0.004f) {
-    pl_texts(pa);
-    for (int i = 0; i < 2; i++) halo_item_draw(pl_side[i]), halo_item_draw(pl_side_ic[i]);
-    shape_draw(BK.cx, BK.cy, BK.kr, BK.r_in, BK.r_out, 0, &BK.rk);
-    shape_draw(BK.cx, BK.cy, BK.kb, BK.b_in, BK.b_out, BK.c_btn, nullptr);
-    halo_item_draw(pl_big_ic);
-    for (int i = 0; i < 2; i++) halo_item_draw(pl_sm[i]), halo_item_draw(pl_sm_ic[i]);
-  }
-  vol_draw();
-}
+// The round board's screen: four pages on upager.h (muapp.h — Codex's design, design/SPEC_music.md, 23 Nov 2026),
+// included from PopkaWatch.ino after upager.h; settings.h calls these
+static void player_enter();
+static void player_update(float dt);
+static void player_layout(const HaloView &v);
+static void player_draw();
 #else
 #include "player_rect.h"  // this screen's own places: the update, the layout, the drawing
 #endif
