@@ -9,7 +9,8 @@
 // page is made again when fresh weather comes (the days' skies change their icons). Round board only.
 // Included from PopkaWatch.ino after sysset.h (the kit, the Wi-Fi's sync).
 #ifdef HALO_ROUND
-extern const HaloFont gl_wa_n80;  // the hero's temperature (studio.py ROUND_APP_FONTS["wxapp"])
+extern const HaloFont gl_wa_n80;   // the hero's temperature (studio.py ROUND_APP_FONTS["wxapp"])
+extern const HaloFont gl_wa_ic64;  // the hero's sky, made at its size (a scaled 24 px glyph was blurry)
 #define WA_IC_SUN "\xEF\x86\x85"
 #define WA_IC_CLOUD "\xEF\x83\x82"
 #define WA_IC_PARTLY "\xEF\x9B\x84"
@@ -38,7 +39,7 @@ static void wa_hhmm(char *o, int n, uint32_t t) {
 // ---------- The hero (a custom row): the sky's icon and the temperature big, the words under ----------
 static HaloItem wa_hero[5];
 static char wa_t_now[8], wa_t_line[40], wa_t_hilo[24];
-static float wa_mid_n80, wa_mid_ic;
+static float wa_mid_n80, wa_mid_ic, wa_mid_ic64;
 static void wa_hero_lay(float x0, float y0, float w, float h, float s, float a, const HaloView &v) {
   const WxCity &c = wx_city[0];
   wx_deg(wa_t_now, sizeof(wa_t_now), c.now);
@@ -49,7 +50,7 @@ static void wa_hero_lay(float x0, float y0, float w, float h, float s, float a, 
   const float cy = y0 + 70 * s, tw = halo_text_width(gl_wa_n80, wa_t_now) * s, iw = 64 * s, gap = 18 * s;
   const float gx = CX - (iw + gap + tw) / 2;  // (the icon and the number centered as one)
   wa_hero[0].alpha = 0;  // (M3: the sky as a glyph in the accent — no disc behind it)
-  ui_text(wa_hero[1], gl_ic24, wa_icon(c.kind), wa_mid_ic, gx + iw / 2, cy, 2.1f * s, 1, 0xFFB030, a, &halo_black);
+  ui_text(wa_hero[1], gl_wa_ic64, wa_icon(c.kind), wa_mid_ic64, gx + iw / 2, cy, s, 1, 0xFFB030, a, &halo_black);
   wa_hero[1].on_black = true;
   ui_text(wa_hero[2], gl_wa_n80, wa_t_now, wa_mid_n80, gx + iw + gap, cy, s, 0, GL_TEXT, a, &halo_black);
   wa_hero[2].on_black = true;
@@ -184,6 +185,7 @@ static UiPage wa_page, wa_locs;
 static uint32_t wa_built_ms = 1;
 static void wa_build() {
   wa_mid_n80 = halo_text_mid(gl_wa_n80, "0123456789"), wa_mid_ic = halo_text_mid(gl_ic24, WA_IC_SUN);
+  wa_mid_ic64 = halo_text_mid(gl_wa_ic64, WA_IC_SUN);
   const WxCity &c = wx_city[0];
   wa_page = {c.name, {}, 0, 0xFFB030};
   UiPage &p = wa_page;

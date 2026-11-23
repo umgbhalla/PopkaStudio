@@ -177,10 +177,20 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
 #endif
 #endif
 #if HAS_SHADE && defined(HALO_ROUND)
+    const bool shade_was = sh_px > 0;
     if (animate) shade_dismiss();
     else shade_close();
+#else
+    const bool shade_was = false;
 #endif
 #ifdef HALO_ROUND
+    // A pseudo back (the user's word, 23 Nov 2026): inside an app or a page opened over one — back a level; on the
+    // Apps list itself, over the face, or with quick settings out — home to the clock (the face: Apps, as before)
+    if (btn == 2 && animate && !shade_was && !open_apps && (halo_nav_depth() > 0 || halo_nav_over())) {
+      halo_nav_back();
+      if (!pw_locked) pw_wake(0);
+      return;
+    }
     if (open_apps) halo_nav_open_apps();
     else
 #endif

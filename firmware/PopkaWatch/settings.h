@@ -62,6 +62,18 @@ static void wxapp_draw();
 #else
 #define HAS_WXAPP 0
 #endif
+// Stopwatch, Timer, World clock (clocks.h, on the kit): the round board's, with one of them
+#if defined(HALO_ROUND) && (defined(__EMSCRIPTEN__) || (defined(FN_CLOCKS) && FN_CLOCKS))
+#define HAS_CLOCKS 1
+static void clocks_enter(uint8_t kind);
+static void clocks_update(uint8_t kind, float dt);
+static void clocks_layout(uint8_t kind, const HaloView &v);
+static void clocks_draw(uint8_t kind);
+static uint32_t clocks_wake_ms();
+static bool clocks_due();
+#else
+#define HAS_CLOCKS 0
+#endif
 
 // The Radio (radio.h; a rectangle's screen — radio_rect.h): in a firmware with it and in the page
 #if defined(__EMSCRIPTEN__) || (defined(FN_RADIO) && FN_RADIO)
@@ -936,19 +948,26 @@ static bool settings_busy() {
 }
 // Asleep: when something wants the board up again — ms from now (0 — nothing does): power.h sets its timer so
 static uint32_t settings_wake_ms() {
+  uint32_t ms = 0;
 #if HAS_POMODORO
-  return pm_wake_ms();  // the interval's end
-#else
-  return 0;
+  ms = pm_wake_ms();  // the interval's end
 #endif
+#if HAS_CLOCKS
+  const uint32_t t = clocks_wake_ms();  // the timer's end
+  if (t && (!ms || t < ms)) ms = t;
+#endif
+  return ms;
 }
 // … and it is time now: power.h brings the screen back (before the frame's tick, which would let it sleep again)
 static bool settings_due() {
+  bool due = false;
 #if HAS_POMODORO
-  return pm_due();
-#else
-  return false;
+  due |= pm_due();
 #endif
+#if HAS_CLOCKS
+  due |= clocks_due();
+#endif
+  return due;
 }
 
 // A screen with a section: opened, on top and still, laid out, drawn (face.h)
@@ -973,6 +992,10 @@ static void settings_enter(const FaceScreen &S) {
 #endif
 #if HAS_WXAPP
   if (st_has(S, FL_WXAPP)) wxapp_enter();
+#endif
+#if HAS_CLOCKS
+  for (uint8_t k : {FL_STOPWATCH, FL_TIMER, FL_WORLD})
+    if (st_has(S, k)) clocks_enter(k);
 #endif
 #if HAS_RADIO
   if (st_has(S, FL_RADIO)) radio_enter();
@@ -1008,6 +1031,10 @@ static void settings_update(const FaceScreen &S, float dt) {
 #if HAS_WXAPP
   if (st_has(S, FL_WXAPP)) wxapp_update(dt);
 #endif
+#if HAS_CLOCKS
+  for (uint8_t k : {FL_STOPWATCH, FL_TIMER, FL_WORLD})
+    if (st_has(S, k)) clocks_update(k, dt);
+#endif
 #if HAS_RADIO
   if (st_has(S, FL_RADIO)) radio_update(S, dt);
 #ifdef HALO_ROUND
@@ -1041,6 +1068,9 @@ static void settings_layout(FaceRun &R, uint8_t kind, const HaloView &v) {
 #endif
 #if HAS_WXAPP
   if (kind == FL_WXAPP) wxapp_layout(v);
+#endif
+#if HAS_CLOCKS
+  if (kind == FL_STOPWATCH || kind == FL_TIMER || kind == FL_WORLD) clocks_layout(kind, v);
 #endif
 #if HAS_RADIO
   if (kind == FL_RADIO) radio_layout(v);
@@ -1084,6 +1114,9 @@ static void settings_draw(uint8_t kind) {
 #endif
 #if HAS_WXAPP
   if (kind == FL_WXAPP) wxapp_draw();
+#endif
+#if HAS_CLOCKS
+  if (kind == FL_STOPWATCH || kind == FL_TIMER || kind == FL_WORLD) clocks_draw(kind);
 #endif
 #if HAS_RADIO
   if (kind == FL_RADIO) radio_draw();  // (round: its parts draw themselves, the volume screen goes over them: face.h)

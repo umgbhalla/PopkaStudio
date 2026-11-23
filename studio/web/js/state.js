@@ -47,6 +47,9 @@ export const KINDS = {
     by: { name: 'YKatrechko', url: 'https://github.com/YKatrechko' } },
   // Settings (sysset.h, on the UI kit ui.h): the watch's settings in one place, many levels — Display, Time, Wi-Fi, Sound,
   // Battery, System; kept on the watch (the round board's)
+  stopwatch: { group: 'section', fixed: true, round: true, name: 'Stopwatch', sub: 'Start, pause, laps — the edge ring sweeps each minute' },
+  timer: { group: 'section', fixed: true, round: true, name: 'Timer', sub: 'Presets, the time left round the edge, Time\'s up with beeps' },
+  world: { group: 'section', fixed: true, round: true, name: 'World clock', sub: 'Here and the cities you pick, how far ahead or behind' },
   wxapp: { group: 'section', fixed: true, round: true, name: 'Weather app', sub: 'One long page: now, 12 hours, 7 days, details, Use my location' },
   settings: { group: 'section', fixed: true, round: true, name: 'Settings', sub: 'Display, Time, Wi-Fi, Sound, Battery, System — one place, kept on the watch' },
   video: { group: 'section', fixed: true, round: true, name: 'Video', sub: 'Tiles of the clips on the microSD card and a player' },
@@ -150,7 +153,7 @@ export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK
 export const DEVS = [['cpu', 'Processor'], ['mem', 'Memory'], ['bat', 'Battery'], ['temp', 'Temperature'], ['snd', 'Sound'], ['mot', 'Motion']];
 export const KIND_INDEX = { date: 0, clock: 1, weather: 2, arc: 3, city: 4, wxicon: 5, wxtemp: 6, wxhilo: 7, hourly: 8, dots: 9, title: 10, card: 11, edge: 12, scroll: 13, steps: 14, stars: 15, feels: 17, display: 18, battery: 19, stnum: 20, stcap: 21, stfoot: 22, stchart: 23, curve: 24, stepring: 25, weekarc: 26, infoline: 27, forecast: 28, dateframe: 29, dotclock: 30, music: 31, recorder: 32, snkdots: 33, snkspace: 34, snkiso: 35, batring: 36, parrot: 37, devcard: 38, device: 39, charge: 40, video: 41, shade: 42, sclock: 43, radio: 44,
   rtime: 45, rname: 46, rsong: 47, rbtn: 48, rline: 49, rrays: 50, rplay: 51, rbrowse: 52, rfolder: 53, rvolume: 54,
-  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62, settings: 63, wxapp: 64 };
+  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62, settings: 63, wxapp: 64, stopwatch: 65, timer: 66, world: 67 };
 export const WXW = ['wxdigits', 'wxcurve', 'wxbaro', 'wxwear', 'wxbuddy', 'wxpixel', 'wxweek'];  // the weather widgets
 // Their layouts on the 7-inch board (studio.py WXLOOKS — the same names, in the same order: wxwidgets.h p3;
 // web/mockups/weather-widgets-rect.html 1A; 2A, 2B; 3A, 3B; 4A, 4B; 5A, 5B; 6A, 6B; 7A, 7B). A third element true — a
@@ -250,7 +253,7 @@ export const ICONS = {
   volume: 0xF028, contrast: 0xF042, gamepad: 0xF11B, camera: 0xF030, coffee: 0xF0F4, run: 0xF70C, snow: 0xF2DC,
   drop: 0xF043, cloud: 0xF0C2, fire: 0xF06D, star: 0xF005, bulb: 0xF0EB, car: 0xF1B9, plane: 0xF072, stopwatch: 0xF2F2,
   image: 0xF03E, chat: 0xF086, wrench: 0xF0AD, lock: 0xF023, menu: 0xF0C9, tv: 0xF26C, mic: 0xF130,
-  chip: 0xF2DB, memory: 0xF538, thermo: 0xF2C9,
+  chip: 0xF2DB, memory: 0xF538, thermo: 0xF2C9, reset: 0xF2F1, plus: 0x002B, xmark: 0xF00D, pause: 0xF04C,
 };
 // The Android 16 transition (lib/Halo: halo_nav_open) — a card's link
 export const A16 = { name: 'Push', sub: 'as on HaloWatch: the screen comes in from the right growing from 0.8, the gallery shrinks to 0.85, moves left and dims' };

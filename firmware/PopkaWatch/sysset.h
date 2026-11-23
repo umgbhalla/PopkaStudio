@@ -291,6 +291,31 @@ static void sysset_begin() {
   if (sy_prefs.isKey("boot")) pw_boot = constrain(sy_prefs.getInt("boot", pw_boot), 0, 4);
   if (sy_prefs.isKey("pwr")) pw_pwr = constrain(sy_prefs.getInt("pwr", pw_pwr), 0, 4);
   if (sy_prefs.isKey("fahr")) wx_fahr = sy_prefs.getInt("fahr", wx_fahr) != 0;
+  // set — the settings by name from the serial port, through the same setters (applied and kept): set pwr 4, set aod 0;
+  // set alone lists them (scripts and tests set the watch up without tapping through it)
+  halo_command("set", [](const char *a) {
+    char k[12] = {};
+    int v = 0;
+    const int got = sscanf(a, "%11s %d", k, &v);
+    struct S { const char *name; int (*get)(); void (*set)(int); } const S[] = {
+        {"aod", sy_aod, sy_set_aod}, {"idle", sy_idle, sy_set_idle}, {"aodb", sy_dim, sy_set_dim},
+        {"wtap", sy_tap, sy_set_tap}, {"wraise", sy_raise, sy_set_raise}, {"shift", sy_shift, sy_set_shift},
+        {"h24", sy_h24, sy_set_h24}, {"fswipe", sy_fswipe, sy_set_fswipe}, {"face", sy_face, sy_set_face},
+        {"boot", sy_boot, sy_set_boot}, {"pwr", sy_pwr, sy_set_pwr}, {"fahr", sy_units, sy_set_units},
+        {"limit", sy_limit, sy_set_limit},
+#if HAS_DISPLAY
+        {"bright", sy_bright, sy_set_bright},
+#endif
+#if SS_SOUND
+        {"vol", sy_vol, sy_set_vol},
+#endif
+    };
+    for (const auto &e : S) {
+      if (got >= 1 && strcmp(k, e.name)) continue;
+      if (got == 2) e.set(v);
+      LOG("set %s %d\n", e.name, e.get());
+    }
+  });
 #if SS_SOUND
   if (sy_prefs.isKey("vol")) vol_level = constrain(sy_prefs.getInt("vol", vol_level), 0, 10);
 #endif

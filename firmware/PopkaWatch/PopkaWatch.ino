@@ -46,6 +46,9 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #if HAS_WXAPP
 #include "wxapp.h"    // Weather: one long page on the kit — hero, 12 hours, 7 days, details, location
 #endif
+#if HAS_CLOCKS
+#include "clocks.h"   // Stopwatch, Timer, World clock — Wear OS's clock apps on the kit
+#endif
 #include "steps.h"    // today's steps (only with a Steps layer)
 #include "bt.h"       // Bluetooth (only when it is on)
 #include "live.h"     // Live: the layers' looks from the editor over USB, at once (no Load)
@@ -64,6 +67,9 @@ static void update(float dt) {
   ui_tick();             // what the apps asked to show: a result over the screen (confirm.h)
 #if HAS_WXAPP
   wa_keep_location();    // Weather: a location just found — kept
+#endif
+#if HAS_CLOCKS
+  clocks_tick();         // the timer runs out wherever the watch is: the result, the beeps
 #endif
 #if HAS_SHADE && defined(HALO_ROUND)
   const bool shade_was_visible = sh_px > 0;
@@ -122,6 +128,9 @@ void setup() {
 #endif
 #if HAS_WXAPP
   wxapp_begin();         // Weather: the location kept (Use my location) — before Wi-Fi's first fetch
+#endif
+#if HAS_CLOCKS
+  clocks_begin();        // World clock: the cities kept
 #endif
   steps_build();         // the chip's pedometer, today's steps from flash
   live_build();          // the command live (the editor's Live)

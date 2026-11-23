@@ -118,7 +118,7 @@ KINDS = {"date": 0, "clock": 1, "weather": 2,                                   
          "rtime": 45, "rname": 46, "rsong": 47, "rbtn": 48, "rline": 49, "rrays": 50, "rplay": 51,
          "rbrowse": 52, "rfolder": 53, "rvolume": 54,
          "wxdigits": 55, "wxcurve": 56, "wxbaro": 57, "wxwear": 58, "wxbuddy": 59, "wxpixel": 60, "wxweek": 61,
-         "pomodoro": 62, "settings": 63, "wxapp": 64}
+         "pomodoro": 62, "settings": 63, "wxapp": 64, "stopwatch": 65, "timer": 66, "world": 67}
 # The weather widgets (wxwidgets.h; web/mockups/weather-widgets.html, the variants the user kept on 14 Nov 2026): the
 # round board's; only those a project has go into its firmware (FN_WXW: a bit a widget, from wxdigits)
 WXW = ("wxdigits", "wxcurve", "wxbaro", "wxwear", "wxbuddy", "wxpixel", "wxweek")
@@ -290,6 +290,8 @@ DEFAULTS = {
     "settings": {"name": "Settings"},
     # Weather (wxapp.h, on the kit): one long page — hero, 12 hours, 7 days, details, location — the round board's
     "wxapp": {"name": "Weather app"},
+    # Wear OS's clock apps on the kit (clocks.h): the round board's
+    "stopwatch": {"name": "Stopwatch"}, "timer": {"name": "Timer"}, "world": {"name": "World clock"},
     "video": {"name": "Video"},  # tiles and a player, clips from the microSD card (video.h): a board with a passport listing it
     # The Radio (radio.h, the round board's): the favourites — the tuner's scale at first — and Browse's folders of the
     # Radio Browser catalog. The defaults are only stations whose broadcasters publish these links for other players
@@ -402,9 +404,10 @@ ICONS = {"chevron": 0xF054, "bell": 0xF0F3, "music": 0xF001, "sun": 0xF185, "gea
          "wifi": 0xF1EB, "location": 0xF3C5, "user": 0xF007, "house": 0xF015, "search": 0xF002, "play": 0xF04B,
          "radio": 0xF8D7, "chart": 0xF201, "pulse": 0xF21E, "battery": 0xF240, "bolt": 0xF0E7, "volume": 0xF028, "contrast": 0xF042,
          "gamepad": 0xF11B, "camera": 0xF030, "coffee": 0xF0F4, "run": 0xF70C, "snow": 0xF2DC, "drop": 0xF043,
-         "cloud": 0xF0C2, "cloudsun": 0xF6C4, "rain": 0xF73D, "wind": 0xF72E, "fire": 0xF06D, "star": 0xF005, "bulb": 0xF0EB, "car": 0xF1B9, "plane": 0xF072,
+         "cloud": 0xF0C2, "cloudsun": 0xF6C4, "rain": 0xF73D, "wind": 0xF72E, "hourglass": 0xF254, "globe": 0xF0AC, "flag": 0xF024, "fire": 0xF06D, "star": 0xF005, "bulb": 0xF0EB, "car": 0xF1B9, "plane": 0xF072,
          "stopwatch": 0xF2F2, "image": 0xF03E, "chat": 0xF086, "wrench": 0xF0AD, "lock": 0xF023, "menu": 0xF0C9,
-         "tv": 0xF26C, "mic": 0xF130, "chip": 0xF2DB, "memory": 0xF538, "thermo": 0xF2C9}
+         "tv": 0xF26C, "mic": 0xF130, "chip": 0xF2DB, "memory": 0xF538, "thermo": 0xF2C9,
+         "reset": 0xF2F1, "plus": 0x002B, "xmark": 0xF00D, "pause": 0xF04C}
 # HaloWatch's fonts of the gallery (its halo.conf: t_title, t24, t20, ic24) — in every PopkaWatch, as gl_*
 GALLERY_FONTS = [
     "font  gl_title  GoogleSansFlex.ttf  34  latin punct \"é\"  @wght=620,wdth=104,ROND=100   # the gallery: titles, stubs",
@@ -414,6 +417,7 @@ GALLERY_FONTS = [
     + " 0xf067 0xf068   # cards' icons; the player's + and −",
     "font  gl_back_ic fa-solid-900.ttf    24  0xf060   # Back arrow",
     "font  gl_cf_ic  fa-solid-900.ttf    30  0xf00d 0xf00c 0xf011 0xf1f8 0xf2f1   # the confirm (confirm.h): x, check, badges",
+    "font  gl_ck_n72  GoogleSansFlex.ttf  72  digits \":.\" @wght=500,ROND=100   # the clock apps' big time (clocks.h)",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
@@ -532,7 +536,8 @@ RADIO_LETTERS = 'latin cyrillic punct "àáâãäåæçèéêëìíîïñòóô�
 # Pomodoro (pomodoro.h): the time and the −/+ value, the settings' values; Font Awesome's eye, mug-hot, umbrella-beach,
 # forward-step, rotate-left, gear, xmark, chevron-right, chevron-left, minus, plus
 # The Weather app (wxapp.h): the hero's temperature
-ROUND_APP_FONTS["wxapp"] = ["font  gl_wa_n80    GoogleSansFlex.ttf  80  digits \"°-\" @wght=560,ROND=100   # Weather app: now"]
+ROUND_APP_FONTS["wxapp"] = ["font  gl_wa_n80    GoogleSansFlex.ttf  80  digits \"°-\" @wght=560,ROND=100   # Weather app: now",
+                            "font  gl_wa_ic64   fa-solid-900.ttf    64  0xf185 0xf6c4 0xf0c2 0xf73d 0xf2dc   # Weather app: the hero's sky, at its size (not scaled: sharp)"]
 ROUND_APP_FONTS["pomodoro"] = [
     "font  gl_pm_n84   GoogleSansFlex.ttf  84  digits \":\" @wght=660,ROND=100   # Pomodoro: the time",
     "font  gl_pm_n40   GoogleSansFlex.ttf  40  digits @wght=660,ROND=100   # Pomodoro: the settings' values",
@@ -1676,14 +1681,16 @@ def write_sketch(project, folder, meta=None):
     face_set = {0, *range(len(own), len(screens))}  # (the watch faces: the home and the saved ones — their layers link)
     # The Weather app: what a face's weather opens when it links nowhere (a tap on the pill shows the weather, as on
     # HaloWatch) — the first screen with the Weather screen's parts
-    wx_id = next((scr["id"] for k, scr in enumerate(own) if k and k != main and any(layer["type"] in WX_APP_PARTS for layer in scr["layers"])), None)
+    wx_id = next((scr["id"] for k, scr in enumerate(own) if k and k != main and any(layer["type"] == "wxapp" for layer in scr["layers"])),
+                 next((scr["id"] for k, scr in enumerate(own) if k and k != main and any(layer["type"] in WX_APP_PARTS for layer in scr["layers"])), None))
+    # (the Weather app first: an older Weather screen earlier in the list must not win)
     os.makedirs(os.path.join(folder, "assets"), exist_ok=True)
     if os.path.abspath(folder) != os.path.abspath(FIRMWARE):
         for name in ("PopkaWatch.ino", "face.h", "weather.h", "wxscreen.h", "gallery.h", "wxscreen_rect.h", "gallery_rect.h", "player_rect.h", "recorder_rect.h", "settings_rect.h", "device_rect.h", "game_dots_rect.h", "power.h", "steps.h", "stars.h",
                      "pixelart.h", "parrot.h", "bt.h", "wxfetch.h", "settings.h", "stepscreen.h", "widgets.h", "widgets_rect.h", "wxwidgets.h",
                      "music.h", "music_sd.h", "player.h", "pomodoro.h", "pomodoro_rect.h", "sound.h", "volume.h", "recorder.h", "radio.h", "radio_net.h", "radio_rect.h", "video.h", "video_hw.h", "video_net.h", "snake.h", "games.h", "game_dots.h",
                      "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
-                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h"):
+                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h"):
             shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
     fonts, icons = {}, {}  # spec -> name, (set, scale) -> name
     all_layers = [layer for scr in screens for layer in scr["layers"]]
@@ -1812,6 +1819,7 @@ def write_sketch(project, folder, meta=None):
            "// The clocks of sixteen looks (sclock.h): a bit a look the project has (none — not in the firmware)",
            f"#define FN_SCLOCK 0x{sum(1 << SC_NAMES.index(look) for look in {layer['look'] for layer in all_layers if layer['type'] == 'sclock'}):04X}",
            f"#define FN_WXAPP {1 if any(layer['type'] == 'wxapp' for layer in all_layers) else 0}  // the Weather app (wxapp.h)",
+           f"#define FN_CLOCKS {1 if any(layer['type'] in ('stopwatch', 'timer', 'world') for layer in all_layers) else 0}  // the clock apps (clocks.h)",
            "// The weather widgets (wxwidgets.h): a bit a widget the project has, from wxdigits (none — not in the firmware)",
            f"#define FN_WXW 0x{sum(1 << WXW.index(k) for k in {layer['type'] for layer in all_layers} if k in WXW):02X}"]
     if meta is not None:  # (a Load: who this firmware is — the board's answer to hello, hello.h)
