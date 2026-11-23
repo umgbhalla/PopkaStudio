@@ -53,8 +53,11 @@ static void ln_enter(const FaceScreen &S);
 static void ln_update(const FaceScreen &S, float dt, int depth);
 static void ln_layout(const FaceScreen &S, float a, const HaloView &v);
 static void ln_draw();
+// (off: the Apps screen is the original list of cards — the user's call, 23 Nov 2026: the list was good; launcher.h
+// stays for a grid if it is wanted again)
+#define GAL_GRID 0
 static bool gal_grid(const FaceScreen &S) {
-  return S.gal && gal_apps(S);
+  return GAL_GRID && S.gal && gal_apps(S);
 }
 static int gal_first(const FaceScreen &S) {
   for (int i = 0; i < S.n; i++)
