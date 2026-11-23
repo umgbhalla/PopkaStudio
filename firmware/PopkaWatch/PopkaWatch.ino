@@ -51,6 +51,8 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #endif
 #if HAS_MUSIC && defined(HALO_ROUND)
 #include "muapp.h"    // Music on the round board: Now playing, Volume, Queue, Music settings — paged (upager.h)
+#if HAS_RECORDER && defined(HALO_ROUND)
+#include "recapp.h"   // the Recorder's pages: capture, Recordings (and a clip's playback), its settings (upager.h)
 #endif
 #if HAS_CLOCKS
 #include "clocks.h"   // Stopwatch, Timer, World clock — paged apps (upager.h)

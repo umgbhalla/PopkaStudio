@@ -1,4 +1,7 @@
-// recorder.h — the Recorder (FL_RECORDER): PopkaStudio's own screen, picked from ten mockups (web/mockups/recorder.html,
+// recorder.h — the Recorder (FL_RECORDER): the sound (capture, cleaning, levelling, playback) for every board. The
+// round board's screen is now paged (recapp.h: capture, Recordings with a clip's playback, settings — Codex's design);
+// the rectangle's is recorder_rect.h. What follows about the screen was the round board's first one:
+// PopkaStudio's own screen, picked from ten mockups (web/mockups/recorder.html,
 // variant 9, "a card and forget"): the title and the timer, a dotted voice wave in a dark card, three buttons as the
 // Music player's — record / stop, the big play / pause, the volume (the player's volume screen, volume.h; the trash
 // was dropped: Record again replaces the recording). One recording, no list. Both microphones (halo_mic_*: Halo
@@ -75,6 +78,12 @@ static uint8_t rc_cur[2];     // the slice in progress, as rc_lv
 static volatile int rc_len, rc_pos;  // the recording, samples; played
 static volatile bool rc_playing;
 static float rc_gainf = 1, rc_gate = 1;  // the playback: its gain; the pauses' (eased)
+// The round board's Recorder settings (recapp.h, kept in flash): the next capture's limit (15, 30 or 60 s) and the
+// playback's levelling (off: unity gain, no quiet-slice gate — the soft limiter stays, as protection). The clip itself
+// is never changed by them
+static int rc_limit_s = RC_MAX_S;
+static bool rc_level_on = true;
+static time_t rc_when;  // when the clip was finished (the list's timestamp)
 static volatile bool rc_mic_want, rc_mic_on, rc_mic_busy, rc_mic_ok;
 static uint32_t rc_seen;
 static bool rc_active;
@@ -116,9 +125,9 @@ static int rc_fill(int16_t *out, int n) {  // the audio task (sound.h): the reco
   const int16_t *src = rc_buf + pos;
   for (int i = 0; i < k; i++) {
     const int sl = (pos + i) / rc_spp;
-    const float tg = sl < rc_k && !rc_lv[sl][0] ? RC_GATE : 1;  // a slice at the room's noise — quieter
+    const float tg = rc_level_on && sl < rc_k && !rc_lv[sl][0] ? RC_GATE : 1;  // a slice at the room's noise — quieter
     rc_gate += (tg - rc_gate) * (tg < rc_gate ? 0.001f : 0.01f);  // down in ~45 ms, up in ~5 ms
-    float v = src[i] * rc_gainf * rc_gate;
+    float v = src[i] * (rc_level_on ? rc_gainf : 1) * rc_gate;
     const float a = fabsf(v);
     if (a > RC_KNEE) {  // (rare: a click louder than the voice)
       const float e = a - RC_KNEE;
@@ -253,7 +262,7 @@ static void rc_record() {
   rc_skip = (int)(RC_SKIP * rc_rate);
 #endif
   rc_playing = false, rc_music_pause();
-  rc_cap = RC_MAX_S * min(rc_rate, RC_RATE), rc_spp = (int)(rc_rate * RC_SLICE);
+  rc_cap = constrain(rc_limit_s, 1, RC_MAX_S) * min(rc_rate, RC_RATE), rc_spp = (int)(rc_rate * RC_SLICE);
   rc_n = rc_k = rc_cnt = rc_pk = 0, rc_sq = 0, rc_t = 0, rc_len = rc_pos = 0, rc_hx = rc_hy = 0;
   rc_cur[0] = rc_cur[1] = 0;
   rc_state = RC_REC;
@@ -269,6 +278,7 @@ static void rc_stop(float trim = 0) {
 #endif
   rc_k = min(rc_k, rc_n / max(1, rc_spp));
   rc_len = rc_n, rc_pos = 0, rc_state = rc_len ? RC_DONE : RC_IDLE;
+  rc_when = time(nullptr);
   rc_overview();
   // The playback's gain: the voice — the loudest tenth of the slices above the room's noise (all, if none is)
   int hist[91] = {0}, peaks[91] = {0}, voiced = 0, peak = 0, top = 0;
@@ -387,11 +397,11 @@ static void recorder_tick(float dt) {  // every frame, whatever is on screen
   if (rc_state == RC_PLAY && !rc_playing) rc_state = RC_DONE, rc_pos = rc_pos >= rc_len ? 0 : (int)rc_pos;
 #else
   if (rc_state == RC_REC) {  // the made-up voice, slice by slice
-    rc_t = fminf(rc_t + dt, (float)RC_MAX_S);
+    rc_t = fminf(rc_t + dt, (float)rc_limit_s);
     while ((rc_k + 1) * RC_SLICE <= rc_t && rc_k < RC_MAX_SLICES) rc_slice_end();
     rc_voice_slice(rc_k * RC_SLICE, fmaxf(rc_t, rc_k * RC_SLICE + 0.01f), rc_cur);
     rc_n = (int)(rc_t * rc_rate);
-    if (rc_t >= RC_MAX_S) rc_stop();
+    if (rc_t >= rc_limit_s) rc_stop();
   }
   if (rc_state == RC_PLAY && (rc_pos += (int)(dt * rc_rate)) >= rc_len) rc_playing = false, rc_state = RC_DONE, rc_pos = 0;
 #endif
@@ -410,25 +420,16 @@ static void recorder_tick(float dt) {  // every frame, whatever is on screen
   snprintf(rc_time_s, sizeof rc_time_s, "%d:%02d", s / 60, s % 60);
 }
 
+#ifdef HALO_ROUND
+// The round board's screen: paged (recapp.h, included from PopkaWatch.ino after upager.h) — declared here for settings.h
+static void recorder_enter();
+static void recorder_update(float dt);
+static void recorder_layout(const HaloView &v);
+static void recorder_draw();
+#else
 static void recorder_enter() {
   rc_armed = -1, rc_mic_want = true, rc_seen = halo_ms();  // (the microphones warm before Record is tapped)
   vol_enter();
-}
-#ifdef HALO_ROUND
-static void recorder_update(float dt) {
-  HaloFinger &f = halo_finger;
-  rc_seen = halo_ms(), rc_active = true, rc_mic_want = true;
-  if (vol_update(dt)) return void(rc_armed = -1);  // the volume screen: "+", "−"; a tap elsewhere or 3 s idle — closed
-  if (f.pressed && !f.owner) {
-    rc_armed = -1;
-    for (int i = 0; i < 3; i++) {
-      const float dx = f.x0 - RC_BX[i], dy = f.y0 - RC_BTN_Y, r = RC_BR[i] + 10;
-      if (dx * dx + dy * dy < r * r && (i != 1 || rc_has())) rc_armed = i;
-    }
-  }
-  if (f.dragging) rc_armed = -1;
-  if (f.tap && rc_armed >= 0) rc_action(rc_armed, (halo_ms() - f.t0) / 1000.0f);
-  if (!f.down) rc_armed = -1;
 }
 #endif
 
@@ -443,128 +444,6 @@ static uint32_t rc_dmg_h;
 static float rc_dmg_r[4];
 static char rc_time_was[8];
 
-#ifdef HALO_ROUND
-static void recorder_layout(const HaloView &view) {
-  rc_fa = vol_layout(view);  // the volume screen over it (volume.h): this screen fades through
-  HaloView v = view;
-  v.a *= rc_fa;
-  rc_v = v;
-  gl_text_mid(rc_title, gl_t24, "Recorder", rc_mid_title, CX, RC_TITLE_Y, 1, RC_TEXT, 1, &halo_black);
-  halo_view_commit(rc_title, v);
-  // The timer; recording — a red dot before it (pulsing), the two centred together
-  if (strcmp(rc_time_was, rc_time_s)) rc_time_w = halo_text_width(gl_n44, rc_time_s), strcpy(rc_time_was, rc_time_s);
-  const float m = halo_clamp01(rc_recm.x), has = halo_clamp01(rc_hasm.x), tx = CX + 11 * m;
-  const uint32_t tc = rc_mix(rc_mix(RC_DIM, RC_TEXT, fmaxf(has, rc_len > 0 ? 1.0f : m)), RC_RED, m);
-  gl_text_mid(rc_time, gl_n44, rc_time_s, rc_mid_time, tx, RC_TIME_Y, 1, tc, 1, &halo_black);
-  halo_view_commit(rc_time, v);
-  const float pulse = rc_state == RC_REC ? 0.82f + 0.18f * cosf(rc_clock * 2 * HALO_PI * 0.8f) : 1;
-  for (HaloItem *it : {&rc_glow, &rc_dot}) {
-    const bool g = it == &rc_glow;
-    it->kind = HI_CIRCLE, it->x = tx - rc_time_w / 2 - 16, it->y = RC_TIME_Y, it->r = g ? 11 : 6, it->scale = 1;
-    it->color = RC_RED, it->alpha = m * pulse * (g ? 0.22f : 1), it->on_black = true, it->on = nullptr;
-    halo_view_commit(*it, v);
-  }
-  // The card and the wave's columns (drawn in recorder_draw)
-  rc_card.kind = HI_RRECT, rc_card.x = CX, rc_card.y = RC_Y, rc_card.w = RC_CARD_W, rc_card.h = RC_CARD_H, rc_card.r = 36;
-  rc_card.scale = 1, rc_card.color = RC_SURF, rc_card.alpha = 1, rc_card.on_black = true, rc_card.on = nullptr;
-  halo_view_commit(rc_card, v);
-  const float played = rc_len ? (float)rc_pos / rc_len : 0;
-  const bool prog = (rc_state == RC_PLAY || rc_state == RC_DONE) && rc_pos > 0;
-  uint32_t h = 2166136261u;
-  for (int c = 0; c <= RC_N; c++) {
-    RcCol &q = rc_cols[c];
-    const float x = RC_X0 + (c - 1) * RC_P + rc_xoff;
-    const float fade = halo_clamp01((x - (RC_X0 - RC_P)) / RC_P) * halo_clamp01((RC_XR + RC_P - x) / RC_P);
-    q.x = (int16_t)lroundf(x) - 2, q.fade = (uint8_t)lroundf(fade * 16);
-    q.nb = rc_db[c] < 0.5f ? 0 : (uint8_t)min(RC_ROWS, (int)(rc_db[c] + 0.5f));
-    q.np = q.nb ? (uint8_t)max((int)q.nb, min(RC_ROWS, (int)(rc_dp[c] + 0.5f))) : 0;
-    q.grey = prog && (c - 0.5f) / RC_N > played;
-    h = (h ^ (uint32_t)(q.x << 20 | q.nb << 16 | q.np << 8 | q.grey << 5 | q.fade)) * 16777619u;
-  }
-  for (float qv : {v.x, v.y, v.s, v.a}) h = (h ^ (uint32_t)(int32_t)(qv * 512)) * 16777619u;
-  const float ry = (RC_ROWS - 1) * RC_P + 4;
-  const float r[4] = {halo_view_x(v, RC_X0 - RC_P - 4), halo_view_y(v, RC_Y - ry), halo_view_x(v, RC_XR + RC_P + 4),
-                      halo_view_y(v, RC_Y + ry)};
-  if (h != rc_dmg_h || memcmp(r, rc_dmg_r, sizeof r)) {
-    if (rc_dmg_h) halo_damage_f(rc_dmg_r[0], rc_dmg_r[1], rc_dmg_r[2], rc_dmg_r[3]);
-    halo_damage_f(r[0], r[1], r[2], r[3]);
-    rc_dmg_h = h, memcpy(rc_dmg_r, r, sizeof r);
-  }
-  // The buttons: record / stop, play / pause, the volume (pressed — 6 % smaller)
-  const uint32_t bc[3] = {rc_mix(RC_RED_C, RC_RED, m), rc_mix(RC_GREY, RC_LIL, has), RC_GREY};
-  float sc[3];
-  for (int i = 0; i < 3; i++) {
-    sc[i] = 1 - 0.06f * halo_clamp01(rc_press[i].s.x);
-    HaloItem &b = rc_btn[i];
-    b.kind = HI_CIRCLE, b.x = RC_BX[i], b.y = RC_BTN_Y, b.r = RC_BR[i] * sc[i], b.scale = 1, b.color = bc[i], b.alpha = 1;
-    b.on_black = true, b.on = nullptr;
-    halo_view_commit(b, v);
-  }
-  HaloItem &ri = rc_rec_ic;  // the red dot turns into the white square
-  const float side = (28 + (26 - 28) * m) * sc[0];
-  ri.kind = HI_RRECT, ri.x = RC_BX[0], ri.y = RC_BTN_Y, ri.w = ri.h = side, ri.r = (14 + (6 - 14) * m) * sc[0];
-  ri.scale = 1, ri.color = rc_mix(RC_RED, RC_TEXT, m), ri.alpha = 1, ri.on_black = false, ri.on = nullptr;
-  halo_view_commit(ri, v);
-  const uint32_t ic = rc_mix(RC_OFF, RC_LIL_ON, has);
-  const float pp = halo_clamp01(rc_ppm.x);
-  gl_text_mid(rc_play_ic, gl_rc32, RC_PLAY_S, rc_mid_ic, RC_BX[1] + 3, RC_BTN_Y, sc[1], ic, 1 - pp, &rc_btn[1]);
-  gl_text_mid(rc_pause_ic, gl_rc32, RC_PAUSE_S, rc_mid_ic, RC_BX[1], RC_BTN_Y, sc[1], ic, pp, &rc_btn[1]);
-  gl_text_mid(rc_vol_ic, gl_rc32, RC_VOL_S, rc_mid_ic, RC_BX[2], RC_BTN_Y, sc[2], RC_TEXT, 1, &rc_btn[2]);
-  for (HaloItem *it : {&rc_play_ic, &rc_pause_ic, &rc_vol_ic}) halo_view_commit(*it, v);
-}
-
-// One dot, 5 × 5 with soft corners, straight into this task's part of the band (the card is under it, solid)
-static void rc_dot5(int x, int y, uint16_t c, uint16_t e) {
-  const int y0 = max(y, hb.y), y1 = min(y + 4, hb.y + hb.rows - 1), xa = max(x, hb.x0), xb = min(x + 4, hb.x1);
-  for (int yy = y0; yy <= y1; yy++) {
-    uint16_t *row = halo_row(yy);
-    const bool edge = yy == y || yy == y + 4;
-    for (int xx = xa; xx <= xb; xx++) row[xx] = edge && (xx == x || xx == x + 4) ? e : c;
-  }
-}
-static void rc_wave_draw() {
-  const HaloView &v = rc_v;
-  if (v.a <= 0.004f) return;  // (hidden: dimmed to black it would paint black over the screen under it)
-  const bool fast = v.s == 1 && v.a >= 0.999f && v.x == (int)v.x && v.y == (int)v.y;
-  const float ry = (RC_ROWS - 1) * RC_P + 3;
-  if (!halo_hits(halo_view_x(v, RC_X0 - RC_P - 3), halo_view_y(v, RC_Y - ry), halo_view_x(v, RC_XR + RC_P + 3),
-                 halo_view_y(v, RC_Y + ry)))
-    return;
-  for (int c = 0; c <= RC_N; c++) {
-    const RcCol &q = rc_cols[c];
-    if (!q.fade) continue;
-    for (int j = 0; j < RC_ROWS; j++) {
-      int a = !q.nb ? (j ? 0 : 4) : j < q.nb ? RC_BA[j] : j < q.np ? RC_GA[q.np - q.nb - 1][j - q.nb] : 0;
-      if (!a) break;
-      if (!(a = (a * q.fade + 8) >> 4)) continue;
-      for (int sgn = j ? -1 : 1; sgn <= 1; sgn += 2) {
-        const int y = (int)RC_Y + sgn * j * RC_P - 2;
-        if (fast) {
-          const int x = q.x + (int)v.x, yy = y + (int)v.y;
-          if (yy + 4 < hb.y || yy >= hb.y + hb.rows || x + 4 < hb.x0 || x > hb.x1) continue;
-          rc_dot5(x, yy, rc_pal[q.grey][a], rc_palc[q.grey][a]);
-        } else {  // (a transition: scaled, dimmed)
-          const float x0 = halo_view_x(v, q.x - 0.5f), y0 = halo_view_y(v, y - 0.5f);
-          const float x1 = halo_view_x(v, q.x + 4.5f), y1 = halo_view_y(v, y + 4.5f);
-          if (!halo_hits(x0, y0, x1, y1)) continue;
-          const uint32_t col = rc_mix(RC_SURF, q.grey ? RC_OFF : RC_TEXT, a / 16.0f);
-          halo_rrect(x0, y0, x1, y1, 1.5f * v.s, halo_dim(col, (int)(v.a * 256)), 1);
-        }
-      }
-    }
-  }
-}
-
-static void recorder_draw() {
-  if (rc_fa > 0.004f) {
-    halo_item_draw(rc_title), halo_item_draw(rc_glow), halo_item_draw(rc_dot), halo_item_draw(rc_time);
-    halo_item_draw(rc_card);
-    rc_wave_draw();
-    for (const auto &b : rc_btn) halo_item_draw(b);
-    halo_item_draw(rc_rec_ic), halo_item_draw(rc_play_ic), halo_item_draw(rc_pause_ic), halo_item_draw(rc_vol_ic);
-  }
-  vol_draw();
-}
-#else
+#ifndef HALO_ROUND
 #include "recorder_rect.h"  // this screen's own places: the update, the layout, the wave
 #endif

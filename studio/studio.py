@@ -467,6 +467,13 @@ GALLERY_FONTS = [
     "font  gl_mu_ic32 fa-solid-900.ttf    32  0xf068 0xf067   # Music: volume minus, plus",
     "font  gl_mu_ic24 fa-solid-900.ttf    24  0xf028   # Music: the speaker",
     "font  gl_mu_ic26 fa-solid-900.ttf    26  0xf0a0   # Music: the library's storage",
+    # Recorder (recapp.h; design/SPEC_recorder.md): a clip's duration, the icons at the spec's sizes
+    "font  gl_ra_dur  GoogleSansFlex.ttf  35  digits \":\" @wght=790,wdth=89,ROND=40,opsz=35   # Recorder: a clip's length",
+    "font  gl_ra_ic43 fa-solid-900.ttf    43  0xf130   # Recorder: start (the microphone)",
+    "font  gl_ra_ic38 fa-solid-900.ttf    38  0xf04d   # Recorder: stop",
+    "font  gl_ra_ic31 fa-solid-900.ttf    31  0xf03a 0xf060   # Recorder: Recordings, Back",
+    "font  gl_ra_ic26 fa-solid-900.ttf    26  0xf068 0xf067   # Recorder: the limit's minus, plus",
+    "font  gl_ra_ic19 fa-solid-900.ttf    19  0xf04b   # Recorder: a clip's play",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
