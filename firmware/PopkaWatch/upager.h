@@ -11,8 +11,8 @@
 extern const HaloFont gl_up_hero, gl_up_disp, gl_up_pick, gl_up_title, gl_up_clock, gl_up_num, gl_up_pre, gl_up_lab,
     gl_up_ic43, gl_up_ic32, gl_up_ic24;  // (studio.py GALLERY_FONTS)
 #define UP_PAGES 8
-#define UP_IT 40
-#define UP_BLOBS 2
+#define UP_IT 64
+#define UP_BLOBS 3
 #define UP_IC_PLAY "\xEF\x81\x8B"
 #define UP_IC_PAUSE "\xEF\x81\x8C"
 #define UP_IC_FLAG "\xEF\x80\xA4"
@@ -37,10 +37,11 @@ extern const HaloFont gl_up_hero, gl_up_disp, gl_up_pick, gl_up_title, gl_up_clo
 #define UP_TITLE_Y 98.0f
 #define UP_DOTS_Y 433.0f
 
-struct UpBlob {  // a primary button's shape (drawn per pixel, in the page's item order)
+struct UpBlob {  // drawn per pixel, in the page's item order: a primary button's shape, or an app's own painting
   int at;        // drawn before item `at` of its page
-  float x, y, r, t, a;  // where (screen, after the view), size, the morph, alpha
+  float x, y, r, t, a;  // where (screen, after the view), size (half the box), the morph or a data key, alpha
   uint32_t c;
+  void (*paint)(const struct UpBlob &b);  // an app's own (a chart): it paints the band itself; nullptr — the button
   float was[5];  // where it was drawn (x, y, r, t, a): a change — its box drawn again
 };
 struct UpPage {
@@ -69,7 +70,9 @@ static char up_clock_of[8];
 static float up_clock_x, up_clock_y;
 static float up_mid_hero, up_mid_disp, up_mid_pick, up_mid_title, up_mid_num, up_mid_pre, up_mid_lab, up_mid_ic;
 
+static void up_commands();
 static bool up_begin() {
+  up_commands();
   if (up_pg) return true;
 #ifdef __EMSCRIPTEN__
   up_pg = (UpPage *)calloc(UP_PAGES, sizeof(UpPage));
@@ -133,6 +136,7 @@ static void up_primary(UpPage &P, float x, float y, float r, float t, const char
   if (P.nb < UP_BLOBS) {
     UpBlob &b = P.b[P.nb++];
     b.at = P.n, b.x = halo_view_x(v, x), b.y = halo_view_y(v, y), b.r = r * v.s, b.t = t, b.a = a * v.a, b.c = fill;
+    b.paint = nullptr;
     const float nw[5] = {b.x, b.y, b.r, b.t, b.a};
     bool same = true;
     for (int k = 0; k < 5; k++) same = same && fabsf(nw[k] - b.was[k]) < (k == 3 || k == 4 ? 0.004f : 0.25f);
@@ -162,8 +166,26 @@ static inline void up_title(UpPage &P, const char *s, float a, const HaloView &v
   up_text(P, gl_up_title, s, up_mid_title, CX, UP_TITLE_Y, 1, UP_WHITE, a, v);
 }
 
+// An app's own painting in a box (centre x, y, half size r) at its place in the page: redrawn when the box, the key or
+// the alpha change (the key: a hash of what it shows)
+static void up_paint(UpPage &P, float x, float y, float r, uint32_t key, void (*paint)(const UpBlob &), float a,
+                     const HaloView &v) {
+  if (P.nb >= UP_BLOBS) return;
+  UpBlob &b = P.b[P.nb++];
+  b.at = P.n, b.x = halo_view_x(v, x), b.y = halo_view_y(v, y), b.r = r * v.s, b.t = (float)(key % 100000), b.a = a * v.a;
+  b.paint = paint;
+  const float nw[5] = {b.x, b.y, b.r, b.t, b.a};
+  bool same = true;
+  for (int k = 0; k < 5; k++) same = same && fabsf(nw[k] - b.was[k]) < (k == 4 ? 0.004f : 0.25f);
+  if (!same) {
+    if (b.was[2] > 0) halo_damage_f(b.was[0] - b.was[2] - 2, b.was[1] - b.was[2] - 2, b.was[0] + b.was[2] + 2, b.was[1] + b.was[2] + 2);
+    halo_damage_f(b.x - b.r - 2, b.y - b.r - 2, b.x + b.r + 2, b.y + b.r + 2);
+    for (int k = 0; k < 5; k++) b.was[k] = nw[k];
+  }
+}
 // The blob, per pixel and smoothed, into this band
 static void up_blob_draw(const UpBlob &b) {
+  if (b.paint) return b.a > 0.004f ? b.paint(b) : (void)0;
   if (b.a < 0.004f || b.r <= 0) return;
   const int y0 = max(hb.y, (int)floorf(b.y - b.r - 1)), y1 = min(hb.y + hb.rows - 1, (int)ceilf(b.y + b.r + 1));
   const int x0 = max(hb.x0, (int)floorf(b.x - b.r - 1)), x1 = min(hb.x1, (int)ceilf(b.x + b.r + 1));
@@ -292,6 +314,60 @@ static void up_draw() {
   }
   halo_item_draw(up_clock);
   for (HaloItem &d : up_dot) halo_item_draw(d);
+}
+
+// ---------- The audit (serial: upcheck) — what overlaps on the page in front, what comes near the rim ----------
+// Every two shown items whose boxes cross by more than 2 px, unless one is the other's ground (on) or holds it whole
+// (a text on its card); every text or shape whose box reaches past r 221 (12 px from the rim). Measured, not eyeballed
+static void up_audit() {
+  if (!up_app || !up_pg) return (void)LOG("upcheck: no paged app open\n");
+  const UpPage &P = up_pg[up_page];
+  int bad = 0;
+  auto name = [&](const HaloItem &it) -> const char * {
+    return it.kind == HI_TEXT && it.text ? it.text : it.kind == HI_RRECT ? "[card]" : it.kind == HI_CIRCLE ? "[disc]" : "[shape]";
+  };
+  // A text's box by its ink (its glyphs' tops and bottoms), not its line: a 154 px line box overlaps everything near it
+  auto ink = [](const HaloItem &it, float *o) {
+    memcpy(o, it.b, sizeof(it.b));
+    if (it.kind != HI_TEXT || !it.font || !it.text) return;
+    int top = 9999, bot = -9999;
+    for (const char *q = it.text; *q;) {
+      const HaloMask *g = halo_glyph(*it.font, halo_utf8_next(q));
+      if (g && g->h > 0) top = min(top, (int)g->oy), bot = max(bot, g->oy + g->h);
+    }
+    if (top > bot) return;
+    const float t0 = it.y - it.font->line * it.scale / 2;  // (the line's top: the item's y is its middle)
+    o[1] = t0 + top * it.scale, o[3] = t0 + bot * it.scale;
+  };
+  auto holds = [](const HaloItem &a, const HaloItem &b) {  // (a's box holds b's whole)
+    return a.b[0] <= b.b[0] + 1 && a.b[1] <= b.b[1] + 1 && a.b[2] >= b.b[2] - 1 && a.b[3] >= b.b[3] - 1;
+  };
+  for (int i = 0; i < P.n; i++) {
+    const HaloItem &a = P.it[i];
+    if (!a.shown || a.alpha < 0.05f) continue;
+    float far = 0;
+    for (int c = 0; c < 4; c++) {
+      const float x = (c & 1 ? a.b[2] : a.b[0]) - CX, y = (c & 2 ? a.b[3] : a.b[1]) - CY;
+      far = fmaxf(far, sqrtf(x * x + y * y));
+    }
+    if (a.kind == HI_TEXT && far > 221) LOG("upcheck: near the rim: \"%s\" reaches r %.0f\n", name(a), far), bad++;
+    for (int j = i + 1; j < P.n; j++) {
+      const HaloItem &b = P.it[j];
+      if (!b.shown || b.alpha < 0.05f || a.kind != HI_TEXT && b.kind != HI_TEXT) continue;
+      if (b.on == &a || a.on == &b || holds(a, b) || holds(b, a)) continue;
+      float A[4], B[4];
+      ink(a, A), ink(b, B);
+      const float ox = fminf(A[2], B[2]) - fmaxf(A[0], B[0]), oy = fminf(A[3], B[3]) - fmaxf(A[1], B[1]);
+      if (ox > 2 && oy > 2) LOG("upcheck: \"%s\" overlaps \"%s\" (%.0f x %.0f px)\n", name(a), name(b), ox, oy), bad++;
+    }
+  }
+  LOG("upcheck: page %d — %d problem%s\n", up_page + 1, bad, bad == 1 ? "" : "s");
+}
+static void up_commands() {
+  static bool done;
+  if (done) return;
+  done = true;
+  halo_command("upcheck", [](const char *) { up_audit(); });
 }
 
 // ---------- A picker column: a value dragged up and down, snapping (the Timer's minutes, seconds) ----------

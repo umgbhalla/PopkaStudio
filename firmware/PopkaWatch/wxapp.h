@@ -1,16 +1,10 @@
-// wxapp.h — Weather (FL_WXAPP): one long page on the UI kit (ui.h) — Material 3 for Wear OS, configurable.
-//   Mumbai ── the hero: the sky, the temperature big, what it feels like, today's high and low
-//          ├─ the next 12 hours: a line of the temperature, its highest and lowest marked
-//          ├─ NEXT 7 DAYS: a row a day — the sky, the low and the high
-//          ├─ NOW: humidity, wind, UV, sunrise, sunset
-//          ├─ [Refresh · updated N min ago]                     — with Wi-Fi
-//          └─ Locations: the city shown; Use my location (by the watch's internet address, ip-api.com), kept
-// The numbers are Open-Meteo's (wxfetch.h: with this app it asks for humidity, wind, UV, sunrise and sunset too); the
-// page is made again when fresh weather comes (the days' skies change their icons). Round board only.
-// Included from PopkaWatch.ino after sysset.h (the kit, the Wi-Fi's sync).
+// wxapp.h — Weather (FL_WXAPP): five non-scrolling pages swiped left and right (upager.h; Codex's measured study,
+// design/SPEC_weather.md — 23 Nov 2026):
+//   1 Now — the city, the sky, the temperature big, the sky and feels-like, HIGH / LOW;  2 Next 12 hours — an area chart;
+//   3 Next 7 days — sky, low, high, the range on one scale;  4 Details — humidity, wind, UV, sunrise → sunset;
+//   5 Settings — °C / °F (kept), the location (Use my location — by the watch's internet address, ip-api.com — kept).
+// The numbers are Open-Meteo's (wxfetch.h). Round board only. Included from PopkaWatch.ino after upager.h.
 #ifdef HALO_ROUND
-extern const HaloFont gl_wa_n80;   // the hero's temperature (studio.py ROUND_APP_FONTS["wxapp"])
-extern const HaloFont gl_wa_ic64;  // the hero's sky, made at its size (a scaled 24 px glyph was blurry)
 #define WA_IC_SUN "\xEF\x86\x85"
 #define WA_IC_CLOUD "\xEF\x83\x82"
 #define WA_IC_PARTLY "\xEF\x9B\x84"
@@ -36,141 +30,8 @@ static void wa_hhmm(char *o, int n, uint32_t t) {
   snprintf(o, n, "%d:%02d", m.tm_hour, m.tm_min);
 }
 
-// ---------- The hero (a custom row): the sky's icon and the temperature big, the words under ----------
-static HaloItem wa_hero[5];
-static char wa_t_now[8], wa_t_line[40], wa_t_hilo[24];
-static float wa_mid_n80, wa_mid_ic, wa_mid_ic64;
-static void wa_hero_lay(float x0, float y0, float w, float h, float s, float a, const HaloView &v) {
-  const WxCity &c = wx_city[0];
-  wx_deg(wa_t_now, sizeof(wa_t_now), c.now);
-  char f[8], hi[8], lo[8];
-  wx_deg(f, sizeof(f), c.feels), wx_deg(hi, sizeof(hi), c.hi), wx_deg(lo, sizeof(lo), c.lo);
-  snprintf(wa_t_line, sizeof(wa_t_line), "Feels %s · %s", f, wa_sky(c.kind));
-  snprintf(wa_t_hilo, sizeof(wa_t_hilo), "H %s  L %s", hi, lo);
-  const float cy = y0 + 70 * s, tw = halo_text_width(gl_wa_n80, wa_t_now) * s, iw = 64 * s, gap = 18 * s;
-  const float gx = CX - (iw + gap + tw) / 2;  // (the icon and the number centered as one)
-  wa_hero[0].alpha = 0;  // (M3: the sky as a glyph in the accent — no disc behind it)
-  ui_text(wa_hero[1], gl_wa_ic64, wa_icon(c.kind), wa_mid_ic64, gx + iw / 2, cy, s, 1, 0xFFB030, a, &halo_black);
-  wa_hero[1].on_black = true;
-  ui_text(wa_hero[2], gl_wa_n80, wa_t_now, wa_mid_n80, gx + iw + gap, cy, s, 0, GL_TEXT, a, &halo_black);
-  wa_hero[2].on_black = true;
-  ui_text(wa_hero[3], gl_t20, wa_t_line, ui_mid_t20, CX, y0 + 130 * s, s, 1, GL_DIM, a, &halo_black, 340);
-  wa_hero[3].on_black = true;
-  ui_text(wa_hero[4], gl_t20, wa_t_hilo, ui_mid_t20, CX, y0 + 160 * s, s, 1, GL_TEXT, a, &halo_black);
-  wa_hero[4].on_black = true;
-  for (HaloItem &it : wa_hero) halo_view_commit(it, v);
-}
-static void wa_hero_draw() {
-  for (HaloItem &it : wa_hero) halo_item_draw(it);
-}
-
-// ---------- The next 12 hours (a custom row): a line of dots on a tonal card, the hours under ----------
-#define WA_H 12
-struct WaChart {
-  float x0, y0, w, h, s, a;
-  float px[WA_H], py[WA_H];
-  int16_t t[WA_H];
-  int first, hi_i, lo_i;
-  uint32_t key;
-};
-static WaChart wa_ch;
-static HaloItem wa_card;
-static void wa_chart_lay(float x0, float y0, float w, float h, float s, float a, const HaloView &v) {
-  const WxCity &c = wx_city[0];
-  // From this hour on (t0 is the first forecast hour)
-  const time_t now = time(nullptr);
-  const int first = c.t0 && now > (time_t)c.t0 ? constrain((int)((now - c.t0) / 3600), 0, WX_AHEAD - WA_H) : 0;
-  int16_t lo = INT16_MAX, hi = INT16_MIN;
-  for (int j = 0; j < WA_H; j++) {
-    const int16_t t = c.ht[first + j];
-    wa_ch.t[j] = t;
-    if (t == WX_NONE) continue;
-    if (t < lo) lo = t, wa_ch.lo_i = j;
-    if (t > hi) hi = t, wa_ch.hi_i = j;
-  }
-  ui_rrect(wa_card, CX, y0 + h / 2, GL_ITEM_W, h / s, 40, s, UI_SURF, a);
-  halo_view_commit(wa_card, v);
-  const float ix0 = halo_view_x(v, x0 + 40 * s), ix1 = halo_view_x(v, x0 + w - 40 * s);
-  const float top = halo_view_y(v, y0 + 34 * s), bot = halo_view_y(v, y0 + h - 62 * s);  // (room under for the low and the hours)
-  uint32_t key = 2166136261u;
-  for (int j = 0; j < WA_H; j++) {
-    const int16_t t = wa_ch.t[j];
-    wa_ch.px[j] = ix0 + (ix1 - ix0) * j / (WA_H - 1);
-    wa_ch.py[j] = t == WX_NONE || hi <= lo ? (top + bot) / 2 : bot - (bot - top) * (t - lo) / (float)(hi - lo);
-    key = (key ^ (uint32_t)lroundf(wa_ch.py[j] * 4)) * 16777619u;
-  }
-  key = (key ^ (uint32_t)lroundf(ix0 * 4) ^ ((uint32_t)lroundf(a * 64) << 20) ^ (uint32_t)first << 12) * 16777619u;
-  wa_ch.first = first, wa_ch.s = s * v.s, wa_ch.a = a * v.a;
-  if (key != wa_ch.key) {  // (moved or changed: the old place and the new one again)
-    halo_damage_f(wa_ch.x0 - 4, wa_ch.y0 - 4, wa_ch.x0 + wa_ch.w + 4, wa_ch.y0 + wa_ch.h + 4);
-    wa_ch.x0 = halo_view_x(v, x0), wa_ch.y0 = halo_view_y(v, y0), wa_ch.w = w * v.s, wa_ch.h = h * v.s;
-    halo_damage_f(wa_ch.x0 - 4, wa_ch.y0 - 4, wa_ch.x0 + wa_ch.w + 4, wa_ch.y0 + wa_ch.h + 4);
-    wa_ch.key = key;
-  }
-}
-static void wa_chart_draw() {
-  halo_item_draw(wa_card);
-  const float a = wa_ch.a, s = wa_ch.s;
-  if (a <= 0.01f || !halo_hits(wa_ch.x0, wa_ch.y0, wa_ch.x0 + wa_ch.w, wa_ch.y0 + wa_ch.h)) return;
-  const uint32_t line = 0xFFB030;
-  for (int j = 0; j + 1 < WA_H; j++) {  // the line: dots close enough to read as one
-    if (wa_ch.t[j] == WX_NONE || wa_ch.t[j + 1] == WX_NONE) continue;
-    const float dx = wa_ch.px[j + 1] - wa_ch.px[j], dy = wa_ch.py[j + 1] - wa_ch.py[j];
-    const int n = max(1, (int)(sqrtf(dx * dx + dy * dy) / (1.6f * s)));
-    for (int q = 0; q < n; q++) halo_circle(wa_ch.px[j] + dx * q / n, wa_ch.py[j] + dy * q / n, 2.2f * s, line, a);
-  }
-  char b[8];
-  for (int j = 0; j < WA_H; j++) {
-    if (wa_ch.t[j] == WX_NONE) continue;
-    const bool mark = j == wa_ch.hi_i || j == wa_ch.lo_i;
-    if (mark) {  // the highest and the lowest: a dot and the number over / under it
-      halo_circle(wa_ch.px[j], wa_ch.py[j], 5 * s, line, a), halo_circle(wa_ch.px[j], wa_ch.py[j], 2.5f * s, UI_SURF, a);
-      wx_deg(b, sizeof(b), wa_ch.t[j]);
-      const float ty = j == wa_ch.hi_i ? wa_ch.py[j] - 28 * s : wa_ch.py[j] + 6 * s;
-      halo_text(gl_t20, b, wa_ch.px[j], ty, GL_TEXT, a, 1, s);
-    }
-    if (j % 3 == 0) {  // the hours under, every third
-      const time_t t = (time_t)wx_city[0].t0 + (wa_ch.first + j) * 3600;
-      struct tm m;
-      localtime_r(&t, &m);
-      snprintf(b, sizeof(b), j ? "%d" : "Now", m.tm_hour);
-      halo_text(gl_t20, b, wa_ch.px[j], wa_ch.y0 + wa_ch.h - 32 * s, GL_DIM, a, 1, s);
-    }
-  }
-}
-
 // ---------- The days, the details, refresh ----------
-template <int D> static void wa_day_line(char *o, int n) {
-  const WxCity &c = wx_city[0];
-  if (!c.t0 || (c.dlo[D] == 0 && c.dhi[D] == 0)) return (void)strlcpy(o, "—", n);  // (no forecast yet: the editor's copy)
-  char lo[8], hi[8];
-  wx_deg(lo, sizeof(lo), c.dlo[D]), wx_deg(hi, sizeof(hi), c.dhi[D]);
-  snprintf(o, n, "%s – %s · %s", lo, hi, wa_sky(c.dk[D]));
-}
-static const char *wa_day_name(int d) {
-  static const char *const WD[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-  if (d == 0) return "Today";
-  const time_t t = time(nullptr) + d * 86400;
-  struct tm m;
-  localtime_r(&t, &m);
-  return WD[m.tm_wday];
-}
-static void wa_hum(char *o, int n) { snprintf(o, n, "%d%%", wx_city[0].hum); }
-static void wa_wind(char *o, int n) { snprintf(o, n, "%d %s", wx_city[0].wind, wx_fahr ? "mph" : "km/h"); }
-static void wa_uv(char *o, int n) {
-  const int u = wx_city[0].uv10;
-  snprintf(o, n, "%d.%d · %s", u / 10, u % 10, u < 30 ? "low" : u < 60 ? "moderate" : u < 80 ? "high" : "very high");
-}
-static void wa_rise(char *o, int n) { wa_hhmm(o, n, wx_city[0].rise); }
-static void wa_set(char *o, int n) { wa_hhmm(o, n, wx_city[0].set); }
 static void wa_city(char *o, int n) { strlcpy(o, wx_city[0].name, n); }
-// The city and how fresh the weather is (the edge button says only "Refresh": Wear OS's edge labels are a word or two)
-static void wa_city_fresh(char *o, int n) {
-  if (!wx_fetched_ms) return (void)strlcpy(o, wx_city[0].name, n);
-  const uint32_t m = (halo_ms() - wx_fetched_ms) / 60000;
-  if (m < 1) snprintf(o, n, "%s · updated just now", wx_city[0].name);
-  else snprintf(o, n, "%s · updated %u min ago", wx_city[0].name, (unsigned)m);
-}
 static void wa_refresh() {
 #if SS_WIFI
   xTaskNotifyGive(hclk_handle);
@@ -181,40 +42,227 @@ static void wa_here() {
   wa_refresh();
 }
 
-static UiPage wa_page, wa_locs;
-static uint32_t wa_built_ms = 1;
-static void wa_build() {
-  wa_mid_n80 = halo_text_mid(gl_wa_n80, "0123456789"), wa_mid_ic = halo_text_mid(gl_ic24, WA_IC_SUN);
-  wa_mid_ic64 = halo_text_mid(gl_wa_ic64, WA_IC_SUN);
+// ---------- The pages (upager.h; Codex's measured study, design/SPEC_weather.md — 23 Nov 2026) ----------
+// 1 Now — the city, the sky in a honey disc, the temperature big, the sky and feels-like, HIGH and LOW cards;
+// 2 Next 12 hours — an area chart on a honey card; 3 Next 7 days — each day's sky, low, high and its range on one scale;
+// 4 Details — humidity, wind, UV, and the day so far between sunrise and sunset; 5 Settings — °C / °F, the location.
+extern const HaloFont gl_wx_hero, gl_wx_line, gl_wx_val, gl_wx_week, gl_wx_ic38;  // (studio.py GALLERY_FONTS)
+#define WA_HONEY 0xFFC983
+#define WA_COOL 0xAED5FA
+#define WA_HCARD 0x281D13
+#define WA_HROW 0x3B2918
+#define WA_ICE 0x192331
+#define WA_NEUTRAL 0x1C1B20
+#define WA_GRID 0x3C3230
+#define WA_AREA 0x4D3625
+#define WA_WTRACK 0x423A39
+#define WA_DARK 0x30200F
+static char wa_now[8], wa_line[40], wa_hi[8], wa_lo[8], wa_hours[4][6], wa_grid[3][6], wa_day[7][2][8], wa_det[3][8];
+static char wa_rise_s[8], wa_set_s[8];
+static float wa_hy[12];  // the chart's points (y), x = 116 + 24 i
+static int wa_hn;
+static UiPage wa_locs;
+static int wa_count() { return 5; }
+static float wa_mid(const HaloFont &f) { return halo_text_mid(f, "0123456789"); }
+static void wa_deg(char *o, int n, int16_t t) {
+  if (t == WX_NONE) strlcpy(o, "--", n);
+  else snprintf(o, n, "%d\xC2\xB0", (int)t);
+}
+// The chart, per pixel in its band: the area under the line, the rules, the line (4 px, smoothed), a dot at each hour
+static void wa_chart_paint(const UpBlob &b) {
+  const float ox = b.x - 233, oy = b.y - 254;  // (where the card is now: the page's shift)
+  const int y0 = max(hb.y, (int)(b.y - b.r)), y1 = min(hb.y + hb.rows - 1, (int)(b.y + b.r));
+  if (wa_hn < 2) return;
+  const int ar = (WA_AREA >> 16 & 255) >> 3, ag = (WA_AREA >> 8 & 255) >> 2, ab = (WA_AREA & 255) >> 3;
+  const int lr = (WA_HONEY >> 16 & 255) >> 3, lg = (WA_HONEY >> 8 & 255) >> 2, lb = (WA_HONEY & 255) >> 3;
+  const int gr = (WA_GRID >> 16 & 255) >> 3, gg = (WA_GRID >> 8 & 255) >> 2, gb = (WA_GRID & 255) >> 3;
+  const int A = (int)(b.a * 256);
+  for (int y = y0; y <= y1; y++) {
+    uint16_t *row = halo_row(y);
+    const float py = y + 0.5f - oy;
+    for (int x = max(hb.x0, (int)(ox + 112)); x <= min(hb.x1, (int)(ox + 390)); x++) {
+      const float px = x + 0.5f - ox;
+      for (const float gy : {183.0f, 247.0f, 311.0f})  // the rules
+        if (fabsf(py - gy) < 0.5f && px >= 113 && px <= 388) halo_blend(row + x, gr, gg, gb, A);
+      if (px < 116 || px > 116 + 24 * (wa_hn - 1)) continue;
+      const int k = min(wa_hn - 2, (int)((px - 116) / 24));
+      const float f = (px - 116 - 24 * k) / 24, ly = wa_hy[k] + (wa_hy[k + 1] - wa_hy[k]) * f;
+      const float slope = (wa_hy[k + 1] - wa_hy[k]) / 24;
+      if (py > ly && py <= 311) halo_blend(row + x, ar, ag, ab, A);  // (the area)
+      const float d = fabsf(py - ly) / sqrtf(1 + slope * slope);
+      float cov = halo_clamp01(2.5f - d);
+      const int kn = (int)roundf((px - 116) / 24);  // (the nearest hour's dot, r 2.5 over the line)
+      if (kn >= 0 && kn < wa_hn) {
+        const float dx = px - (116 + 24 * kn), dy = py - wa_hy[kn];
+        cov = fmaxf(cov, halo_clamp01(3.5f - sqrtf(dx * dx + dy * dy)));
+      }
+      if (cov > 0) halo_blend(row + x, lr, lg, lb, (int)(cov * A));
+    }
+  }
+}
+static void wa_lay(int p, UpPage &P, float a, const HaloView &v) {
   const WxCity &c = wx_city[0];
-  wa_page = {c.name, {}, 0, 0xFFB030};
-  UiPage &p = wa_page;
-  p.rows[p.n++] = ur_custom(184, wa_hero_lay, wa_hero_draw);
-  p.rows[p.n++] = ur_custom(150, wa_chart_lay, wa_chart_draw);
-  p.rows[p.n++] = ur_head("Next 7 days");
-  static void (*const DAY[7])(char *, int) = {wa_day_line<0>, wa_day_line<1>, wa_day_line<2>, wa_day_line<3>,
-                                              wa_day_line<4>, wa_day_line<5>, wa_day_line<6>};
-  for (int d = 0; d < 7 && p.n < UI_ROWS; d++)
-    p.rows[p.n++] = ur_info(wa_icon(c.dk[d], c.dsnow >> d & 1), wa_day_name(d), DAY[d]);
-  // (the page has room for UI_ROWS: the details go on their own short page under NOW)
-  wa_locs = {"Weather", {}, 0, 0xFFB030};
+  if (p == 0) {  // Now
+    up_title(P, c.name, a, v);
+    HaloItem &disc = up_disc(P, CX, 144, 26, WA_HCARD, a, v);
+    up_text(P, gl_wx_ic38, wa_icon(c.kind), halo_text_mid(gl_wx_ic38, WA_IC_SUN), CX, 144, 1, WA_HONEY, a, v, &disc);
+    wa_deg(wa_now, sizeof(wa_now), c.now);
+    up_text(P, gl_wx_hero, wa_now, wa_mid(gl_wx_hero), CX, 231, 1, UP_WHITE, a, v);
+    char f[8];
+    wa_deg(f, sizeof(f), c.feels);
+    snprintf(wa_line, sizeof(wa_line), "%s \xC2\xB7 feels %s", wa_sky(c.kind), f);
+    up_text(P, gl_wx_line, wa_line, halo_text_mid(gl_wx_line, "Sfx"), CX, 311, 1, UP_MUTED, a, v);
+    wa_deg(wa_hi, sizeof(wa_hi), c.hi), wa_deg(wa_lo, sizeof(wa_lo), c.lo);
+    for (int k = 0; k < 2; k++) {
+      const float x = k ? 295 : 171;
+      up_rrect(P, x - 55, 335, x + 55, 395, 24, k ? WA_ICE : WA_HCARD, a, v);
+      HaloItem &card = P.it[P.n - 1];
+      up_text(P, gl_up_lab, k ? "LOW" : "HIGH", up_mid_lab, x, 350, 1, k ? WA_COOL : WA_HONEY, a, v, &card);
+      up_text(P, gl_wx_val, k ? wa_lo : wa_hi, wa_mid(gl_wx_val), x, 375, 1, UP_WHITE, a, v, &card);
+    }
+  } else if (p == 1) {  // Next 12 hours
+    up_title(P, "Next 12 hours", a, v);
+    up_rrect(P, 47, 143, 419, 365, 37, WA_HCARD, a, v);
+    // the next twelve hours from now (strictly future), their range padded to the rules 183 … 311
+    const uint32_t now = time(nullptr);
+    int first = 0;
+    while (first < WX_AHEAD && c.t0 && c.t0 + first * 3600 <= now) first++;
+    int lo = 999, hi = -999;
+    wa_hn = 0;
+    for (int i = 0; i < 12 && first + i < WX_AHEAD; i++) {
+      const int t = c.ht[first + i];
+      if (t == WX_NONE) break;
+      lo = min(lo, t), hi = max(hi, t), wa_hn++;
+    }
+    if (wa_hn >= 2) {
+      const float l = lo - 1, h = max(hi + 1, lo + 3);
+      uint32_t key = 0;
+      for (int i = 0; i < wa_hn; i++) wa_hy[i] = 311 - 128 * (c.ht[first + i] - l) / (h - l), key = key * 31 + c.ht[first + i];
+      up_paint(P, 233, 254, 178, key + first, wa_chart_paint, a, v);
+      const int g[3] = {(int)roundf(h), (int)roundf((h + l) / 2), (int)roundf(l)};
+      for (int k = 0; k < 3; k++) {
+        snprintf(wa_grid[k], 6, "%d\xC2\xB0", g[k]);
+        up_text(P, gl_up_lab, wa_grid[k], up_mid_lab, 94, 183 + 64 * k, 2, UP_MUTED, a, v);
+      }
+      static const int IX[4] = {0, 4, 8, 11};
+      for (int k = 0; k < 4; k++) {
+        const int i = min(IX[k], wa_hn - 1);
+        const time_t t = c.t0 + (first + i) * 3600;
+        struct tm m;
+        localtime_r(&t, &m);
+        snprintf(wa_hours[k], 6, "%02d:00", m.tm_hour);
+        up_text(P, gl_up_lab, wa_hours[k], up_mid_lab, 116 + 24 * i, 339, 1, UP_MUTED, a, v);
+      }
+    } else {
+      up_text(P, gl_up_lab, "NO FORECAST YET", up_mid_lab, CX, 254, 1, UP_MUTED, a, v);
+    }
+  } else if (p == 2) {  // Next 7 days
+    up_title(P, "Next 7 days", a, v);
+#if WX_MORE
+    up_rrect(P, 61, 125, 405, 396, 56, WA_NEUTRAL, a, v);
+    up_rrect(P, 79, 131, 387, 165, 17, WA_HROW, a, v);
+    int lo = 999, hi = -999;
+    for (int d = 0; d < 7; d++) lo = min(lo, (int)c.dlo[d]), hi = max(hi, (int)c.dhi[d]);
+    const float span = max(4, hi - lo);
+    static const char *const WD[7] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+    const time_t now = time(nullptr);
+    for (int d = 0; d < 7; d++) {
+      const float y = 148 + 37 * d;
+      const time_t t = now + d * 86400;
+      struct tm m;
+      localtime_r(&t, &m);
+      up_text(P, gl_up_lab, WD[m.tm_wday], up_mid_lab, 95, y, 0, d ? UP_MUTED : UP_WHITE, a, v);
+      const bool rain = c.dk[d] == WX_RAIN;
+      HaloItem &ic = up_item(P);
+      ui_text(ic, gl_ic24, wa_icon(c.dk[d], c.dsnow >> d & 1), halo_text_mid(gl_ic24, WA_IC_SUN), 152, y, 0.875f, 1,
+              rain ? WA_COOL : WA_HONEY, a, &halo_black);
+      ic.on_black = true, up_commit(ic, v);
+      wa_deg(wa_day[d][0], 8, c.dlo[d]), wa_deg(wa_day[d][1], 8, c.dhi[d]);
+      up_text(P, gl_wx_week, wa_day[d][0], wa_mid(gl_wx_week), 218, y, 2, WA_COOL, a, v);
+      up_text(P, gl_wx_week, wa_day[d][1], wa_mid(gl_wx_week), 369, y, 2, UP_WHITE, a, v);
+      up_rrect(P, 239, y - 3, 308, y + 3, 3, WA_WTRACK, a, v);
+      const float x0 = 239 + 69 * (c.dlo[d] - lo) / span, x1 = 239 + 69 * (c.dhi[d] - lo) / span;
+      up_rrect(P, x0, y - 3, fmaxf(x1, x0 + 6), y + 3, 3, WA_HONEY, a, v);
+    }
+#endif
+  } else if (p == 3) {  // Details
+    up_title(P, "Details", a, v);
+#if WX_APP
+    snprintf(wa_det[0], 8, "%d%%", c.hum), snprintf(wa_det[1], 8, "%d", c.wind), snprintf(wa_det[2], 8, "%d", (c.uv10 + 5) / 10);
+    static const char *const LAB[3] = {"HUMIDITY", "WIND", "UV INDEX"};
+    const uint32_t fill[3] = {WA_ICE, WA_NEUTRAL, WA_HCARD}, ink[3] = {WA_COOL, UP_WHITE, WA_HONEY};
+    const char *icon[3] = {WA_IC_DROP, WA_IC_WIND, WA_IC_SUN};
+    const int u = c.uv10;
+    const char *sub[3] = {"", wx_fahr ? "mph" : "km/h", u < 30 ? "Low" : u < 60 ? "Moderate" : u < 80 ? "High" : "Very high"};
+    for (int k = 0; k < 3; k++) {
+      const float x = 117 + 116 * k;
+      up_rrect(P, x - 53, 143, x + 53, 243, 26, fill[k], a, v);
+      HaloItem &tile = P.it[P.n - 1];
+      HaloItem &ic = up_item(P);
+      ui_text(ic, gl_ic24, icon[k], halo_text_mid(gl_ic24, WA_IC_SUN), x, 162, 0.75f, 1, ink[k], a, &tile), up_commit(ic, v);
+      up_text(P, gl_up_lab, LAB[k], up_mid_lab, x, 183, 1, ink[k], a, v, &tile);
+      up_text(P, gl_wx_val, wa_det[k], wa_mid(gl_wx_val), x, k ? 208 : 215, 1, UP_WHITE, a, v, &tile);
+      if (k) up_text(P, gl_up_lab, sub[k], up_mid_lab, x, 233, 1, UP_MUTED, a, v, &tile);
+    }
+    up_rrect(P, 84, 256, 382, 390, 36, WA_HCARD, a, v);
+    up_arc(P, 54, 3, -HALO_PI / 2, HALO_PI / 2, WA_GRID, a, v);  // (centred at 233,233 by up_arc: moved below)
+    HaloItem &tr = P.it[P.n - 1];
+    tr.y = 328, halo_view_commit(tr, v);
+    const time_t now = time(nullptr);
+    float fr = c.rise && c.set > c.rise ? halo_clamp01((float)(now - c.rise) / (c.set - c.rise)) : 0;
+    up_arc(P, 54, 3, -HALO_PI / 2, -HALO_PI / 2 + HALO_PI * fr, WA_HONEY, fr > 0.01f ? a : 0, v);
+    HaloItem &el = P.it[P.n - 1];
+    el.y = 328, halo_view_commit(el, v);
+    const float an = -HALO_PI / 2 + HALO_PI * fr;
+    up_disc(P, CX + 54 * sinf(an), 328 - 54 * cosf(an), 7, WA_HONEY, fr > 0 ? a : 0, v);
+    up_rrect(P, 112, 328.5f, 354, 329.5f, 0.5f, WA_GRID, a, v);
+    wa_hhmm(wa_rise_s, 8, c.rise), wa_hhmm(wa_set_s, 8, c.set);
+    up_text(P, gl_up_lab, "SUNRISE", up_mid_lab, 154, 348, 1, UP_MUTED, a, v);
+    up_text(P, gl_up_lab, "SUNSET", up_mid_lab, 312, 348, 1, UP_MUTED, a, v);
+    up_text(P, gl_wx_val, wa_rise_s, wa_mid(gl_wx_val), 154, 373, 1, UP_WHITE, a, v);
+    up_text(P, gl_wx_val, wa_set_s, wa_mid(gl_wx_val), 312, 373, 1, UP_WHITE, a, v);
+#endif
+  } else {  // Settings
+    up_title(P, "Weather settings", a, v);
+    up_rrect(P, 77, 138, 389, 270, 33, WA_HCARD, a, v);
+    up_text(P, gl_up_lab, "UNITS", up_mid_lab, CX, 165, 1, WA_HONEY, a, v);
+    for (int k = 0; k < 2; k++) {
+      const bool on = (k == 1) == wx_fahr;
+      const float x0 = k ? 237 : 94;
+      up_rrect(P, x0, 185, x0 + 135, 254, 30, on ? WA_HONEY : WA_HROW, a, v);
+      up_text(P, gl_wx_val, k ? "\xC2\xB0""F" : "\xC2\xB0""C", wa_mid(gl_wx_val), x0 + 67.5f, 219.5f, 1, on ? WA_DARK : UP_WHITE, a, v,
+              &P.it[P.n - 1]);
+    }
+    up_rrect(P, 91, 293, 375, 380, 34, WA_ICE, a, v);
+    HaloItem &card = P.it[P.n - 1];
+    HaloItem &pin = up_item(P);
+    ui_text(pin, gl_ic24, WA_IC_LOC, halo_text_mid(gl_ic24, WA_IC_LOC), 132, 337, 1.2f, 1, WA_COOL, a, &card), up_commit(pin, v);
+    HaloItem &chev = up_item(P);
+    ui_text(chev, gl_ic24, "\xEF\x81\x94", halo_text_mid(gl_ic24, "\xEF\x81\x94"), 337, 337, 0.9f, 1, WA_COOL, a, &card);
+    up_commit(chev, v);
+    up_text(P, gl_up_lab, "LOCATION", up_mid_lab, 167, 323, 0, WA_COOL, a, v, &card);
+    up_text(P, gl_up_title, c.name, up_mid_title, 167, 351, 0, UP_WHITE, a, v, &card);
+  }
+}
+static void wa_tap(int p, float x, float y) {
+  if (p != 4) return;
+  if (up_in(x, y, 94, 185, 229, 254) && wx_fahr) sy_set_units(0);
+  else if (up_in(x, y, 237, 185, 372, 254) && !wx_fahr) sy_set_units(1);
+  else if (up_in(x, y, 91, 293, 375, 380)) ui_cur = 0, ui_open(&wa_locs);
+}
+static void wa_upd(int, float) {
+  static uint32_t seen = 1;
+  if (wx_fetched_ms != seen) seen = wx_fetched_ms, halo_damage_all();  // (fresh weather: every page again)
+}
+static const UpApp WA_APP = {wa_count, wa_lay, wa_tap, wa_upd, nullptr, WA_HONEY};
+static void wa_build_locs() {
+  wa_locs = {"Location", {}, 0, WA_HONEY};
   UiPage &l = wa_locs;
-  l.rows[l.n++] = ur_head("Now");
-  l.rows[l.n++] = ur_info(WA_IC_DROP, "Humidity", wa_hum);
-  l.rows[l.n++] = ur_info(WA_IC_WIND, "Wind", wa_wind);
-  l.rows[l.n++] = ur_info(WA_IC_SUN, "UV index", wa_uv);
-  l.rows[l.n++] = ur_info(WA_IC_SUN, "Sunrise", wa_rise);
-  l.rows[l.n++] = ur_info(WA_IC_MOON, "Sunset", wa_set);
-  l.rows[l.n++] = ur_head("Location");
   l.rows[l.n++] = ur_info(WA_IC_LOC, "Showing", wa_city);
 #if SS_WIFI
-  l.rows[l.n++] = ur_action("Use my location", wa_here, 0xFFB030);
+  l.rows[l.n++] = ur_action("Use my location", wa_here, WA_HONEY);
+  l.rows[l.n++] = ur_action("Refresh now", wa_refresh, WA_HONEY);
 #endif
-  if (p.n < UI_ROWS) p.rows[p.n++] = ur_nav(WA_IC_LOC, "Details and location", &wa_locs, wa_city_fresh, 0xFFB030);
-#if SS_WIFI  // (the page's main action: the edge button hugging the bottom — Wear OS's "View all")
-  p.edge = ur_action("Refresh", wa_refresh, 0xFFB030);
-#endif
-  wa_built_ms = wx_fetched_ms;
 }
 
 // The location kept (Use my location): the first city at start
@@ -234,21 +282,11 @@ static void wa_keep_location() {
 }
 
 // The screen (settings.h calls these)
-static void wxapp_enter() {
-  wa_build();
-  ui_cur = 0;
-  ui_set_page(0, &wa_page);
-}
+static void wxapp_enter() { wa_build_locs(), up_open(&WA_APP); }
 static void wxapp_update(float dt) {
   wa_keep_location();
-  if (wx_fetched_ms != wa_built_ms && ui_run && ui_run[0].pg == &wa_page) {  // (fresh weather: the rows again, in place)
-    const float scroll = ui_run[0].list.scroll;
-    wa_build();
-    ui_set_page(0, &wa_page);
-    ui_run[0].list.scroll = scroll;
-  }
-  ui_update(0, dt);
+  up_update(dt);
 }
-static void wxapp_layout(const HaloView &v) { ui_layout(0, v); }
-static void wxapp_draw() { ui_draw(0); }
+static void wxapp_layout(const HaloView &v) { up_layout(v); }
+static void wxapp_draw() { up_draw(); }
 #endif

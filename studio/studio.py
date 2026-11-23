@@ -434,6 +434,12 @@ GALLERY_FONTS = [
     "font  gl_up_ic43 fa-solid-900.ttf    43  0xf04b 0xf04c 0xf0ac   # the primary's glyph",
     "font  gl_up_ic32 fa-solid-900.ttf    32  0xf2ea 0xf024 0xf00a 0xf00d   # secondary glyphs",
     "font  gl_up_ic24 fa-solid-900.ttf    24  0x2b 0xf185 0xf186   # small glyphs",
+    # Weather (wxapp.h; design/SPEC_weather.md)
+    "font  gl_wx_hero GoogleSansFlex.ttf 154  digits \"°-\" @wght=880,wdth=97,ROND=58,opsz=128   # Weather: now",
+    "font  gl_wx_line GoogleSansFlex.ttf  35  latin punct digits \"°·\" @wght=660,wdth=83,ROND=42,opsz=35   # the sky, feels",
+    "font  gl_wx_val  GoogleSansFlex.ttf  35  digits \"°%:-CF\" @wght=830,wdth=91,ROND=55,opsz=35   # card readings",
+    "font  gl_wx_week GoogleSansFlex.ttf  35  digits \"°-\" @wght=775,wdth=67,ROND=43,opsz=35   # a day's low, high",
+    "font  gl_wx_ic38 fa-solid-900.ttf    38  0xf185 0xf6c4 0xf0c2 0xf73d 0xf2dc   # the sky now",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
@@ -552,8 +558,6 @@ RADIO_LETTERS = 'latin cyrillic punct "àáâãäåæçèéêëìíîïñòóô�
 # Pomodoro (pomodoro.h): the time and the −/+ value, the settings' values; Font Awesome's eye, mug-hot, umbrella-beach,
 # forward-step, rotate-left, gear, xmark, chevron-right, chevron-left, minus, plus
 # The Weather app (wxapp.h): the hero's temperature
-ROUND_APP_FONTS["wxapp"] = ["font  gl_wa_n80    GoogleSansFlex.ttf  80  digits \"°-\" @wght=560,ROND=100   # Weather app: now",
-                            "font  gl_wa_ic64   fa-solid-900.ttf    64  0xf185 0xf6c4 0xf0c2 0xf73d 0xf2dc   # Weather app: the hero's sky, at its size (not scaled: sharp)"]
 ROUND_APP_FONTS["pomodoro"] = [
     "font  gl_pm_n84   GoogleSansFlex.ttf  84  digits \":\" @wght=660,ROND=100   # Pomodoro: the time",
     "font  gl_pm_n40   GoogleSansFlex.ttf  40  digits @wght=660,ROND=100   # Pomodoro: the settings' values",
