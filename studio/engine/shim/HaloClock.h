@@ -11,6 +11,7 @@ static inline bool halo_clock_valid() {
 
 static inline void halo_clock_online(void (*)(), uint32_t) {}  // (the page gets the weather from studio.py)
 
+static inline void halo_clock_network(const char *, const char *) {}  // (the board's: more networks to try)
 static inline void halo_clock_begin(const char *tz, const char * = nullptr, const char * = nullptr) {
   setenv("TZ", tz ? tz : "UTC0", 1);
   tzset();

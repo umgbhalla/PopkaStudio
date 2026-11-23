@@ -118,7 +118,7 @@ KINDS = {"date": 0, "clock": 1, "weather": 2,                                   
          "rtime": 45, "rname": 46, "rsong": 47, "rbtn": 48, "rline": 49, "rrays": 50, "rplay": 51,
          "rbrowse": 52, "rfolder": 53, "rvolume": 54,
          "wxdigits": 55, "wxcurve": 56, "wxbaro": 57, "wxwear": 58, "wxbuddy": 59, "wxpixel": 60, "wxweek": 61,
-         "pomodoro": 62}
+         "pomodoro": 62, "settings": 63}
 # The weather widgets (wxwidgets.h; web/mockups/weather-widgets.html, the variants the user kept on 14 Nov 2026): the
 # round board's; only those a project has go into its firmware (FN_WXW: a bit a widget, from wxdigits)
 WXW = ("wxdigits", "wxcurve", "wxbaro", "wxwear", "wxbuddy", "wxpixel", "wxweek")
@@ -286,6 +286,8 @@ DEFAULTS = {
     # this many focus intervals; the alert, Auto-start — the watch's starting settings (its own Settings change them)
     "pomodoro": {"name": "Pomodoro", "pm_focus": 25, "pm_short": 5, "pm_long": 15, "pm_after": 4, "pm_sound": True,
                  "pm_auto": False},
+    # Settings (sysset.h, on the UI kit ui.h): one place for the watch's settings, many levels — the round board's
+    "settings": {"name": "Settings"},
     "video": {"name": "Video"},  # tiles and a player, clips from the microSD card (video.h): a board with a passport listing it
     # The Radio (radio.h, the round board's): the favourites — the tuner's scale at first — and Browse's folders of the
     # Radio Browser catalog. The defaults are only stations whose broadcasters publish these links for other players
@@ -1677,7 +1679,7 @@ def write_sketch(project, folder, meta=None):
                      "pixelart.h", "parrot.h", "bt.h", "wxfetch.h", "settings.h", "stepscreen.h", "widgets.h", "widgets_rect.h", "wxwidgets.h",
                      "music.h", "music_sd.h", "player.h", "pomodoro.h", "pomodoro_rect.h", "sound.h", "volume.h", "recorder.h", "radio.h", "radio_net.h", "radio_rect.h", "video.h", "video_hw.h", "video_net.h", "snake.h", "games.h", "game_dots.h",
                      "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
-                     "sclock.h", "confirm.h"):
+                     "sclock.h", "confirm.h", "ui.h", "sysset.h"):
             shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
     fonts, icons = {}, {}  # spec -> name, (set, scale) -> name
     all_layers = [layer for scr in screens for layer in scr["layers"]]
@@ -1768,6 +1770,7 @@ def write_sketch(project, folder, meta=None):
           f"#define FN_MUSIC {1 if any(layer['type'] == 'music' for layer in all_layers) else 0}",
           f"#define FN_RECORDER {1 if any(layer['type'] == 'recorder' for layer in all_layers) else 0}",
           f"#define FN_POMODORO {1 if pomo else 0}",
+          f"#define FN_SETTINGS {1 if any(layer['type'] == 'settings' for layer in all_layers) else 0}",
           *(["// Pomodoro's starting settings (pomodoro.h): minutes, the long break after N, the alert, Auto-start",
              f"#define FN_PM_FOCUS {pomo['pm_focus']}", f"#define FN_PM_SHORT {pomo['pm_short']}",
              f"#define FN_PM_LONG {pomo['pm_long']}", f"#define FN_PM_AFTER {pomo['pm_after']}",

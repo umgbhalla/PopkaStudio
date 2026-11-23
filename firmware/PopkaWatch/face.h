@@ -100,7 +100,8 @@ enum : uint8_t {
   // The weather widgets (wxwidgets.h, 14 Nov 2026), the round board's: the sky inside the digits, the next 12 hours'
   // line, a barometer, what to wear, a buddy, pixel weather, the next five days
   FL_WXDIGITS, FL_WXCURVE, FL_WXBARO, FL_WXWEAR, FL_WXBUDDY, FL_WXPIXEL, FL_WXWEEK,
-  FL_POMODORO  // Pomodoro: focus intervals and breaks, a screen of its own (settings.h, pomodoro.h)
+  FL_POMODORO,  // Pomodoro: focus intervals and breaks, a screen of its own (settings.h, pomodoro.h)
+  FL_SETTINGS   // Settings: the watch's settings, many levels — the UI kit's first app (sysset.h, ui.h)
 };
 static inline bool fl_wxw(uint8_t k) {  // a weather widget (wxwidgets.h)
   return k >= FL_WXDIGITS && k <= FL_WXWEEK;
@@ -501,6 +502,9 @@ static inline bool fl_section(uint8_t k) {
 #endif
 #if HAS_POMODORO  // (pomodoro.h: in a firmware without it the board's code stays as it was)
          || k == FL_POMODORO
+#endif
+#if HAS_SETTINGS
+         || k == FL_SETTINGS
 #endif
       ;
 }

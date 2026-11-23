@@ -45,6 +45,9 @@ export const KINDS = {
   pomodoro: { group: 'section', fixed: true, round: true, name: 'Pomodoro', sub: 'Focus intervals and breaks: a ring, Skip, Reset and its own settings',
     pm_focus: 25, pm_short: 5, pm_long: 15, pm_after: 4, pm_sound: true, pm_auto: false,
     by: { name: 'YKatrechko', url: 'https://github.com/YKatrechko' } },
+  // Settings (sysset.h, on the UI kit ui.h): the watch's settings in one place, many levels — Display, Time, Wi-Fi, Sound,
+  // Battery, System; kept on the watch (the round board's)
+  settings: { group: 'section', fixed: true, round: true, name: 'Settings', sub: 'Display, Time, Wi-Fi, Sound, Battery, System — one place, kept on the watch' },
   video: { group: 'section', fixed: true, round: true, name: 'Video', sub: 'Tiles of the clips on the microSD card and a player' },
   radio: { group: 'section', fixed: true, round: true, name: 'Radio', sub: 'Internet radio: a tuner of your stations and the Radio Browser catalog' },
   // The Radio's main screen, a layer a part (radio.h FL_RTIME …; web/mockups/radio7.html variant 8, 13 Nov 2026): over
@@ -146,7 +149,7 @@ export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK
 export const DEVS = [['cpu', 'Processor'], ['mem', 'Memory'], ['bat', 'Battery'], ['temp', 'Temperature'], ['snd', 'Sound'], ['mot', 'Motion']];
 export const KIND_INDEX = { date: 0, clock: 1, weather: 2, arc: 3, city: 4, wxicon: 5, wxtemp: 6, wxhilo: 7, hourly: 8, dots: 9, title: 10, card: 11, edge: 12, scroll: 13, steps: 14, stars: 15, feels: 17, display: 18, battery: 19, stnum: 20, stcap: 21, stfoot: 22, stchart: 23, curve: 24, stepring: 25, weekarc: 26, infoline: 27, forecast: 28, dateframe: 29, dotclock: 30, music: 31, recorder: 32, snkdots: 33, snkspace: 34, snkiso: 35, batring: 36, parrot: 37, devcard: 38, device: 39, charge: 40, video: 41, shade: 42, sclock: 43, radio: 44,
   rtime: 45, rname: 46, rsong: 47, rbtn: 48, rline: 49, rrays: 50, rplay: 51, rbrowse: 52, rfolder: 53, rvolume: 54,
-  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62 };
+  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62, settings: 63 };
 export const WXW = ['wxdigits', 'wxcurve', 'wxbaro', 'wxwear', 'wxbuddy', 'wxpixel', 'wxweek'];  // the weather widgets
 // Their layouts on the 7-inch board (studio.py WXLOOKS — the same names, in the same order: wxwidgets.h p3;
 // web/mockups/weather-widgets-rect.html 1A; 2A, 2B; 3A, 3B; 4A, 4B; 5A, 5B; 6A, 6B; 7A, 7B). A third element true — a
@@ -702,6 +705,7 @@ export const SECTIONS = {
   music: { text: 'Music', subtitle: 'piano classics', icon: 'music', color: '#F6B5EA' },
   recorder: { text: 'Recorder', subtitle: 'record and play back', icon: 'mic', color: '#F28B82' },
   pomodoro: { text: 'Pomodoro', subtitle: 'focus timer', icon: 'stopwatch', color: '#FF6B4A' },
+  settings: { text: 'Settings', subtitle: 'display, time, Wi-Fi', icon: 'gear', color: '#A8C7FA' },
   video: { text: 'Video', subtitle: 'clips from the card', icon: 'play', color: '#8FB6FF' },
   radio: { text: 'Radio', subtitle: 'stations of the world', icon: 'radio', color: '#FF8A3D' },
   snkdots: { text: 'Dot Snake', subtitle: 'LED matrix', icon: 'gamepad', color: '#FFF8EE' },

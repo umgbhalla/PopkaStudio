@@ -42,6 +42,7 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #include "wxfetch.h"  // fresh weather from Open-Meteo over Wi-Fi (only with Wi-Fi)
 #include "confirm.h"  // one confirm for the whole watch (Material 3 for Wear OS): power off first
 #include "power.h"    // the Functions: Always On, the BOOT and PWR buttons
+#include "sysset.h"   // Settings: one place for the watch's settings, many levels (on the UI kit, ui.h)
 #include "steps.h"    // today's steps (only with a Steps layer)
 #include "bt.h"       // Bluetooth (only when it is on)
 #include "live.h"     // Live: the layers' looks from the editor over USB, at once (no Load)
@@ -110,6 +111,9 @@ void setup() {
 #endif
   halo_begin(update, draw, cfg);
   power_build();         // the motion sensor (it wakes the board when picked up) and the commands aod, idle, sleep
+#if HAS_SETTINGS
+  sysset_begin();        // Settings: what was kept (Always On, how it wakes, 12/24 h, the volume)
+#endif
   steps_build();         // the chip's pedometer, today's steps from flash
   live_build();          // the command live (the editor's Live)
   hello_build();         // the command hello (the editor: is this board ours, and which project)

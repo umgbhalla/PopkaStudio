@@ -41,6 +41,18 @@
 #define HAS_POMODORO 0
 #endif
 
+// Settings (sysset.h, on the UI kit ui.h): the round board's, in a firmware with it and in the page. Its code comes
+// after power.h (its settings are power.h's): the screen's calls below are declared here
+#if defined(HALO_ROUND) && (defined(__EMSCRIPTEN__) || (defined(FN_SETTINGS) && FN_SETTINGS))
+#define HAS_SETTINGS 1
+static void sysset_enter();
+static void sysset_update(float dt);
+static void sysset_layout(const HaloView &v);
+static void sysset_draw();
+#else
+#define HAS_SETTINGS 0
+#endif
+
 // The Radio (radio.h; a rectangle's screen — radio_rect.h): in a firmware with it and in the page
 #if defined(__EMSCRIPTEN__) || (defined(FN_RADIO) && FN_RADIO)
 #define HAS_RADIO 1
@@ -946,6 +958,9 @@ static void settings_enter(const FaceScreen &S) {
 #if HAS_POMODORO
   if (st_has(S, FL_POMODORO)) pomodoro_enter();
 #endif
+#if HAS_SETTINGS
+  if (st_has(S, FL_SETTINGS)) sysset_enter();
+#endif
 #if HAS_RADIO
   if (st_has(S, FL_RADIO)) radio_enter();
 #ifdef HALO_ROUND  // (the round board's other Radio screens)
@@ -974,6 +989,9 @@ static void settings_update(const FaceScreen &S, float dt) {
 #if HAS_POMODORO
   if (st_has(S, FL_POMODORO)) pomodoro_update(dt);
 #endif
+#if HAS_SETTINGS
+  if (st_has(S, FL_SETTINGS)) sysset_update(dt);
+#endif
 #if HAS_RADIO
   if (st_has(S, FL_RADIO)) radio_update(S, dt);
 #ifdef HALO_ROUND
@@ -1001,6 +1019,9 @@ static void settings_layout(FaceRun &R, uint8_t kind, const HaloView &v) {
 #endif
 #if HAS_POMODORO
   if (kind == FL_POMODORO) pomodoro_layout(v);
+#endif
+#if HAS_SETTINGS
+  if (kind == FL_SETTINGS) sysset_layout(v);
 #endif
 #if HAS_RADIO
   if (kind == FL_RADIO) radio_layout(v);
@@ -1038,6 +1059,9 @@ static void settings_draw(uint8_t kind) {
 #endif
 #if HAS_POMODORO
   if (kind == FL_POMODORO) pomodoro_draw();
+#endif
+#if HAS_SETTINGS
+  if (kind == FL_SETTINGS) sysset_draw();
 #endif
 #if HAS_RADIO
   if (kind == FL_RADIO) radio_draw();  // (round: its parts draw themselves, the volume screen goes over them: face.h)
