@@ -46,6 +46,10 @@ if [ "$FONTS" != round ]; then  # a rectangle's own fonts (gallery_rect.h), besi
 else  # the round board's own fonts (shade_round.h): only its firmwares with the layer have them, its page — always
   mkdir -p "$TMP/round/assets"
   "$PY" "$ROOT/studio/studio.py" --round-conf "$TMP/round/assets/halo.conf"
+  # (the sketch's own fonts — its default project already has the round ones — are not built twice)
+  awk 'NR==FNR { if ($1 == "font" || $1 == "image") have[$2] = 1; next } !(($1 == "font" || $1 == "image") && ($2 in have))' \
+    "$SKETCH/assets/halo.conf" "$TMP/round/assets/halo.conf" > "$TMP/round/assets/halo.conf.new"
+  mv -f "$TMP/round/assets/halo.conf.new" "$TMP/round/assets/halo.conf"
   "$PY" "$ROOT/tools/halo_assets.py" "$TMP/round" >/dev/null
   SRCS+=("$TMP/round/src/halo_assets.cpp")
 fi

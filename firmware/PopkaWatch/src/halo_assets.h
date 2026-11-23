@@ -40,3 +40,4 @@ extern const HaloImage icons0_partly;  // icons0_partly.png, 63×64
 extern const HaloImage icons0_sun;  // icons0_sun.png, 57×57
 extern const HaloImage icons0_cloud;  // icons0_cloud.png, 63×60
 extern const HaloImage icons0_rain;  // icons0_rain.png, 57×60
+extern const HaloFont gl_t16;  // GoogleSansFlex.ttf 16 px, 17 букв, строка 21, базовая линия 16
