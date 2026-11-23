@@ -4,41 +4,43 @@
 // screen (-1 — no link) with the transition, the radius of the clock along the top edge; the gallery's text.
 #pragma once
 
-#define SCREEN_N 1
-#define MAIN_SCREEN -1 // the gallery: a swipe up on the face (-1 — none)
+#define SCREEN_N 26
+#define MAIN_SCREEN 1 // the gallery: a swipe up on the face (-1 — none)
 // The Functions (power.h): Always On when idle, after idle s, the panel in it (of 255); BOOT and PWR: 0 — nothing,
-// 1 — the screen off, 2 — lock (Always On, the touch off; a long press of that button unlocks), 3 — Always On
-#define FN_AOD 0
-#define FN_AOD_IDLE 15
+// 1 — screen off, 2 — lock, 3 — Always On, 4 — home
+#define FN_AOD 1
+#define FN_AOD_IDLE 30
 #define FN_AOD_BRIGHT 24
 #define FN_AOD_HOME 0 // out of Always On on the watch face (1) or where it was
 #define FN_AOD_SHIFT 1 // Always On: a few pixels elsewhere every minute (burn-in)
-#define FN_BOOT 0
-#define FN_PWR 0
+#define FN_BOOT 2
+#define FN_PWR 4
+#define FN_PALM_LOCK 1
 // Waking up from Always On or dark (power.h): a touch, picking it up (off, or the Steps layer has the motion
 // sensor — not at all), a button; a way that is off does not wake the screen
 #define FN_WAKE_TAP 1
-#define FN_WAKE_RAISE 1
+#define FN_WAKE_RAISE 0
 #define FN_WAKE_BTN 1
 // HaloWatch's Settings sections (settings.h): only with their layer
-#define FN_DISPLAY 0
-#define FN_BATTERY 0
-#define FN_MUSIC 0
-#define FN_RECORDER 0
+#define FN_DISPLAY 1
+#define FN_BATTERY 1
+#define FN_MUSIC 1
+#define FN_RECORDER 1
 #define FN_POMODORO 0
+#define FN_SETTINGS 1
 #define FN_VIDEO 0
 // The Radio (radio.h, radio_net.h): only with its layer — it needs Wi-Fi (on with it) and not Bluetooth
-#define FN_RADIO 0
+#define FN_RADIO 1
 // The quick settings panel of the home (shade_rect.h, shade_round.h): only with its layer
-#define FN_SHADE 0
+#define FN_SHADE 1
 // About and Power (device.h): only with their layers (About: the microphones and the motion sensor only while
 // something on screen shows them)
-#define FN_ABOUT 0
-#define FN_CHARGE 0
+#define FN_ABOUT 1
+#define FN_CHARGE 1
 // The Games (games.h): only the snakes added
-#define FN_SNKDOTS 0
-#define FN_SNKSPACE 0
-#define FN_SNKISO 0
+#define FN_SNKDOTS 1
+#define FN_SNKSPACE 1
+#define FN_SNKISO 1
 // Steps (steps.h): only with a Steps layer or the Steps screen — then the motion chip's pedometer counts;
 // the screen (stepscreen.h) — only with it (and the hours and the days kept in flash)
 #define FN_STEPS 0
@@ -49,17 +51,234 @@
 #define FN_PARROT 0
 static const HaloImage *const icons0[4] = {&icons0_partly, &icons0_sun, &icons0_cloud, &icons0_rain};
 // Live (live.h): what this firmware has, for the editor's Live to check its project against
-#define LIVE_SHAPE "1bb0c6f4"
-#define LIVE_MAP "face=date1:0:6145,clock1:1:858e,weather1:2:0fd8"
+#define LIVE_SHAPE "491eac63"
+#define LIVE_MAP "face=date1:0:6145,clock1:1:858e,weather1:2:0fd8,shade1:42:7add;gallery1=title1:10:bd81,card2:11:d5c2,card_stopwatch:11:bdc4,card_timer:11:cde2,card_world:11:b83f,card6:11:2d8b,card4:11:4b67,card5:11:9bd7,card7:11:3005,card13:11:1526,card_settings:11:b7ce,edge1:12:d862,arc1:3:edbe,scroll1:13:4ba8;wxappscr=wxapp1:64:01fe;screen4=music1:31:5219;screen5=recorder1:32:ceef;screen6=radio1:44:a6cb,rrays1:50:9f48,rtime1:45:0cb5,rname1:46:406f,rsong1:47:1352,rbtn1:48:ca11,rline1:49:06f2,rbtn2:48:f426,rplay1:51:3cd8;rbrowse1=rbrowse2:52:7753;rfolder1=rfolder2:53:af87;rvolume1=rvolume2:54:1e2d;screen7=title2:10:15ae,card8:11:dbc4,card9:11:c927,card10:11:943d,edge2:12:3c1f,arc4:3:edbe,scroll1:13:4ba8;screen8=snkdots1:33:049b;screen9=snkspace1:34:377b;screen10=snkiso1:35:ea32;screen11=display1:18:2999;screen12=battery1:19:0326;screen13=title3:10:83a4,devcard1:38:81d7,devcard2:38:1d1a,devcard3:38:12d9,devcard4:38:8a24,devcard5:38:79b1,devcard6:38:3367,scroll1:13:4ba8,arc11:3:edbe;screen14=arc5:3:edbe,device1:39:8c78;screen15=arc6:3:edbe,device2:39:8c78;screen16=arc7:3:edbe,charge1:40:b88b;screen17=arc8:3:edbe,device3:39:8c78;screen18=arc9:3:edbe,device4:39:8c78;screen19=arc10:3:edbe,device5:39:8c78;settingsapp=settings1:63:b7b2;swapp=stopwatch1:65:4a42;tmapp=timer1:66:c436;wcapp=world1:67:3fcc"
 
-// Watch face — the home
+// HaloWatch — the home
 static FaceLayer screen0_layers[] = {
     {FL_DATE, 0.0f, 0.0f, 1.0f, 0xC2C3CB, 0x000000, 0, &font0, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Date
     {FL_CLOCK, 0.0f, 0.0f, 1.0f, 0xF8F7F9, 0x000000, -1, &font1, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Clock
-    {FL_WEATHER, 0.0f, 0.0f, 1.0f, 0x2D2F2F, 0xF8F7F9, 0, &font2, icons0, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Weather
+    {FL_WEATHER, 0.0f, 0.0f, 1.0f, 0x2D2F2F, 0xF8F7F9, 0, &font2, icons0, 2, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Weather
+    {FL_SHADE, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Quick settings
 };
-static FaceRun (&screen0_run)[3] = face_runs<3>();
+static FaceRun (&screen0_run)[4] = face_runs<4>();
+
+// Apps
+static FaceLayer screen1_layers[] = {
+    {FL_TITLE, 0.0f, 0.0f, 1.0f, 0xFFF8EE, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, "Apps", nullptr, nullptr},  // Title
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xFFB030, 0x2E3034, 0, nullptr, nullptr, 2, HALO_FX_FADE, 0.0f, false, "Weather", "now and hourly", "\357\206\205"},  // Weather
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0x2E3034, 0, nullptr, nullptr, 23, HALO_FX_FADE, 0.0f, false, "Stopwatch", "start, laps", "\357\213\262"},  // Stopwatch card
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xFFB68A, 0x2E3034, 0, nullptr, nullptr, 24, HALO_FX_FADE, 0.0f, false, "Timer", "countdown", "\357\211\224"},  // Timer card
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xC7BFFF, 0x2E3034, 0, nullptr, nullptr, 25, HALO_FX_FADE, 0.0f, false, "World clock", "cities", "\357\202\254"},  // World clock card
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xFF8A3D, 0x2E3034, 0, nullptr, nullptr, 5, HALO_FX_FADE, 0.0f, false, "Radio", "stations of the world", "\357\243\227"},  // Radio
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xF6B5EA, 0x2E3034, 0, nullptr, nullptr, 3, HALO_FX_FADE, 0.0f, false, "Music", "piano classics", "\357\200\201"},  // Music
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xF28B82, 0x2E3034, 0, nullptr, nullptr, 4, HALO_FX_FADE, 0.0f, false, "Recorder", "record and play back", "\357\204\260"},  // Recorder
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xC3F584, 0x2E3034, 0, nullptr, nullptr, 9, HALO_FX_FADE, 0.0f, false, "Games", "self-playing snakes", "\357\204\233"},  // Games
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0x2E3034, 0, nullptr, nullptr, 15, HALO_FX_FADE, 0.0f, false, "About", "this watch, live", "\357\213\233"},  // About
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0x2E3034, 0, nullptr, nullptr, 22, HALO_FX_FADE, 0.0f, false, "Settings", "display, time, Wi-Fi", "\357\200\223"},  // Settings card
+    {FL_EDGE, 0.0f, 0.0f, 1.0f, 0x2E3034, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, "Power off", nullptr, nullptr},  // Power off
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_SCROLL, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x333333, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr},  // Scroll indicator
+};
+static FaceRun (&screen1_run)[14] = face_runs<14>();
+
+// Weather
+static FaceLayer screen2_layers[] = {
+    {FL_WXAPP, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Weather app
+};
+static FaceRun (&screen2_run)[1] = face_runs<1>();
+
+// Music
+static FaceLayer screen3_layers[] = {
+    {FL_MUSIC, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Music
+};
+static FaceRun (&screen3_run)[1] = face_runs<1>();
+
+// Recorder
+static FaceLayer screen4_layers[] = {
+    {FL_RECORDER, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Recorder
+};
+static FaceRun (&screen4_run)[1] = face_runs<1>();
+
+// Radio
+static FaceLayer screen5_layers[] = {
+    {FL_RADIO, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Radio
+    {FL_RRAYS, 0.0f, 0.0f, 1.21000004f, 0xFFB98A, 0xFF8A3D, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xFFF1E4, nullptr, 0.0f, 0.0f},  // Equalizer
+    {FL_RTIME, 0.0f, 0.0f, 1.0f, 0xFFF8EE, 0x000000, 0, &font4, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Time
+    {FL_RNAME, 0.0f, -2.0f, 1.0f, 0xFFF8EE, 0x000000, 0, &font5, nullptr, -1, HALO_FX_FADE, 290.0f, false, nullptr, nullptr, nullptr, 0x000000, &font6, 286.0f, 0.0f},  // Station
+    {FL_RSONG, 0.0f, 0.0f, 1.0f, 0x9E9E9E, 0x000000, 0, &font7, nullptr, -1, HALO_FX_FADE, 328.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Song
+    {FL_RBTN, -65.0f, 5.0f, 1.03999996f, 0xFFB98A, 0x000000, 2, &font8, nullptr, 6, HALO_FX_FADE, 0.0f, false, "STATIONS", nullptr, "\357\203\211", 0x000000, nullptr, 0.0f, 0.0f},  // Stations
+    {FL_RLINE, 0.0f, 0.0f, 1.0f, 0x3A3A40, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 37.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Line
+    {FL_RBTN, 63.0f, 5.0f, 1.03999996f, 0xFFB98A, 0x000000, 2, &font8, nullptr, 8, HALO_FX_FADE, 0.0f, false, "VOLUME", nullptr, "\357\200\250", 0x000000, nullptr, 1.0f, 0.0f},  // Volume
+    {FL_RPLAY, 0.0f, 0.0f, 1.0f, 0xFF8A3D, 0x2A1200, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Play / Stop
+};
+static FaceRun (&screen5_run)[9] = face_runs<9>();
+
+// Stations
+static FaceLayer screen6_layers[] = {
+    {FL_RBROWSE, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, 7, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Stations
+};
+static FaceRun (&screen6_run)[1] = face_runs<1>();
+
+// Folder
+static FaceLayer screen7_layers[] = {
+    {FL_RFOLDER, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Folder
+};
+static FaceRun (&screen7_run)[1] = face_runs<1>();
+
+// Volume
+static FaceLayer screen8_layers[] = {
+    {FL_RVOLUME, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Volume
+};
+static FaceRun (&screen8_run)[1] = face_runs<1>();
+
+// Games
+static FaceLayer screen9_layers[] = {
+    {FL_TITLE, 0.0f, 0.0f, 1.0f, 0xFFF8EE, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, "Games", nullptr, nullptr},  // Title
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xFFF8EE, 0x2E3034, 0, nullptr, nullptr, 10, HALO_FX_FADE, 0.0f, false, "Dot Snake", "LED matrix", "\357\204\233"},  // Dot Snake
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0x8ECBFF, 0x2E3034, 0, nullptr, nullptr, 11, HALO_FX_FADE, 0.0f, false, "Comet", "snake in space", "\357\204\233"},  // Comet
+    {FL_CARD, 0.0f, 0.0f, 1.0f, 0xB8FF6A, 0x2E3034, 0, nullptr, nullptr, 12, HALO_FX_FADE, 0.0f, false, "Voxel Snake", "isometric 3D", "\357\204\233"},  // Voxel Snake
+    {FL_EDGE, 0.0f, 0.0f, 1.0f, 0x2E3034, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, "Back", nullptr, nullptr},  // Back button
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_SCROLL, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x333333, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr},  // Scroll indicator
+};
+static FaceRun (&screen9_run)[7] = face_runs<7>();
+
+// Dot Snake
+static FaceLayer screen10_layers[] = {
+    {FL_SNKDOTS, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Dot Snake
+};
+static FaceRun (&screen10_run)[1] = face_runs<1>();
+
+// Comet
+static FaceLayer screen11_layers[] = {
+    {FL_SNKSPACE, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Comet
+};
+static FaceRun (&screen11_run)[1] = face_runs<1>();
+
+// Voxel Snake
+static FaceLayer screen12_layers[] = {
+    {FL_SNKISO, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Voxel Snake
+};
+static FaceRun (&screen12_run)[1] = face_runs<1>();
+
+// Brightness
+static FaceLayer screen13_layers[] = {
+    {FL_DISPLAY, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Display
+};
+static FaceRun (&screen13_run)[1] = face_runs<1>();
+
+// Battery
+static FaceLayer screen14_layers[] = {
+    {FL_BATTERY, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Battery
+};
+static FaceRun (&screen14_run)[1] = face_runs<1>();
+
+// About
+static FaceLayer screen15_layers[] = {
+    {FL_TITLE, 0.0f, 0.0f, 1.0f, 0xFFF8EE, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, "About", nullptr, nullptr},  // Title
+    {FL_DEVCARD, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0x1B1B1F, 0, nullptr, nullptr, 16, HALO_FX_FADE, 0.0f, false, "Processor", nullptr, "\357\213\233", 0x000000, nullptr, 0.0f, 0.0f},  // Processor
+    {FL_DEVCARD, 0.0f, 0.0f, 1.0f, 0xD0BCFF, 0x1B1B1F, 0, nullptr, nullptr, 17, HALO_FX_FADE, 0.0f, false, "Memory", nullptr, "\357\224\270", 0x000000, nullptr, 1.0f, 0.0f},  // Memory
+    {FL_DEVCARD, 0.0f, 0.0f, 1.0f, 0x6DD58C, 0x1B1B1F, 0, nullptr, nullptr, 18, HALO_FX_FADE, 0.0f, false, "Battery", nullptr, "\357\211\200", 0x000000, nullptr, 2.0f, 0.0f},  // Battery
+    {FL_DEVCARD, 0.0f, 0.0f, 1.0f, 0xFFB86B, 0x1B1B1F, 0, nullptr, nullptr, 19, HALO_FX_FADE, 0.0f, false, "Temperature", nullptr, "\357\213\211", 0x000000, nullptr, 3.0f, 0.0f},  // Temperature
+    {FL_DEVCARD, 0.0f, 0.0f, 1.0f, 0xFF9ECD, 0x1B1B1F, 0, nullptr, nullptr, 20, HALO_FX_FADE, 0.0f, false, "Sound", nullptr, "\357\204\260", 0x000000, nullptr, 4.0f, 0.0f},  // Sound
+    {FL_DEVCARD, 0.0f, 0.0f, 1.0f, 0x7DD8E8, 0x1B1B1F, 0, nullptr, nullptr, 21, HALO_FX_FADE, 0.0f, false, "Motion", nullptr, "\357\234\214", 0x000000, nullptr, 5.0f, 0.0f},  // Motion
+    {FL_SCROLL, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x333333, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr},  // Scroll indicator
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+};
+static FaceRun (&screen15_run)[9] = face_runs<9>();
+
+// Processor
+static FaceLayer screen16_layers[] = {
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_DEVICE, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Device screen
+};
+static FaceRun (&screen16_run)[2] = face_runs<2>();
+
+// Memory
+static FaceLayer screen17_layers[] = {
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_DEVICE, 0.0f, 0.0f, 1.0f, 0xD0BCFF, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 1.0f, 0.0f},  // Device screen
+};
+static FaceRun (&screen17_run)[2] = face_runs<2>();
+
+// Power
+static FaceLayer screen18_layers[] = {
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 200.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_CHARGE, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Power
+};
+static FaceRun (&screen18_run)[2] = face_runs<2>();
+
+// Temperature
+static FaceLayer screen19_layers[] = {
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_DEVICE, 0.0f, 0.0f, 1.0f, 0xFFB86B, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 3.0f, 0.0f},  // Device screen
+};
+static FaceRun (&screen19_run)[2] = face_runs<2>();
+
+// Sound
+static FaceLayer screen20_layers[] = {
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_DEVICE, 0.0f, 0.0f, 1.0f, 0xFF9ECD, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 4.0f, 0.0f},  // Device screen
+};
+static FaceRun (&screen20_run)[2] = face_runs<2>();
+
+// Motion
+static FaceLayer screen21_layers[] = {
+    {FL_ARC, 0.0f, 0.0f, 1.0f, 0xC6C6C6, 0x000000, 1, &font3, nullptr, -1, HALO_FX_FADE, 219.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Top clock
+    {FL_DEVICE, 0.0f, 0.0f, 1.0f, 0x7DD8E8, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 5.0f, 0.0f},  // Device screen
+};
+static FaceRun (&screen21_run)[2] = face_runs<2>();
+
+// Settings
+static FaceLayer screen22_layers[] = {
+    {FL_SETTINGS, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Settings
+};
+static FaceRun (&screen22_run)[1] = face_runs<1>();
+
+// Stopwatch
+static FaceLayer screen23_layers[] = {
+    {FL_STOPWATCH, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Stopwatch
+};
+static FaceRun (&screen23_run)[1] = face_runs<1>();
+
+// Timer
+static FaceLayer screen24_layers[] = {
+    {FL_TIMER, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // Timer
+};
+static FaceRun (&screen24_run)[1] = face_runs<1>();
+
+// World clock
+static FaceLayer screen25_layers[] = {
+    {FL_WORLD, 0.0f, 0.0f, 1.0f, 0x000000, 0x000000, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x000000, nullptr, 0.0f, 0.0f},  // World clock
+};
+static FaceRun (&screen25_run)[1] = face_runs<1>();
 
 static FaceScreen screens[SCREEN_N] = {
-    {screen0_layers, screen0_run, 3, "Watch face"},  // Watch face
+    {screen0_layers, screen0_run, 4, "HaloWatch"},  // HaloWatch
+    {screen1_layers, screen1_run, 14, "Apps"},  // Apps
+    {screen2_layers, screen2_run, 1, "Weather"},  // Weather
+    {screen3_layers, screen3_run, 1, "Music"},  // Music
+    {screen4_layers, screen4_run, 1, "Recorder"},  // Recorder
+    {screen5_layers, screen5_run, 9, "Radio"},  // Radio
+    {screen6_layers, screen6_run, 1, "Stations"},  // Stations
+    {screen7_layers, screen7_run, 1, "Folder"},  // Folder
+    {screen8_layers, screen8_run, 1, "Volume"},  // Volume
+    {screen9_layers, screen9_run, 7, "Games"},  // Games
+    {screen10_layers, screen10_run, 1, "Dot Snake"},  // Dot Snake
+    {screen11_layers, screen11_run, 1, "Comet"},  // Comet
+    {screen12_layers, screen12_run, 1, "Voxel Snake"},  // Voxel Snake
+    {screen13_layers, screen13_run, 1, "Brightness"},  // Brightness
+    {screen14_layers, screen14_run, 1, "Battery"},  // Battery
+    {screen15_layers, screen15_run, 9, "About"},  // About
+    {screen16_layers, screen16_run, 2, "Processor"},  // Processor
+    {screen17_layers, screen17_run, 2, "Memory"},  // Memory
+    {screen18_layers, screen18_run, 2, "Power"},  // Power
+    {screen19_layers, screen19_run, 2, "Temperature"},  // Temperature
+    {screen20_layers, screen20_run, 2, "Sound"},  // Sound
+    {screen21_layers, screen21_run, 2, "Motion"},  // Motion
+    {screen22_layers, screen22_run, 1, "Settings"},  // Settings
+    {screen23_layers, screen23_run, 1, "Stopwatch"},  // Stopwatch
+    {screen24_layers, screen24_run, 1, "Timer"},  // Timer
+    {screen25_layers, screen25_run, 1, "World clock"},  // World clock
 };

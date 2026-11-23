@@ -1,0 +1,1229 @@
+{
+ "format": "popkastudio/2",
+ "board": "amoled175",
+ "screens": [
+  {
+   "id": "face",
+   "name": "HaloWatch",
+   "x": 0,
+   "y": 0,
+   "layers": [
+    {
+     "id": "date1",
+     "type": "date",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Date",
+     "size": 41,
+     "weight": 700,
+     "width": 100,
+     "spacing": 0,
+     "color": "#C2C3CB"
+    },
+    {
+     "id": "clock1",
+     "type": "clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Clock",
+     "size": 148,
+     "weight": 580,
+     "width": 106,
+     "spacing": -1,
+     "color": "#F8F7F9"
+    },
+    {
+     "id": "weather1",
+     "type": "weather",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Weather",
+     "scale": 1,
+     "spacing": 0,
+     "color": "#2D2F2F",
+     "color2": "#F8F7F9",
+     "pill": true
+    },
+    {
+     "id": "shade1",
+     "type": "shade",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Quick settings",
+     "look": "full",
+     "color": "#A8C7FA"
+    }
+   ],
+   "face": "saved:halowatch"
+  },
+  {
+   "id": "gallery1",
+   "name": "Gallery",
+   "x": 0,
+   "y": 726,
+   "layers": [
+    {
+     "id": "title1",
+     "type": "title",
+     "name": "Title",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#FFF8EE",
+     "text": "Gallery"
+    },
+    {
+     "id": "card2",
+     "type": "card",
+     "name": "Weather",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "wxappscr",
+      "fx": "a16"
+     },
+     "color": "#FFB030",
+     "color2": "#2E3034",
+     "text": "Weather",
+     "subtitle": "now and hourly",
+     "icon": "sun"
+    },
+    {
+     "id": "card_stopwatch",
+     "type": "card",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Stopwatch card",
+     "text": "Stopwatch",
+     "subtitle": "start, laps",
+     "icon": "stopwatch",
+     "color": "#A8C7FA",
+     "color2": "#2E3034",
+     "live": false,
+     "tap": {
+      "to": "swapp",
+      "fx": "a16"
+     }
+    },
+    {
+     "id": "card_timer",
+     "type": "card",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Timer card",
+     "text": "Timer",
+     "subtitle": "countdown",
+     "icon": "hourglass",
+     "color": "#FFB68A",
+     "color2": "#2E3034",
+     "live": false,
+     "tap": {
+      "to": "tmapp",
+      "fx": "a16"
+     }
+    },
+    {
+     "id": "card_world",
+     "type": "card",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "World clock card",
+     "text": "World clock",
+     "subtitle": "cities",
+     "icon": "globe",
+     "color": "#C7BFFF",
+     "color2": "#2E3034",
+     "live": false,
+     "tap": {
+      "to": "wcapp",
+      "fx": "a16"
+     }
+    },
+    {
+     "id": "card6",
+     "type": "card",
+     "name": "Radio",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen6",
+      "fx": "a16"
+     },
+     "color": "#FF8A3D",
+     "color2": "#2E3034",
+     "text": "Radio",
+     "subtitle": "stations of the world",
+     "icon": "radio"
+    },
+    {
+     "id": "card4",
+     "type": "card",
+     "name": "Music",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen4",
+      "fx": "a16"
+     },
+     "color": "#F6B5EA",
+     "color2": "#2E3034",
+     "text": "Music",
+     "subtitle": "piano classics",
+     "icon": "music"
+    },
+    {
+     "id": "card5",
+     "type": "card",
+     "name": "Recorder",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen5",
+      "fx": "a16"
+     },
+     "color": "#F28B82",
+     "color2": "#2E3034",
+     "text": "Recorder",
+     "subtitle": "record and play back",
+     "icon": "mic"
+    },
+    {
+     "id": "card7",
+     "type": "card",
+     "name": "Games",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen7",
+      "fx": "a16"
+     },
+     "color": "#C3F584",
+     "color2": "#2E3034",
+     "text": "Games",
+     "subtitle": "self-playing snakes",
+     "icon": "gamepad"
+    },
+    {
+     "id": "card13",
+     "type": "card",
+     "name": "About",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen13",
+      "fx": "a16"
+     },
+     "color": "#A8C7FA",
+     "color2": "#2E3034",
+     "text": "About",
+     "subtitle": "this watch, live",
+     "icon": "chip"
+    },
+    {
+     "id": "card_settings",
+     "type": "card",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Settings card",
+     "text": "Settings",
+     "subtitle": "display, time, Wi-Fi",
+     "icon": "gear",
+     "color": "#A8C7FA",
+     "color2": "#2E3034",
+     "live": false,
+     "tap": {
+      "to": "settingsapp",
+      "fx": "a16"
+     }
+    },
+    {
+     "id": "edge1",
+     "type": "edge",
+     "name": "More button",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#2E3034",
+     "text": "More"
+    },
+    {
+     "id": "arc1",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "scroll1",
+     "type": "scroll",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Scroll indicator",
+     "color": "#C6C6C6",
+     "color2": "#333333"
+    }
+   ]
+  },
+  {
+   "id": "wxappscr",
+   "name": "Weather",
+   "x": 3630.0,
+   "y": -1452.0,
+   "layers": [
+    {
+     "id": "wxapp1",
+     "type": "wxapp",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Weather app"
+    }
+   ]
+  },
+  {
+   "id": "screen4",
+   "name": "Music",
+   "x": 726,
+   "y": 2178,
+   "layers": [
+    {
+     "id": "music1",
+     "type": "music",
+     "name": "Music",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen5",
+   "name": "Recorder",
+   "x": 726,
+   "y": -726,
+   "layers": [
+    {
+     "id": "recorder1",
+     "type": "recorder",
+     "name": "Recorder",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen6",
+   "name": "Radio",
+   "x": 726,
+   "y": 2904,
+   "layers": [
+    {
+     "id": "radio1",
+     "type": "radio",
+     "name": "Radio",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    },
+    {
+     "id": "rrays1",
+     "type": "rrays",
+     "name": "Equalizer",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "scale": 1.21,
+     "color": "#FFB98A",
+     "color2": "#FF8A3D",
+     "color3": "#FFF1E4",
+     "sides": "both"
+    },
+    {
+     "id": "rtime1",
+     "type": "rtime",
+     "name": "Time",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 660,
+     "width": 100,
+     "spacing": 0,
+     "color": "#FFF8EE"
+    },
+    {
+     "id": "rname1",
+     "type": "rname",
+     "name": "Station",
+     "hidden": false,
+     "dx": 0,
+     "dy": -2,
+     "tap": null,
+     "size": 55,
+     "weight": 620,
+     "width": 104,
+     "spacing": 0,
+     "color": "#FFF8EE",
+     "span": 290,
+     "span2": 286
+    },
+    {
+     "id": "rsong1",
+     "type": "rsong",
+     "name": "Song",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 22,
+     "weight": 620,
+     "width": 104,
+     "spacing": 0,
+     "color": "#9E9E9E",
+     "span": 328
+    },
+    {
+     "id": "rbtn1",
+     "type": "rbtn",
+     "name": "Stations",
+     "hidden": false,
+     "dx": -65,
+     "dy": 5,
+     "tap": {
+      "to": "rbrowse1",
+      "fx": "a16"
+     },
+     "size": 16,
+     "weight": 620,
+     "width": 104,
+     "scale": 1.04,
+     "spacing": 2,
+     "color": "#FFB98A",
+     "what": "stations",
+     "text": "STATIONS",
+     "icon": "menu"
+    },
+    {
+     "id": "rline1",
+     "type": "rline",
+     "name": "Line",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#3A3A40",
+     "span": 37
+    },
+    {
+     "id": "rbtn2",
+     "type": "rbtn",
+     "name": "Volume",
+     "hidden": false,
+     "dx": 63,
+     "dy": 5,
+     "tap": {
+      "to": "rvolume1",
+      "fx": "a16"
+     },
+     "size": 16,
+     "weight": 620,
+     "width": 104,
+     "scale": 1.04,
+     "spacing": 2,
+     "color": "#FFB98A",
+     "what": "volume",
+     "text": "VOLUME",
+     "icon": "volume"
+    },
+    {
+     "id": "rplay1",
+     "type": "rplay",
+     "name": "Play / Stop",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#FF8A3D",
+     "color2": "#2A1200"
+    }
+   ]
+  },
+  {
+   "id": "rbrowse1",
+   "name": "Stations",
+   "x": 1452,
+   "y": 2904,
+   "layers": [
+    {
+     "id": "rbrowse2",
+     "type": "rbrowse",
+     "name": "Stations",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "rfolder1",
+      "fx": "a16"
+     }
+    }
+   ]
+  },
+  {
+   "id": "rfolder1",
+   "name": "Folder",
+   "x": 2178,
+   "y": 2904,
+   "layers": [
+    {
+     "id": "rfolder2",
+     "type": "rfolder",
+     "name": "Folder",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "rvolume1",
+   "name": "Volume",
+   "x": 2178,
+   "y": 3630,
+   "layers": [
+    {
+     "id": "rvolume2",
+     "type": "rvolume",
+     "name": "Volume",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen7",
+   "name": "Games",
+   "x": 1452,
+   "y": 726,
+   "layers": [
+    {
+     "id": "title2",
+     "type": "title",
+     "name": "Title",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#FFF8EE",
+     "text": "Games"
+    },
+    {
+     "id": "card8",
+     "type": "card",
+     "name": "Dot Snake",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen8",
+      "fx": "a16"
+     },
+     "color": "#FFF8EE",
+     "color2": "#2E3034",
+     "text": "Dot Snake",
+     "subtitle": "LED matrix",
+     "icon": "gamepad"
+    },
+    {
+     "id": "card9",
+     "type": "card",
+     "name": "Comet",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen9",
+      "fx": "a16"
+     },
+     "color": "#8ECBFF",
+     "color2": "#2E3034",
+     "text": "Comet",
+     "subtitle": "snake in space",
+     "icon": "gamepad"
+    },
+    {
+     "id": "card10",
+     "type": "card",
+     "name": "Voxel Snake",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen10",
+      "fx": "a16"
+     },
+     "color": "#B8FF6A",
+     "color2": "#2E3034",
+     "text": "Voxel Snake",
+     "subtitle": "isometric 3D",
+     "icon": "gamepad"
+    },
+    {
+     "id": "edge2",
+     "type": "edge",
+     "name": "More button",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#2E3034",
+     "text": "More"
+    },
+    {
+     "id": "arc4",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "scroll1",
+     "type": "scroll",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Scroll indicator",
+     "color": "#C6C6C6",
+     "color2": "#333333"
+    }
+   ]
+  },
+  {
+   "id": "screen8",
+   "name": "Dot Snake",
+   "x": 2178,
+   "y": 726,
+   "layers": [
+    {
+     "id": "snkdots1",
+     "type": "snkdots",
+     "name": "Dot Snake",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen9",
+   "name": "Comet",
+   "x": 2178,
+   "y": 1452,
+   "layers": [
+    {
+     "id": "snkspace1",
+     "type": "snkspace",
+     "name": "Comet",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen10",
+   "name": "Voxel Snake",
+   "x": 2178,
+   "y": 0,
+   "layers": [
+    {
+     "id": "snkiso1",
+     "type": "snkiso",
+     "name": "Voxel Snake",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen11",
+   "name": "Brightness",
+   "x": 1452,
+   "y": 1452,
+   "layers": [
+    {
+     "id": "display1",
+     "type": "display",
+     "name": "Display",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen12",
+   "name": "Battery",
+   "x": 1452,
+   "y": 2178,
+   "layers": [
+    {
+     "id": "battery1",
+     "type": "battery",
+     "name": "Battery",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen13",
+   "name": "About",
+   "x": 1452,
+   "y": -726,
+   "layers": [
+    {
+     "id": "title3",
+     "type": "title",
+     "name": "Title",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#FFF8EE",
+     "text": "About"
+    },
+    {
+     "id": "devcard1",
+     "type": "devcard",
+     "name": "Processor",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen14",
+      "fx": "a16"
+     },
+     "color": "#A8C7FA",
+     "color2": "#1B1B1F",
+     "what": "cpu",
+     "text": "Processor",
+     "icon": "chip"
+    },
+    {
+     "id": "devcard2",
+     "type": "devcard",
+     "name": "Memory",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen15",
+      "fx": "a16"
+     },
+     "color": "#D0BCFF",
+     "color2": "#1B1B1F",
+     "what": "mem",
+     "text": "Memory",
+     "icon": "memory"
+    },
+    {
+     "id": "devcard3",
+     "type": "devcard",
+     "name": "Battery",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen16",
+      "fx": "a16"
+     },
+     "color": "#6DD58C",
+     "color2": "#1B1B1F",
+     "what": "bat",
+     "text": "Battery",
+     "icon": "battery"
+    },
+    {
+     "id": "devcard4",
+     "type": "devcard",
+     "name": "Temperature",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen17",
+      "fx": "a16"
+     },
+     "color": "#FFB86B",
+     "color2": "#1B1B1F",
+     "what": "temp",
+     "text": "Temperature",
+     "icon": "thermo"
+    },
+    {
+     "id": "devcard5",
+     "type": "devcard",
+     "name": "Sound",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen18",
+      "fx": "a16"
+     },
+     "color": "#FF9ECD",
+     "color2": "#1B1B1F",
+     "what": "snd",
+     "text": "Sound",
+     "icon": "mic"
+    },
+    {
+     "id": "devcard6",
+     "type": "devcard",
+     "name": "Motion",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen19",
+      "fx": "a16"
+     },
+     "color": "#7DD8E8",
+     "color2": "#1B1B1F",
+     "what": "mot",
+     "text": "Motion",
+     "icon": "run"
+    },
+    {
+     "id": "scroll1",
+     "type": "scroll",
+     "name": "Scroll indicator",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#C6C6C6",
+     "color2": "#333333"
+    },
+    {
+     "id": "arc11",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    }
+   ]
+  },
+  {
+   "id": "screen14",
+   "name": "Processor",
+   "x": 2178,
+   "y": -726,
+   "layers": [
+    {
+     "id": "arc5",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "device1",
+     "type": "device",
+     "name": "Device screen",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#A8C7FA",
+     "what": "cpu"
+    }
+   ]
+  },
+  {
+   "id": "screen15",
+   "name": "Memory",
+   "x": 2178,
+   "y": -1452,
+   "layers": [
+    {
+     "id": "arc6",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "device2",
+     "type": "device",
+     "name": "Device screen",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#D0BCFF",
+     "what": "mem"
+    }
+   ]
+  },
+  {
+   "id": "screen16",
+   "name": "Power",
+   "x": 2178,
+   "y": -2178,
+   "layers": [
+    {
+     "id": "arc7",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 200,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "charge1",
+     "type": "charge",
+     "name": "Power",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null
+    }
+   ]
+  },
+  {
+   "id": "screen17",
+   "name": "Temperature",
+   "x": 2904,
+   "y": -726,
+   "layers": [
+    {
+     "id": "arc8",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "device3",
+     "type": "device",
+     "name": "Device screen",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#FFB86B",
+     "what": "temp"
+    }
+   ]
+  },
+  {
+   "id": "screen18",
+   "name": "Sound",
+   "x": 2904,
+   "y": 0,
+   "layers": [
+    {
+     "id": "arc9",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "device4",
+     "type": "device",
+     "name": "Device screen",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#FF9ECD",
+     "what": "snd"
+    }
+   ]
+  },
+  {
+   "id": "screen19",
+   "name": "Motion",
+   "x": 2904,
+   "y": -1452,
+   "layers": [
+    {
+     "id": "arc10",
+     "type": "arc",
+     "name": "Top clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "size": 24,
+     "weight": 620,
+     "width": 104,
+     "spacing": 1,
+     "radius": 219,
+     "color": "#C6C6C6"
+    },
+    {
+     "id": "device5",
+     "type": "device",
+     "name": "Device screen",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": null,
+     "color": "#7DD8E8",
+     "what": "mot"
+    }
+   ]
+  },
+  {
+   "id": "settingsapp",
+   "name": "Settings",
+   "x": 3630.0,
+   "y": -2178.0,
+   "layers": [
+    {
+     "id": "settings1",
+     "type": "settings",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Settings"
+    }
+   ]
+  },
+  {
+   "id": "swapp",
+   "name": "Stopwatch",
+   "x": 4356.0,
+   "y": -2178.0,
+   "layers": [
+    {
+     "id": "stopwatch1",
+     "type": "stopwatch",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Stopwatch"
+    }
+   ]
+  },
+  {
+   "id": "tmapp",
+   "name": "Timer",
+   "x": 5082.0,
+   "y": -2178.0,
+   "layers": [
+    {
+     "id": "timer1",
+     "type": "timer",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Timer"
+    }
+   ]
+  },
+  {
+   "id": "wcapp",
+   "name": "World clock",
+   "x": 5808.0,
+   "y": -2178.0,
+   "layers": [
+    {
+     "id": "world1",
+     "type": "world",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "World clock"
+    }
+   ]
+  }
+ ],
+ "main": "gallery1",
+ "time": {
+  "zone": "Kolkata",
+  "h24": true
+ },
+ "name": "Mumbai Full Watch",
+ "functions": {
+  "wifi": {
+   "on": true
+  },
+  "aod": {
+   "on": true,
+   "idle": 30,
+   "bright": 24,
+   "raise": false
+  },
+  "pwr": {
+   "on": true,
+   "act": "home"
+  },
+  "boot": {
+   "on": true,
+   "act": "lock"
+  },
+  "palm": {
+   "on": true
+  }
+ },
+ "weather": {
+  "units": "C",
+  "cities": [
+   {
+    "name": "Mumbai",
+    "where": "Maharashtra, India",
+    "lat": 19.07283,
+    "lon": 72.88261
+   }
+  ]
+ },
+ "rev": 8,
+ "faces": [
+  {
+   "id": "halowatch",
+   "name": "HaloWatch",
+   "layers": [
+    {
+     "id": "date1",
+     "type": "date",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Date",
+     "size": 41,
+     "weight": 700,
+     "width": 100,
+     "spacing": 0,
+     "color": "#C2C3CB"
+    },
+    {
+     "id": "clock1",
+     "type": "clock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Clock",
+     "size": 148,
+     "weight": 580,
+     "width": 106,
+     "spacing": -1,
+     "color": "#F8F7F9"
+    },
+    {
+     "id": "weather1",
+     "type": "weather",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Weather",
+     "scale": 1,
+     "spacing": 0,
+     "color": "#2D2F2F",
+     "color2": "#F8F7F9",
+     "pill": true
+    }
+   ]
+  }
+ ],
+ "faceSwipe": true
+}

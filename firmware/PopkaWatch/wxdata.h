@@ -5,5 +5,5 @@
 #define WXD_N 1
 #define WXD_F 0  // 1 — Fahrenheit
 static WxCity wx_city[WX_MAX] = {
-    {"New York", 40.71427f, -74.00597f, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_CLOUD, 0u, {}, {WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE, WX_NONE}},  // New York, United States
+    {"Mumbai", 19.0728f, 72.8826f, 34, 36, 34, 22, WX_SUN, 1795419000u, {1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1}, {34, 34, 33, 31, 30, 29, 29, 29, 28, 28, 28, 28, 28, 27, 27, 26, 26, 26, 26, 27, 30, 32, 33, 34}},  // Maharashtra, India
 };

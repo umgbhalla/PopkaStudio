@@ -2,11 +2,13 @@
 // The Functions that decide what is built at all (included first): Wi-Fi (HaloClock: the time from the internet,
 // the networks the board sees), Bluetooth (bt.h); the time zone and the clock's 12 or 24 hours.
 #pragma once
-#define FN_WIFI 0
+#define FN_WIFI 1
 #define FN_BT 0
-#define TZ "EST5EDT,M3.2.0,M11.1.0"  // New York
-#define CLOCK_24H 0
+#define TZ "IST-5:30"  // Kolkata
+#define CLOCK_24H 1
 // The clocks of sixteen looks (sclock.h): a bit a look the project has (none — not in the firmware)
 #define FN_SCLOCK 0x0000
+#define FN_WXAPP 1  // the Weather app (wxapp.h)
+#define FN_CLOCKS 1  // the clock apps (clocks.h)
 // The weather widgets (wxwidgets.h): a bit a widget the project has, from wxdigits (none — not in the firmware)
 #define FN_WXW 0x00
