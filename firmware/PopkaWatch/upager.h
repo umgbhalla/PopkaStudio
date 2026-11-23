@@ -130,9 +130,10 @@ static void up_arc(UpPage &P, float r, float w, float a0, float a1, uint32_t c, 
   it.alpha = a1 > a0 ? a : 0, it.on_black = true, it.on = nullptr;
   up_commit(it, v);
 }
-// The primary: a filled shape (circle → four lobes by t) and its glyph in the dark ink
+// The primary: a filled shape (circle → four lobes by t) and its glyph in the dark ink (f — an app's own glyph size;
+// nullptr — the study's 43 px)
 static void up_primary(UpPage &P, float x, float y, float r, float t, const char *icon, uint32_t fill, uint32_t ink,
-                       float a, const HaloView &v) {
+                       float a, const HaloView &v, const HaloFont *f = nullptr) {
   if (P.nb < UP_BLOBS) {
     UpBlob &b = P.b[P.nb++];
     b.at = P.n, b.x = halo_view_x(v, x), b.y = halo_view_y(v, y), b.r = r * v.s, b.t = t, b.a = a * v.a, b.c = fill;
@@ -147,7 +148,7 @@ static void up_primary(UpPage &P, float x, float y, float r, float t, const char
     }
   }
   const bool play = !strcmp(icon, UP_IC_PLAY);  // (the play glyph sits 3 px right: its mass balanced)
-  up_text(P, gl_up_ic43, icon, up_mid_ic, x + (play ? 3 : 0), y, 1, ink, a, v, nullptr);
+  up_text(P, f ? *f : gl_up_ic43, icon, f ? halo_text_mid(*f, icon) : up_mid_ic, x + (play ? 3 : 0), y, 1, ink, a, v, nullptr);
 }
 // A secondary: a tonal disc, its glyph in the accent
 static void up_secondary(UpPage &P, float x, float y, float r, const char *icon, uint32_t bg, uint32_t fg, float a,

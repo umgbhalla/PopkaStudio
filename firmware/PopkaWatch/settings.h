@@ -81,6 +81,17 @@ static bool clocks_due();
 #else
 #define HAS_RADIO 0
 #endif
+// … the round board's Radio screen: four pages on the kit (radioapp.h, upager.h — 23 Nov 2026); its old main screen's
+// parts (FL_RTIME … FL_RPLAY) stay the editor's, hidden here
+#if HAS_RADIO && defined(HALO_ROUND)
+#define HAS_RAPP 1
+static void rapp_enter();
+static void rapp_update(float dt);
+static void rapp_layout(const HaloView &v);
+static void rapp_draw();
+#else
+#define HAS_RAPP 0
+#endif
 
 // The Video app (video.h): only the 7″ board has it (its JPEG decoder, its card slot) — in a firmware with it and in
 // that board's page. A small rectangle (HALO_COMPACT) is a rectangle too, but not that one; nor the 7″ board held tall
@@ -998,7 +1009,11 @@ static void settings_enter(const FaceScreen &S) {
     if (st_has(S, k)) clocks_enter(k);
 #endif
 #if HAS_RADIO
+#if HAS_RAPP
+  if (st_has(S, FL_RADIO)) rapp_enter();
+#else
   if (st_has(S, FL_RADIO)) radio_enter();
+#endif
 #ifdef HALO_ROUND  // (the round board's other Radio screens)
   if (st_has(S, FL_RBROWSE)) rb_enter();
   if (st_has(S, FL_RFOLDER)) rs_enter();
@@ -1036,7 +1051,11 @@ static void settings_update(const FaceScreen &S, float dt) {
     if (st_has(S, k)) clocks_update(k, dt);
 #endif
 #if HAS_RADIO
+#if HAS_RAPP
+  if (st_has(S, FL_RADIO)) rapp_update(dt);
+#else
   if (st_has(S, FL_RADIO)) radio_update(S, dt);
+#endif
 #ifdef HALO_ROUND
   if (st_has(S, FL_RBROWSE)) rb_update_on(S, dt);
   if (st_has(S, FL_RFOLDER)) rs_update(dt);
@@ -1073,7 +1092,11 @@ static void settings_layout(FaceRun &R, uint8_t kind, const HaloView &v) {
   if (kind == FL_STOPWATCH || kind == FL_TIMER || kind == FL_WORLD) clocks_layout(kind, v);
 #endif
 #if HAS_RADIO
+#if HAS_RAPP
+  if (kind == FL_RADIO) rapp_layout(v);
+#else
   if (kind == FL_RADIO) radio_layout(v);
+#endif
 #ifdef HALO_ROUND
   if (kind == FL_RBROWSE) rb_layout_on(v);
   if (kind == FL_RFOLDER) rs_layout_on(v);
@@ -1119,7 +1142,11 @@ static void settings_draw(uint8_t kind) {
   if (kind == FL_STOPWATCH || kind == FL_TIMER || kind == FL_WORLD) clocks_draw(kind);
 #endif
 #if HAS_RADIO
-  if (kind == FL_RADIO) radio_draw();  // (round: its parts draw themselves, the volume screen goes over them: face.h)
+#if HAS_RAPP
+  if (kind == FL_RADIO) rapp_draw();  // (round: the pages; the old parts are hidden)
+#else
+  if (kind == FL_RADIO) radio_draw();  // (its parts draw themselves, the volume screen goes over them: face.h)
+#endif
 #ifdef HALO_ROUND
   if (kind == FL_RBROWSE) rb_draw();
   if (kind == FL_RFOLDER) rs_draw();

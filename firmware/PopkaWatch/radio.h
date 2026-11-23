@@ -199,6 +199,7 @@ static float rn_band[RD_BANDS];
 static RdSt rn_res_buf[RD_RES], *rn_res = rn_res_buf;
 static char rn_title[RD_TITLE];
 static int rn_demo, rn_fetch_folder;
+static bool rn_retry = true;  // (Auto-retry: radio_net.h's; nothing drops here)
 static void rn_play(const char *) {
   rn_on = true, rn_playing = false, rn_net = RN_CONNECTING, rn_t0 = halo_ms(), rn_title[0] = 0, rn_title_gen++;
 #ifndef __EMSCRIPTEN__
@@ -456,6 +457,7 @@ static void radio_poll() {
 static void radio_tick(float dt) {  // every frame, whatever is on screen
   if (!ru) return;
   rd_clock = fmodf(rd_clock + dt, 1000);
+  if (rd_on && !rn_on) rd_on = false;  // (the stream stopped itself — Auto-retry off and it dropped: Ready again)
 #ifdef __EMSCRIPTEN__
   static const char *const SONGS[] = {"Moon Harbor \xE2\x80\x94 Slow Tide", "Kite Season \xE2\x80\x94 Paper Lanterns",
                                       "Lumen Drift \xE2\x80\x94 Under Glass", "Les Mar\xC3\xA9" "es \xE2\x80\x94 Caf\xC3\xA9 de minuit"};
@@ -663,7 +665,7 @@ static void radio_part_layout(const FaceScreen &S, int i, float a, const HaloVie
   FaceRun &R = S.run[i];
   const FaceLayer &L = S.layers[i];
   R.box[0] = R.box[1] = 0, R.box[2] = R.box[3] = -1;
-  if (!R.rd || !ru) return;
+  if (!R.rd || !ru || HAS_RAPP) return;  // (the paged Radio: radioapp.h — the old parts stay the editor's, unseen here)
   RdPart &P = *R.rd;
   HaloView v = view;
   v.a *= rp_fa;  // (the volume screen over the main one: it fades through)
@@ -854,7 +856,7 @@ static void rp_song_draw(const FaceLayer &L, const RdPart &P) {
 }
 static void radio_part_draw(const FaceScreen &S, int i) {
   const FaceRun &R = S.run[i];
-  if (!R.rd || !ru) return;
+  if (!R.rd || !ru || HAS_RAPP) return;
   const FaceLayer &L = S.layers[i];
   const RdPart &P = *R.rd;
   if (L.kind == FL_RRAYS) return rp_rays_draw(L, P);

@@ -45,6 +45,7 @@ enum { RN_OFF, RN_JOINING, RN_CONNECTING, RN_STREAMING, RN_NOWIFI, RN_FAILED };
 static volatile int rn_net = RN_OFF;   // the network's side
 static volatile bool rn_playing;       // sound comes out (the ring had RN_START once and is not dry)
 static volatile bool rn_on;            // should play (the play button)
+static volatile bool rn_retry = true;  // Auto-retry (radioapp.h): off — a dropped or failed stream stops (rn_on false)
 static char rn_url[RD_URL];            // the station asked for (rn_mux)
 static volatile uint32_t rn_gen;       // +1 — a new station (or play again after a pause)
 static char rn_title[RD_TITLE];        // the song now (rn_mux); rn_title_gen +1 when it changes
@@ -394,6 +395,10 @@ static void rn_net_loop(void *) {
       if (r != 1) {
         if (rn_gone(gen)) continue;
         rn_net = RN_FAILED;
+        if (!rn_retry) {  // (no retries: stopped — the screen shows Ready)
+          rn_on = false;
+          continue;
+        }
         backoff = min(backoff ? backoff * 2 : (uint32_t)2000, (uint32_t)16000);
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(backoff));
         continue;
@@ -409,7 +414,8 @@ static void rn_net_loop(void *) {
     if (!rn_stream(gen)) {
       rn_close();
       rn_st_reconnects++;
-      LOG("radio: the stream stopped — again\n");
+      LOG("radio: the stream stopped — %s\n", rn_retry ? "again" : "Auto-retry off: stopped");
+      if (!rn_retry && !rn_gone(gen)) rn_on = false;
       vTaskDelay(pdMS_TO_TICKS(300));
     }
   }
