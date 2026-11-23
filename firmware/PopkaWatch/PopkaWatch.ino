@@ -107,11 +107,9 @@ void setup() {
 #ifdef HALO_ROUND
   halo_nav_bottom_back(false);
 #endif
-#ifdef MAIN_SIDE
-  // (layers.h: the project's swipes sideways — the gallery to the left, back from the left edge; with several faces
-  // sideways switches them: the gallery is a swipe up then, face.h)
-  if (face_n <= 1) halo_nav_side(true);
-#endif
+  // Apps is always a swipe up from anywhere on the face — with one face or many (sideways is the faces'; the old
+  // "swipe": "side" project setting — Apps to the left — no longer changes it, so the gestures never depend on how
+  // many faces there are)
   halo_nav_face(FACE);  // the home: the board starts on it
   HaloConfig cfg;
   cfg.name = "PopkaWatch";

@@ -168,7 +168,7 @@ static void pw_locked_display(bool on) {
 
 // A button pressed (1 — BOOT, 2 — PWR; held — its long press) with what it does
 static void pw_button(int btn, int fn, bool held, int64_t now) {
-  if (fn == FN_HOME && !held && (!pw_locked || btn == 2)) {
+  if (fn == FN_HOME && !held && !pw_locked && pw_mode != PW_AOD && pw_mode != PW_DARK) {  // (asleep or locked: below)
     const bool animate = !pw_locked && pw_mode == PW_ACTIVE && pw_amb.x == 0;
 #ifdef HALO_ROUND
     bool open_apps = btn == 2 && animate && halo_nav_on_face();
@@ -199,31 +199,25 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
     if (!pw_locked) pw_wake(0);
     return;
   }
+  // Locked, either button (the user's rule, 23 Nov 2026): a press — the locked screen on, the next one off (a cycle);
+  // held — unlocked and awake
   if (pw_locked) {
-#ifdef HALO_ROUND
-    if (btn == 1) {
-      if (held) pw_lock_set(false, 0), pw_wake(0);
-      else {
-        pw_listen_us = now + PW_LISTEN_S * 1000000ll;
-        pw_locked_display(!halo_display_is_on());
-      }
+    if (held) {
+      if (halo_ms() - pw_lock_ms > HALO_BOOT_LONG_MS + 300) pw_lock_set(false, 0), pw_wake(0);  // (not the hold that locked)
       return;
     }
+    pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+#ifdef HALO_ROUND
+    pw_locked_display(!halo_display_is_on());
 #endif
-    if (held && btn == pw_lock_btn && halo_ms() - pw_lock_ms > HALO_BOOT_LONG_MS + 300) pw_lock_set(false, 0), pw_wake(0);
-    else if (!held) pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+    return;
+  }
+  // Asleep (Always On or dark), either button, pressed or held: awake — nothing else
+  if (pw_mode == PW_AOD || pw_mode == PW_DARK) {
+    pw_wake(0);
     return;
   }
   if (held) return;
-  bool asleep = pw_mode == PW_AOD || pw_mode == PW_DARK;
-#ifdef HALO_ROUND
-  // The round BOOT press is complete by release, so it can lock directly from an idle or dark screen.
-  asleep = asleep && !(btn == 1 && fn == FN_LOCK);
-#endif
-  if (asleep) {  // asleep: a press only wakes — if buttons do (Wake up)
-    if (pw_wake_btn) pw_wake(0);
-    return;
-  }
   if (fn == FN_LOCK) {  // into Always On, locked — from anywhere (from dark too: the panel on, straight to its level)
     pw_lock_set(true, btn);
 #ifdef HALO_ROUND
