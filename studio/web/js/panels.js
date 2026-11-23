@@ -65,6 +65,7 @@ const ICON = {
   weekarc: '<svg viewBox="0 0 16 16"><circle cx="8" cy="5" r="2"/><path d="M2.5 9.5h.01M5 6.5h.01M11 6.5h.01M13.5 9.5h.01"/></svg>',
   infoline: '<svg viewBox="0 0 16 16"><path d="M2.5 8h3M7.5 8h6"/></svg>',
   forecast: '<svg viewBox="0 0 16 16"><path d="M3 11a2 2 0 0 1 .4-4 3 3 0 0 1 5.8.9A1.6 1.6 0 1 1 9.6 11z"/><path d="M11.5 3.5v1M14 6h-1M13.3 4.2l-.7.7"/></svg>',
+  image: '<svg viewBox="0 0 16 16"><path d="M2.5 11.5l3.5-4 3 3 2-2 2.5 3M2.5 3.5h11v9h-11z"/><circle cx="10.5" cy="6" r="1"/></svg>',
   dateframe: '<svg viewBox="0 0 16 16"><path d="M4 4.5h8M4 11.5h8M6 2.5h4M6 13.5h4"/></svg>',
   dotclock: '<svg viewBox="0 0 16 16"><path d="M3 5h.01M3 8h.01M3 11h.01M6 5h.01M6 11h.01M8 6.5h.01M8 9.5h.01M10 5h.01M10 8h.01M10 11h.01M13 5h.01M13 8h.01M13 11h.01"/></svg>',
   wxdigits: '<svg viewBox="0 0 16 16"><path d="M1.5 6a2 2 0 1 1 3.4 1.4L1.5 12h4M10 12V4L7.5 9.5H12"/><circle cx="14" cy="4.5" r="1.2"/></svg>',
@@ -192,6 +193,7 @@ const SHELVES = {
     { name: 'Saved', icon: 'saved', items: [] },  // (the project's own faces and Add: savedFaces)
   ],
   face: [
+    { name: 'Scene', icon: 'image', items: ['psDunes', 'psLake', 'psCoast', 'psNight', 'psForest', 'psPeaks', 'psConfetti', 'psArcs'] },
     { name: 'Clock', icon: 'clock', items: ['clock', 'pDotClock', ...CLOCK_LOOKS.map(([k]) => 'pc' + k[0].toUpperCase() + k.slice(1))] },
     { name: 'Date', icon: 'date', items: ['date', 'pDateArc', 'pWeekday', 'pDayMonth', 'pWeek', 'pDateFrame'] },
     { name: 'Weather', icon: 'weather', items: ['weather', 'pWxArc', 'pForecast', ...WXW] },

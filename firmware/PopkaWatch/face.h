@@ -103,7 +103,8 @@ enum : uint8_t {
   FL_POMODORO,  // Pomodoro: focus intervals and breaks, a screen of its own (settings.h, pomodoro.h)
   FL_SETTINGS,  // Settings: the watch's settings, many levels — the UI kit's first app (sysset.h, ui.h)
   FL_WXAPP,     // Weather: one long page on the UI kit — hero, 12 hours, 7 days, details, location (wxapp.h)
-  FL_STOPWATCH, FL_TIMER, FL_WORLD  // Wear OS's clock apps on the kit: Stopwatch, Timer, World clock (clocks.h)
+  FL_STOPWATCH, FL_TIMER, FL_WORLD,  // Wear OS's clock apps on the kit: Stopwatch, Timer, World clock (clocks.h)
+  FL_SCENE  // a flat illustration behind the face (scene.h)
 };
 static inline bool fl_wxw(uint8_t k) {  // a weather widget (wxwidgets.h)
   return k >= FL_WXDIGITS && k <= FL_WXWEEK;
@@ -265,6 +266,11 @@ static FaceRun *face_alloc(int n) {
 #else
 #define HAS_STARS 0
 #endif
+#if defined(HALO_ROUND) && (defined(__EMSCRIPTEN__) || (defined(FN_SCENE) && FN_SCENE))  // and Scene (the round watch's)
+#define HAS_SCENE 1
+#else
+#define HAS_SCENE 0
+#endif
 #if defined(__EMSCRIPTEN__) || (defined(FN_PARROT) && FN_PARROT)  // and for the pixel art: Popka, the parrot
 #define HAS_PARROT 1
 #else
@@ -423,6 +429,7 @@ static inline void rd_part_free(FaceRun &) {}
 #include "sclock.h"      // the clocks of sixteen looks
 #endif
 #include "stars.h"     // the starry background
+#include "scene.h"     // a flat illustration behind the face
 #include "pixelart.h"  // pixel art
 #if HAS_SHADE  // (shade_rect.h or shade_round.h, at the end of this file)
 static int shade_index(const FaceScreen &S);
@@ -860,6 +867,12 @@ static void screen_layout(int s, const HaloView &v) {
       continue;
     }
 #endif
+#if HAS_SCENE
+    if (L.kind == FL_SCENE) {
+      scene_layout(S, i, L.hidden ? 0 : 1);
+      continue;
+    }
+#endif
     if (fl_pixels(L.kind)) {
 #if HAS_PIXELS
       pixel_layout(S, i, L.hidden ? 0 : 1, v);
@@ -987,6 +1000,10 @@ static void screen_draw(int s, bool shade_preview = false) {
     if (L.kind == FL_STARS) {
 #if HAS_STARS
       stars_draw(S, i);
+#endif
+    } else if (L.kind == FL_SCENE) {
+#if HAS_SCENE
+      scene_draw(S, i);
 #endif
     } else if (fl_pixels(L.kind)) {
 #if HAS_PIXELS

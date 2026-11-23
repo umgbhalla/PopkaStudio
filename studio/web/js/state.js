@@ -25,6 +25,8 @@ export const KINDS = {
   weather: { group: 'face', name: 'Weather pill', sub: 'Pill: icon and temperature', scale: 1, spacing: 0, color: '#2D2F2F', color2: '#F8F7F9', pill: true },
   // Not on HaloWatch (PopkaStudio's): today's steps — the motion chip counts them; in the firmware only with this layer
   // Not on HaloWatch (projects/Orbit's): a starry background — twinkling stars, a meteor now and then; the bottom layer
+  // A flat illustration behind the face (scene.h; tools/scenes: one style — STYLE.md): the bottom layer
+  scene: { group: 'face', fixed: true, round: true, name: 'Scene', sub: 'A flat illustration behind the face', look: 'dunes' },
   stars: { group: 'face', fixed: true, round: true, name: 'Stars', sub: 'A starry background: twinkling, meteors (Orbit\'s)', scale: 1, count: 90, twinkle: 1, meteors: 6, color: '#C8DCFF' },
   // Not on HaloWatch: pixel art drawn cell by cell (pixelart.h) — Popka, the parrot, and the notes it sings
   parrot: { group: 'face', name: 'Popka', sub: 'Pixel art: the parrot flaps its wings and sings', scale: 1, angle: 0, sparkles: 'around' },
@@ -148,12 +150,14 @@ export const CLOCK_LOOKS = [
   ['california', 'California', ['#FF5A4E', '#FF5A4E', '#F5F5F5'], ['Numerals', 'Accent', 'Hands'], 4],
   ['chrono', 'Chrono', ['#9E2B25', '#E5392F', '#F3EFE8'], ['Band', 'Accent', 'Light'], 3],
 ];
+// The Scene layer's pictures (scene.h; studio.py SCENE_LOOKS — the same order)
+export const SCENE_LOOKS = [['dunes', 'Dunes'], ['lake', 'Lake'], ['coast', 'Coast'], ['night', 'Night'], ['forest', 'Forest'], ['peaks', 'Peaks'], ['confetti', 'Confetti'], ['arcs', 'Arcs']];
 export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK_LOOKS[0];
 // What a live card or a device screen shows (device.h: DV_CPU …)
 export const DEVS = [['cpu', 'Processor'], ['mem', 'Memory'], ['bat', 'Battery'], ['temp', 'Temperature'], ['snd', 'Sound'], ['mot', 'Motion']];
 export const KIND_INDEX = { date: 0, clock: 1, weather: 2, arc: 3, city: 4, wxicon: 5, wxtemp: 6, wxhilo: 7, hourly: 8, dots: 9, title: 10, card: 11, edge: 12, scroll: 13, steps: 14, stars: 15, feels: 17, display: 18, battery: 19, stnum: 20, stcap: 21, stfoot: 22, stchart: 23, curve: 24, stepring: 25, weekarc: 26, infoline: 27, forecast: 28, dateframe: 29, dotclock: 30, music: 31, recorder: 32, snkdots: 33, snkspace: 34, snkiso: 35, batring: 36, parrot: 37, devcard: 38, device: 39, charge: 40, video: 41, shade: 42, sclock: 43, radio: 44,
   rtime: 45, rname: 46, rsong: 47, rbtn: 48, rline: 49, rrays: 50, rplay: 51, rbrowse: 52, rfolder: 53, rvolume: 54,
-  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62, settings: 63, wxapp: 64, stopwatch: 65, timer: 66, world: 67 };
+  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62, settings: 63, wxapp: 64, stopwatch: 65, timer: 66, world: 67, scene: 68 };
 export const WXW = ['wxdigits', 'wxcurve', 'wxbaro', 'wxwear', 'wxbuddy', 'wxpixel', 'wxweek'];  // the weather widgets
 // Their layouts on the 7-inch board (studio.py WXLOOKS — the same names, in the same order: wxwidgets.h p3;
 // web/mockups/weather-widgets-rect.html 1A; 2A, 2B; 3A, 3B; 4A, 4B; 5A, 5B; 6A, 6B; 7A, 7B). A third element true — a
@@ -200,6 +204,8 @@ export const FACE_PRESETS = {
   pDotClock: { name: 'Dot clock', icon: 'dotclock', parts: [['dotclock', {}]] },
   pInfoIcons: { name: 'Weather & steps, icons', icon: 'infoline', parts: [['infoline', { name: 'Weather & steps, icons', format: 'icons', size: 20, weight: 700, color: '#FFF8EE', dy: -32 }]] },
 };
+// The scenes: a piece each (Layers → Scene)
+for (const [look, name] of SCENE_LOOKS) FACE_PRESETS['ps' + look[0].toUpperCase() + look.slice(1)] = { name, icon: 'image', parts: [['scene', { name, look }]] };
 // The clocks of sixteen looks: a piece each (Layers → Clock)
 for (const [look, name, [color, color2, color3]] of CLOCK_LOOKS)
   FACE_PRESETS['pc' + look[0].toUpperCase() + look.slice(1)] = { name, icon: 'clock', parts: [['sclock', { name, look, color, color2, color3 }]] };

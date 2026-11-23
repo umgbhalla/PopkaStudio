@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="466" height="466" viewBox="0 0 466 466">
+  <title>Arcs</title>
+  <!-- All arc centerlines are centered at (233, 233). -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M415.603 292.331A192 192 0 0 1 50.397 292.331" stroke="#5F506C" stroke-width="20"/>
+    <path d="M362.038 307.500A149 149 0 0 1 103.962 307.500" stroke="#9D726D" stroke-width="27"/>
+    <path d="M303.259 311.030A105 105 0 0 1 162.741 311.030" stroke="#D9A984" stroke-width="32"/>
+  </g>
+</svg>

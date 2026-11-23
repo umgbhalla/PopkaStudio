@@ -52,6 +52,7 @@ const P2 = { curve: (l) => CURVE_I.indexOf(l.what), stepring: (l) => l.radius, i
   devcard: (l) => DEV_I.indexOf(l.what), device: (l) => DEV_I.indexOf(l.what),
   shade: (l) => Math.max(0, ['full', 'dual', 'corner', 'strip', 'wear'].indexOf(l.look)),  // (shade_rect.h: its look; the round board's one — shade_round.h)
   sclock: (l) => Math.max(0, CLOCK_LOOKS.findIndex(([k]) => k === l.look)),  // (sclock.h: its look)
+  scene: (l) => Math.max(0, ['dunes', 'lake', 'coast', 'night', 'forest', 'peaks', 'confetti', 'arcs'].indexOf(l.look)),  // (scene.h: which picture)
   rname: (l) => l.span2 ?? l.span ?? 0,  // (the station's top line: its width)
   rbtn: (l) => (l.what === 'volume' ? 1 : 0), rrays: (l) => Math.max(0, ['both', 'left', 'right'].indexOf(l.sides)),  // (radio.h)
   wxdigits: (l) => (l.lines === false ? 1 : 0), wxpixel: (l) => (l.clock === false ? 0 : 1) };  // (wxwidgets.h)

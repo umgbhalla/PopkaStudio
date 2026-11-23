@@ -37,7 +37,7 @@ WRAP="$TMP/PopkaWatch.sketch.cpp"
 # always the computer's zone, so the page shows the board's wall clock
 printf '#include <Arduino.h>\n#include <sys/time.h>\nstatic int st_time_shift;\nstatic inline time_t web_time(time_t *p) { time_t t = (time)(nullptr) + st_time_shift; if (p) *p = t; return t; }\n#define time(p) web_time(p)\n#include "%s"\n#include "%s"\n' "$SKETCH/PopkaWatch.ino" "$ENGINE/studio_api.h" > "$WRAP"
 SRCS=("$ENGINE/halo_web.cpp" "$HALO/halo_draw.cpp" "$HALO/halo_ui.cpp" "$HALO/halo_list.cpp" "$HALO/halo_nav.cpp"
-      "$HALO/halo_roll.cpp" "$SKETCH/src/halo_assets.cpp" "$WRAP")
+      "$HALO/halo_roll.cpp" "$SKETCH/src/halo_assets.cpp" "$SKETCH/src/scenes.cpp" "$WRAP")
 if [ "$FONTS" != round ]; then  # a rectangle's own fonts (gallery_rect.h), beside the template's; a small one's — at its sizes
   mkdir -p "$TMP/rect/assets"
   "$PY" "$ROOT/studio/studio.py" "--$FONTS-conf" "$TMP/rect/assets/halo.conf"

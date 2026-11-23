@@ -118,7 +118,7 @@ KINDS = {"date": 0, "clock": 1, "weather": 2,                                   
          "rtime": 45, "rname": 46, "rsong": 47, "rbtn": 48, "rline": 49, "rrays": 50, "rplay": 51,
          "rbrowse": 52, "rfolder": 53, "rvolume": 54,
          "wxdigits": 55, "wxcurve": 56, "wxbaro": 57, "wxwear": 58, "wxbuddy": 59, "wxpixel": 60, "wxweek": 61,
-         "pomodoro": 62, "settings": 63, "wxapp": 64, "stopwatch": 65, "timer": 66, "world": 67}
+         "pomodoro": 62, "settings": 63, "wxapp": 64, "stopwatch": 65, "timer": 66, "world": 67, "scene": 68}
 # The weather widgets (wxwidgets.h; web/mockups/weather-widgets.html, the variants the user kept on 14 Nov 2026): the
 # round board's; only those a project has go into its firmware (FN_WXW: a bit a widget, from wxdigits)
 WXW = ("wxdigits", "wxcurve", "wxbaro", "wxwear", "wxbuddy", "wxpixel", "wxweek")
@@ -203,7 +203,9 @@ SC_LOOKS = {
                ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA" digits', "wght=760,ROND=100", None)],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
-LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES}  # what a layer's look may be, by its kind
+# The Scene layer's pictures (scene.h; tools/scene_pack.py SCENES — the same order)
+SCENE_LOOKS = ("dunes", "lake", "coast", "night", "forest", "peaks", "confetti", "arcs")
+LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES, "scene": SCENE_LOOKS}  # what a layer's look may be, by its kind
 # The weather widgets' layouts on the 7-inch board (wxwidgets.h: p3 — the index; web/mockups/weather-widgets-rect.html:
 # 1A; 2A, 2B; 3A, 3B; 4A, 4B; 5A, 5B; 6A, 6B; 7A, 7B); the round watch has one and ignores it. The digits' "band" is the
 # WT32-SC01 Plus held wide's own (wt32-widgets.html 1B): the page offers a layout only where the passport's "wxlooks"
@@ -364,6 +366,7 @@ DEFAULTS = {
               "goal": 10000, "pill": True},
     # Stars (projects/Orbit's starry background, stars.h FL_STARS): how many, brightness (scale), twinkling, meteors/min
     "stars": {"name": "Stars", "scale": 1, "count": 90, "twinkle": 1, "meteors": 6, "color": "#C8DCFF"},
+    "scene": {"name": "Scene", "look": "dunes"},
     # Pixel art drawn cell by cell (pixelart.h): Popka, the parrot — its size (scale), the turn (degrees), its notes
     # (sparkles: off, around it, all over the screen)
     "parrot": {"name": "Popka", "scale": 1, "angle": 0, "sparkles": "around"},
@@ -1614,6 +1617,8 @@ def layer_numbers(layer):
         p2 = SHADE_LOOKS.index(layer["look"])
     elif kind == "sclock":  # a clock of sclock.h: its look
         p2 = SC_NAMES.index(layer["look"])
+    elif kind == "scene":  # a flat illustration (scene.h): which one
+        p2 = SCENE_LOOKS.index(layer["look"])
     elif kind == "rname":  # the station's top line: its width (a word that doesn't fit there goes down)
         p2 = layer["span2"]
     elif kind == "rbtn":  # what the Radio's button opens
@@ -1690,7 +1695,10 @@ def write_sketch(project, folder, meta=None):
                      "pixelart.h", "parrot.h", "bt.h", "wxfetch.h", "settings.h", "stepscreen.h", "widgets.h", "widgets_rect.h", "wxwidgets.h",
                      "music.h", "music_sd.h", "player.h", "pomodoro.h", "pomodoro_rect.h", "sound.h", "volume.h", "recorder.h", "radio.h", "radio_net.h", "radio_rect.h", "video.h", "video_hw.h", "video_net.h", "snake.h", "games.h", "game_dots.h",
                      "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
-                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h"):
+                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h", "scene.h"):
+            shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
+        os.makedirs(os.path.join(folder, "src"), exist_ok=True)
+        for name in ("src/scenes.cpp", "src/scenes.h"):  # (the Scene layer's pictures: tools/scene_pack.py)
             shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
     fonts, icons = {}, {}  # spec -> name, (set, scale) -> name
     all_layers = [layer for scr in screens for layer in scr["layers"]]
@@ -1805,6 +1813,8 @@ def write_sketch(project, folder, meta=None):
           f"#define FN_STEPSCR {1 if stscreen else 0}",
           "// Stars (stars.h): only with a Stars layer",
           f"#define FN_STARS {1 if any(layer['type'] == 'stars' for layer in all_layers) else 0}",
+          "// Scene (scene.h): only with a Scene layer",
+          f"#define FN_SCENE {1 if any(layer['type'] == 'scene' for layer in all_layers) else 0}",
           "// Pixel art (pixelart.h): only the pictures added",
           f"#define FN_PARROT {1 if any(layer['type'] == 'parrot' for layer in all_layers) else 0}",
           ]
