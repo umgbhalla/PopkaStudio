@@ -75,7 +75,7 @@
      "dy": 0,
      "tap": null,
      "color": "#FFF8EE",
-     "text": "Gallery"
+     "text": "Apps"
     },
     {
      "id": "card2",
@@ -88,11 +88,98 @@
       "to": "wxappscr",
       "fx": "a16"
      },
-     "color": "#FFB030",
-     "color2": "#2E3034",
+     "color": "#FFC983",
+     "color2": "#352819",
      "text": "Weather",
      "subtitle": "now and hourly",
-     "icon": "sun"
+     "icon": "cloudsun"
+    },
+    {
+     "id": "card4",
+     "type": "card",
+     "name": "Music",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen4",
+      "fx": "a16"
+     },
+     "color": "#E9C8FC",
+     "color2": "#32233A",
+     "text": "Music",
+     "subtitle": "piano classics",
+     "icon": "music"
+    },
+    {
+     "id": "card6",
+     "type": "card",
+     "name": "Radio",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen6",
+      "fx": "a16"
+     },
+     "color": "#A8E9F2",
+     "color2": "#152D35",
+     "text": "Radio",
+     "subtitle": "stations of the world",
+     "icon": "tower"
+    },
+    {
+     "id": "card5",
+     "type": "card",
+     "name": "Recorder",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "tap": {
+      "to": "screen5",
+      "fx": "a16"
+     },
+     "color": "#FFB7AD",
+     "color2": "#362322",
+     "text": "Recorder",
+     "subtitle": "record and play back",
+     "icon": "mic"
+    },
+    {
+     "id": "card_timer",
+     "type": "card",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Timer card",
+     "text": "Timer",
+     "subtitle": "countdown",
+     "icon": "timer",
+     "color": "#D9F28F",
+     "color2": "#242B18",
+     "live": false,
+     "tap": {
+      "to": "tmapp",
+      "fx": "a16"
+     }
+    },
+    {
+     "id": "card_settings",
+     "type": "card",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Settings card",
+     "text": "Settings",
+     "subtitle": "display, time, Wi-Fi",
+     "icon": "gear",
+     "color": "#C9D0FF",
+     "color2": "#262B42",
+     "live": false,
+     "tap": {
+      "to": "settingsapp",
+      "fx": "a16"
+     }
     },
     {
      "id": "card_stopwatch",
@@ -104,29 +191,11 @@
      "text": "Stopwatch",
      "subtitle": "start, laps",
      "icon": "stopwatch",
-     "color": "#A8C7FA",
-     "color2": "#2E3034",
+     "color": "#D9CBFF",
+     "color2": "#29233A",
      "live": false,
      "tap": {
       "to": "swapp",
-      "fx": "a16"
-     }
-    },
-    {
-     "id": "card_timer",
-     "type": "card",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Timer card",
-     "text": "Timer",
-     "subtitle": "countdown",
-     "icon": "hourglass",
-     "color": "#FFB68A",
-     "color2": "#2E3034",
-     "live": false,
-     "tap": {
-      "to": "tmapp",
       "fx": "a16"
      }
     },
@@ -140,64 +209,13 @@
      "text": "World clock",
      "subtitle": "cities",
      "icon": "globe",
-     "color": "#C7BFFF",
-     "color2": "#2E3034",
+     "color": "#F2D2FB",
+     "color2": "#2C2335",
      "live": false,
      "tap": {
       "to": "wcapp",
       "fx": "a16"
      }
-    },
-    {
-     "id": "card6",
-     "type": "card",
-     "name": "Radio",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "tap": {
-      "to": "screen6",
-      "fx": "a16"
-     },
-     "color": "#FF8A3D",
-     "color2": "#2E3034",
-     "text": "Radio",
-     "subtitle": "stations of the world",
-     "icon": "radio"
-    },
-    {
-     "id": "card4",
-     "type": "card",
-     "name": "Music",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "tap": {
-      "to": "screen4",
-      "fx": "a16"
-     },
-     "color": "#F6B5EA",
-     "color2": "#2E3034",
-     "text": "Music",
-     "subtitle": "piano classics",
-     "icon": "music"
-    },
-    {
-     "id": "card5",
-     "type": "card",
-     "name": "Recorder",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "tap": {
-      "to": "screen5",
-      "fx": "a16"
-     },
-     "color": "#F28B82",
-     "color2": "#2E3034",
-     "text": "Recorder",
-     "subtitle": "record and play back",
-     "icon": "mic"
     },
     {
      "id": "card7",
@@ -210,8 +228,8 @@
       "to": "screen7",
       "fx": "a16"
      },
-     "color": "#C3F584",
-     "color2": "#2E3034",
+     "color": "#B7EBD6",
+     "color2": "#172E26",
      "text": "Games",
      "subtitle": "self-playing snakes",
      "icon": "gamepad"
@@ -227,29 +245,11 @@
       "to": "screen13",
       "fx": "a16"
      },
-     "color": "#A8C7FA",
-     "color2": "#2E3034",
+     "color": "#B9D6FF",
+     "color2": "#1E2B3C",
      "text": "About",
      "subtitle": "this watch, live",
-     "icon": "chip"
-    },
-    {
-     "id": "card_settings",
-     "type": "card",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Settings card",
-     "text": "Settings",
-     "subtitle": "display, time, Wi-Fi",
-     "icon": "gear",
-     "color": "#A8C7FA",
-     "color2": "#2E3034",
-     "live": false,
-     "tap": {
-      "to": "settingsapp",
-      "fx": "a16"
-     }
+     "icon": "info"
     },
     {
      "id": "edge1",

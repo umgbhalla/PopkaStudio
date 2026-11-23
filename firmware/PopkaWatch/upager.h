@@ -354,6 +354,42 @@ static void up_draw() {
   for (HaloItem &d : up_dot) halo_item_draw(d);
 }
 
+// ---------- More than one pager at once (the launcher under an app, the quick settings over one) ----------
+// The pager is one set of globals; a screen that keeps its own pager beside the app's swaps its state in around
+// up_open / up_update / up_layout (one task, one after another) — and draws from its own copy with up_draw_of, never by
+// swapping: the bands are drawn on both cores at once
+struct UpState {
+  const UpApp *app = nullptr;
+  UpPage *pg = nullptr;
+  HaloSpring pos = {0, 0, 0};
+  int page = 0;
+  bool drag = false, vis[UP_PAGES] = {};
+  float x0 = 0, g0 = 0;
+  HaloItem track, fill, clock, dot[UP_PAGES];
+};
+static void up_swap(UpState &s) {
+  std::swap(s.app, up_app), std::swap(s.pg, up_pg), std::swap(s.pos, up_pos), std::swap(s.page, up_page);
+  std::swap(s.drag, up_drag), std::swap(s.x0, up_x0), std::swap(s.g0, up_g0);
+  for (int p = 0; p < UP_PAGES; p++) std::swap(s.vis[p], up_vis[p]), std::swap(s.dot[p], up_dot[p]);
+  std::swap(s.track, up_track), std::swap(s.fill, up_fill), std::swap(s.clock, up_clock);
+}
+static void up_draw_of(const UpState &s) {  // (up_draw of a state kept aside)
+  if (!s.app || !s.pg) return;
+  halo_item_draw(s.track), halo_item_draw(s.fill);
+  for (int p = 0; p < UP_PAGES; p++) {
+    if (!s.vis[p]) continue;
+    const UpPage &P = s.pg[p];
+    int k = 0;
+    for (int i = 0; i < P.n; i++) {
+      while (k < P.nb && P.b[k].at == i) up_blob_draw(P.b[k++]);
+      halo_item_draw(P.it[i]);
+    }
+    while (k < P.nb) up_blob_draw(P.b[k++]);
+  }
+  halo_item_draw(s.clock);
+  for (const HaloItem &d : s.dot) halo_item_draw(d);
+}
+
 // ---------- The audit (serial: upcheck) — what overlaps on the page in front, what comes near the rim ----------
 // Every two shown items whose boxes cross by more than 2 px, unless one is the other's ground (on) or holds it whole
 // (a text on its card); every text or shape whose box reaches past r 221 (12 px from the rim). Measured, not eyeballed

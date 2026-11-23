@@ -46,6 +46,21 @@ static bool gal_edge_back(const FaceLayer &layer) {
 static bool gal_apps(const FaceScreen &screen) {
   return nav_scr[0] > 0 && nav_scr[0] < face_scr_n && &screen == &face_scr[nav_scr[0]];
 }
+// The Apps screen (the one a swipe up on the face opens) is the launcher (launcher.h): its cards are pages of round
+// icons, its title the pages' title, the pager's curved time in place of its clock layer; its list, button and scroll
+// indicator are not shown. Its parts are laid out and drawn once, at its first part's place
+static void ln_enter(const FaceScreen &S);
+static void ln_update(const FaceScreen &S, float dt, int depth);
+static void ln_layout(const FaceScreen &S, float a, const HaloView &v);
+static void ln_draw();
+static bool gal_grid(const FaceScreen &S) {
+  return S.gal && gal_apps(S);
+}
+static int gal_first(const FaceScreen &S) {
+  for (int i = 0; i < S.n; i++)
+    if (fl_gallery(S.layers[i].kind) && S.layers[i].kind != FL_EDGE) return i;
+  return -1;
+}
 #endif
 
 struct Press {  // a press of a card (as Wear OS buttons: RoundButton.kt)
@@ -208,6 +223,9 @@ static void gal_build() {
 static void gal_enter(FaceScreen &S) {
   GalRun *g = S.gal;
   if (!g) return;
+#ifdef HALO_ROUND
+  if (gal_grid(S)) return ln_enter(S);
+#endif
   if (g->list.n) halo_list_reset(g->list);
   g->armed = -1, g->tt_k = 1;
   halo_spring_set(g->sc_pos, 0), halo_spring_set(g->sc_vis, 0);
@@ -223,6 +241,7 @@ static void gal_enter(FaceScreen &S) {
 static void gal_update(FaceScreen &S, float dt, int depth) {
   GalRun *g = S.gal;
   if (!g) return;
+  if (gal_grid(S)) return ln_update(S, dt, depth);
   HaloFinger &f = halo_finger;
   HaloList &menu = g->list;
   const bool list = menu.n > 0;
@@ -270,6 +289,11 @@ static int gal_item_of(const GalRun &g, int layer) {
 static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
   const FaceLayer &L = S.layers[i];
   FaceRun &R = S.run[i];
+  if (gal_grid(S)) {  // (the launcher: all of it at its first part)
+    R.box[0] = R.box[1] = 0, R.box[2] = R.box[3] = -1;
+    if (i == gal_first(S)) ln_layout(S, 1, v);
+    return;
+  }
   if (L.kind == FL_DEVCARD) return dc_layout(S, i, a, v);
   HaloItem *it = R.g;
   R.box[0] = R.box[1] = 0, R.box[2] = R.box[3] = -1;
@@ -352,6 +376,9 @@ static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
 #endif
 
 static void gal_draw(const FaceScreen &S, int i) {
+#ifdef HALO_ROUND
+  if (gal_grid(S)) return i == gal_first(S) ? ln_draw() : (void)0;
+#endif
   if (S.layers[i].kind == FL_DEVCARD) return dc_draw(S, i);
   const HaloItem *it = S.run[i].g;
   if (!it) return;

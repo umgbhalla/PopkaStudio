@@ -414,6 +414,8 @@ ICONS = {"chevron": 0xF054, "bell": 0xF0F3, "music": 0xF001, "sun": 0xF185, "gea
          "tv": 0xF26C, "mic": 0xF130, "chip": 0xF2DB, "memory": 0xF538, "thermo": 0xF2C9,
          "reset": 0xF2F1, "plus": 0x002B, "xmark": 0xF00D, "pause": 0xF04C}
 MU_ACCENTS = '"àáâãäåæçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßœŒ’"'  # (muapp.h: Latin letters with accents, as tracks' tags have them)
+         "reset": 0xF2F1, "plus": 0x002B, "xmark": 0xF00D, "pause": 0xF04C,
+         "info": 0xF05A, "tower": 0xF519, "grid": 0xF009, "timer": 0xF252}
 # HaloWatch's fonts of the gallery (its halo.conf: t_title, t24, t20, ic24) — in every PopkaWatch, as gl_*
 GALLERY_FONTS = [
     "font  gl_title  GoogleSansFlex.ttf  34  latin punct \"é\"  @wght=620,wdth=104,ROND=100   # the gallery: titles, stubs",
@@ -474,6 +476,14 @@ GALLERY_FONTS = [
     "font  gl_ra_ic31 fa-solid-900.ttf    31  0xf03a 0xf060   # Recorder: Recordings, Back",
     "font  gl_ra_ic26 fa-solid-900.ttf    26  0xf068 0xf067   # Recorder: the limit's minus, plus",
     "font  gl_ra_ic19 fa-solid-900.ttf    19  0xf04b   # Recorder: a clip's play",
+    # The Apps launcher (launcher.h; design/SPEC_launcher.md): any card's icon at the tiles' 38 px, the names, the
+    # Launcher settings' cuts; the switch's check (the quick settings' too)
+    "font  gl_ln_ic38 fa-solid-900.ttf    38  " + " ".join(f"0x{c:04x}" for c in ICONS.values()) + "   # Apps: the tiles' icons",
+    "font  gl_ln_lab  GoogleSansFlex.ttf  15  latin punct \"é\" @wght=735,wdth=96,ROND=35,opsz=15   # Apps: the tiles' names",
+    "font  gl_ln_kick GoogleSansFlex.ttf  15  \"APP ORDER\" @wght=730,wdth=105,ROND=30,opsz=15   # Launcher: the group's label",
+    "font  gl_ln_row  GoogleSansFlex.ttf  35  \"App labels\" @wght=740,wdth=82,ROND=43,opsz=35   # Launcher: a row's name",
+    "font  gl_ln_opt  GoogleSansFlex.ttf  35  \"ProjectA–Z\" @wght=780,wdth=75,ROND=45,opsz=35   # Launcher: the order's choices",
+    "font  gl_ln_ic15 fa-solid-900.ttf    15  0xf00c   # a switch's check (Launcher, the quick settings)",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
@@ -582,11 +592,16 @@ def is_square(board):
 
 # The round board's apps of its own (shade_round.h): only in a firmware with them; the page's engine — always (build.sh)
 ROUND_APP_FONTS = {
-    # The quick settings panel (Wear OS 6): Font Awesome's wifi, volume-xmark, clock, power-off, lock, volume-high, minus,
-    # plus at the buttons' size; the chip's battery-full and wifi; the battery's percent
-    "shade": ["font  gl_shr_ic30  fa-solid-900.ttf    30  0xf1eb 0xf185 0xf6a9 0xf017 0xf011 0xf023 0xf028   # Shade: the buttons' icons",
-              "font  gl_shr_ic20  fa-solid-900.ttf    20  0xf240 0xf1eb   # Shade: the chip's icons",
-              "font  gl_shr_n18   GoogleSansFlex.ttf  18  digits \"%\" @wght=660,ROND=100   # Shade: the battery's percent"],
+    # The quick settings panel (shade_round.h, qsapp.h; design/SPEC_quick_settings.md): the tiles' and the levels'
+    # values, the settings' headings; Font Awesome's wifi, sun, clock, volume-high, volume-xmark, gear, minus, plus at
+    # 24 px, lock and power-off at 23, the battery's five at 19, the back arrow at 25 (the labels: gl_up_lab)
+    "shade": ["font  gl_qs_val  GoogleSansFlex.ttf  35  \"SyncOfMuted\" digits \"/%\" @wght=820,wdth=98,ROND=48,opsz=35   # Quick settings: a tile's value",
+              "font  gl_qs_lvl  GoogleSansFlex.ttf  35  digits \"/%\" @wght=850,wdth=106,ROND=46,opsz=35   # Quick settings: a level's value",
+              "font  gl_qs_head GoogleSansFlex.ttf  35  \"Open onBattery\" @wght=775,wdth=86,ROND=45,opsz=35   # Shade settings: a card's heading",
+              "font  gl_qs_ic24 fa-solid-900.ttf    24  0xf1eb 0xf185 0xf017 0xf028 0xf6a9 0xf013 0xf068 0xf067   # Quick settings: tiles, steppers",
+              "font  gl_qs_ic23 fa-solid-900.ttf    23  0xf023 0xf011   # Quick settings: Lock, Screen off",
+              "font  gl_qs_ic19 fa-solid-900.ttf    19  0xf240 0xf241 0xf242 0xf243 0xf244   # Quick settings: the battery",
+              "font  gl_qs_ic25 fa-solid-900.ttf    25  0xf060   # Shade settings: back to Controls"],
 }
 RADIO_LETTERS = 'latin cyrillic punct "àáâãäåæçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßœŒšŠžŽłŁńśźżąęćőűĞğİıŞşŢţ’‘€£¥©®™"'
 # Pomodoro (pomodoro.h): the time and the −/+ value, the settings' values; Font Awesome's eye, mug-hot, umbrella-beach,
