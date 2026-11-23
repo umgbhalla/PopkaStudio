@@ -1818,11 +1818,16 @@ def write_sketch(project, folder, meta=None):
         f.write("\n".join(cfg) + "\n")
     # The network picked in the editor: only into the build copy (never firmware/PopkaWatch: it is in git)
     net, pick = os.path.join(folder, "wifi_net.h"), wifi_pick()
+    # (the other saved networks, up to 3 more — HaloClock.h's HCLK_NETS: tried in turn when the main one is not there)
+    more = [(n, pw) for n, pw in sorted(wifi_read()["nets"].items()) if pick and n != pick[0]][:3]
     if os.path.abspath(folder) != os.path.abspath(FIRMWARE) and wifi and pick:
         with open(os.open(net, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
             f.write("// The board's Wi-Fi, picked in PopkaStudio (secrets/wifi.json) — written for this build only.\n"
                     "#pragma once\n"
-                    f"#define PW_WIFI_SSID {c_string(pick[0])}\n#define PW_WIFI_PASS {c_string(pick[1])}\n")
+                    f"#define PW_WIFI_SSID {c_string(pick[0])}\n#define PW_WIFI_PASS {c_string(pick[1])}\n"
+                    # the other saved networks: tried in turn when the main one is not there (HaloClock.h)
+                    + ("#define PW_WIFI_MORE {" + ", ".join("{" + c_string(n) + ", " + c_string(pw) + "}"
+                                                           for n, pw in more) + "}\n" if more else ""))
     elif os.path.exists(net):
         os.remove(net)
     for (iset, scale), name in icons.items():

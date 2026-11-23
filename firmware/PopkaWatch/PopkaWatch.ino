@@ -127,6 +127,10 @@ void setup() {
   });
 #if FN_WIFI
   wx_begin();  // the weather with every Wi-Fi wake (every 30 minutes)
+#ifdef PW_WIFI_MORE  // (the other saved networks: tried in turn when the main one is not there)
+  static const char *const wifi_more[][2] = PW_WIFI_MORE;
+  for (auto &n : wifi_more) halo_clock_network(n[0], n[1]);
+#endif
 #ifdef PW_WIFI_SSID
   halo_clock_begin(TZ, PW_WIFI_SSID, PW_WIFI_PASS);  // Wi-Fi — to learn the time; the editor's network
 #else

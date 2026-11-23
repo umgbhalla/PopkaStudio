@@ -31,6 +31,11 @@ static volatile bool hclk_synced, hclk_scan_req;
 static volatile uint8_t hclk_state;
 static char hclk_tz[48] = "UTC0";
 static const char *hclk_ssid = WIFI_SSID, *hclk_pass = WIFI_PASSWORD;
+// More networks to try (halo_clock_network, before halo_clock_begin): each sync tries the one that worked last first,
+// then the others, ~15 s each — a watch carried between home and office joins whichever is there
+#define HCLK_NETS 4
+static const char *hclk_net_ssid[HCLK_NETS], *hclk_net_pass[HCLK_NETS];
+static int hclk_nets, hclk_good;
 static TaskHandle_t hclk_handle;
 static void (*hclk_online)();         // работа, пока Wi-Fi подключён (halo_clock_online)
 static uint32_t hclk_every = 6 * 3600;  // как часто включать Wi-Fi, когда всё прошло (с)
@@ -76,8 +81,22 @@ static void hclk_sync() {
   halo_stay_awake(true);  // пока Wi-Fi включён, плата не засыпает по-настоящему (halo_sleep): связь оборвалась бы
   LOG("clock: wifi on\n");
   WiFi.mode(WIFI_STA);
-  if (WiFi.status() != WL_CONNECTED)  // (begin on a connected station drops it first: a stream would stop)
-    WiFi.begin(hclk_ssid, hclk_pass);
+  if (WiFi.status() != WL_CONNECTED) {  // (begin on a connected station drops it first: a stream would stop)
+    // The networks in turn, the last good one first; the first that joins is used (and is first next time)
+    for (int k = 0; k < hclk_nets && !hclk_scan_req; k++) {
+      const int i = (hclk_good + k) % hclk_nets;
+      if (k) WiFi.disconnect(false), vTaskDelay(pdMS_TO_TICKS(100));
+      WiFi.begin(hclk_net_ssid[i], hclk_net_pass[i]);
+      const uint32_t t1 = millis();
+      while (WiFi.status() != WL_CONNECTED && !hclk_scan_req && millis() - t1 < (hclk_nets > 1 ? 15000u : 60000u))
+        vTaskDelay(pdMS_TO_TICKS(250));
+      if (WiFi.status() == WL_CONNECTED) {
+        hclk_good = i, hclk_ssid = hclk_net_ssid[i], hclk_pass = hclk_net_pass[i];
+        break;
+      }
+      LOG("wifi: %s not there\n", hclk_net_ssid[i]);
+    }
+  }
   sntp_set_time_sync_notification_cb(hclk_on_sync);
   configTzTime(hclk_tz, "pool.ntp.org", "time.google.com");  // SNTP сам дождётся сети
   const uint32_t t0 = millis();
@@ -128,11 +147,21 @@ static inline void halo_clock_online(void (*fn)(), uint32_t every_s) {
   hclk_online = fn, hclk_every = every_s;
 }
 
+// Another network to try (up to HCLK_NETS with halo_clock_begin's): before halo_clock_begin
+static inline void halo_clock_network(const char *ssid, const char *pass) {
+  if (!ssid || !*ssid || hclk_nets >= HCLK_NETS) return;
+  hclk_net_ssid[hclk_nets] = ssid, hclk_net_pass[hclk_nets] = pass ? pass : "", hclk_nets++;
+}
+
 static inline void halo_clock_begin(const char *tz, const char *ssid = WIFI_SSID, const char *pass = WIFI_PASSWORD) {
   strlcpy(hclk_tz, tz ? tz : "UTC0", sizeof(hclk_tz));
   setenv("TZ", hclk_tz, 1);
   tzset();
   hclk_ssid = ssid ? ssid : "", hclk_pass = pass ? pass : "";
+  if (*hclk_ssid && hclk_nets < HCLK_NETS) {  // (the main one first in the list)
+    for (int i = hclk_nets; i > 0; i--) hclk_net_ssid[i] = hclk_net_ssid[i - 1], hclk_net_pass[i] = hclk_net_pass[i - 1];
+    hclk_net_ssid[0] = hclk_ssid, hclk_net_pass[0] = hclk_pass, hclk_nets++;
+  }
   if (!strlen(hclk_ssid)) LOG("clock: wifi not configured (no network given)\n");
   xTaskCreatePinnedToCore(hclk_task, "clock", hclk_online ? 8192 : 6144, nullptr, 1, &hclk_handle, 0);  // (запрос — глубже)
   halo_command("ntp", [](const char *) { xTaskNotifyGive(hclk_handle); });  // сверить время сейчас
