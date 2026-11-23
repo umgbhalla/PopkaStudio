@@ -1,0 +1,455 @@
+// radioapp.h — the Radio (FL_RADIO) as four non-scrolling pages swiped left and right (upager.h; Codex's measured
+// study, design/SPEC_radio.md — 23 Nov 2026), the round board's:
+//   1 Station — the poster (the monogram between paired level bars, the name, LIVE or READY and the bitrate or the
+//     song), Previous, Play / Pause (the primary: a circle, four soft lobes while it plays), Next;
+//   2 Stations — three rows a view: the dial's stations (the folder the swipes and Previous / Next go through), the
+//     catalog's folders (the folder button) and a folder's stations; ‹ › turn the slice, the count under them;
+//     a tap tunes, a long press is the heart (a favourite); Back (the middle button in a folder) goes one level up;
+//   3 Volume — the speaker's level (volume.h, 0 … 10) on an arc, − and +;
+//   4 Radio settings — Auto-retry (off: a dropped stream stops and the station is Ready again), Track info (the song's
+//     title in place of the bitrate), the catalog (Radio Browser), which is information only.
+// The stations, the favourites, the folders, the stream and the speaker are radio.h's, radio_net.h's and volume.h's —
+// this file only shows them and calls them. The old main screen's parts (FL_RTIME … FL_RPLAY) stay in the editor, hidden
+// on the board (radio.h). Included from PopkaWatch.ino after upager.h.
+#if HAS_RAPP
+extern const HaloFont gl_rpg_title, gl_rpg_tnar, gl_rpg_row, gl_rpg_meta, gl_rpg_mono, gl_rpg_vol, gl_rpg_ic44, gl_rpg_ic32,
+    gl_rpg_ic31, gl_rpg_ic22, gl_rpg_ic20;  // (studio.py ROUND_APP_FONTS["radio"])
+// The design's tokens
+#define RPG_ACC 0xA8E9F2    // accent
+#define RPG_INK 0x142D34    // dark ink on the accent
+#define RPG_PANEL 0x11262D  // the poster, an inset badge, the source card
+#define RPG_CARD 0x152E36   // a card, a secondary button
+#define RPG_CUR 0x244752    // the selected station's card
+#define RPG_RING 0x203940   // the volume's track, a switch off
+#define RPG_WAVE 0x39707D   // the level bars, a disabled slice button
+#define RPG_SOFT 0x86A9B2   // metadata, a switch's thumb off
+#define RPG_IC_PREV "\xEF\x81\x88"
+#define RPG_IC_NEXT "\xEF\x81\x91"
+#define RPG_IC_LEFT "\xEF\x84\x84"
+#define RPG_IC_RIGHT "\xEF\x84\x85"
+#define RPG_IC_FOLDER "\xEF\x81\xBB"
+#define RPG_IC_BACK "\xEF\x81\xA0"
+#define RPG_IC_MINUS "\xEF\x81\xA8"
+#define RPG_IC_PLUS "\xEF\x81\xA7"
+#define RPG_IC_GLOBE "\xEF\x82\xAC"
+#define RPG_SEP "  /  "  // (the design's metadata: two spaces either side of the slash)
+
+// ---------- Text by its ink ----------
+// The ink's left and right edges of s from its pen's start (the design places ink, not advance boxes)
+static void rpg_ink(const HaloFont &f, const char *s, float &l, float &r) {
+  int pen = 0;
+  l = 1e9f, r = -1e9f;
+  for (const char *q = s; *q;) {
+    const HaloMask *g = halo_glyph(f, halo_utf8_next(q));
+    if (!g) continue;
+    if (g->w > 1 || g->h > 1) l = fminf(l, pen + g->ox), r = fmaxf(r, pen + g->ox + g->w);
+    pen += g->adv;
+  }
+  if (l > r) l = r = 0;
+}
+static inline float rpg_ink_w(const HaloFont &f, const char *s) {
+  float l, r;
+  rpg_ink(f, s, l, r);
+  return r - l;
+}
+// A text whose ink is centred on y and, by align, starts at x (0) or is centred on x (1); sc — smaller (a long monogram)
+static HaloItem &rpg_text(UpPage &P, const HaloFont &f, const char *s, float x, float y, int align, uint32_t c, float a,
+                          const HaloView &v, const HaloItem *on = &halo_black, float sc = 1) {
+  float l, r;
+  rpg_ink(f, s, l, r);
+  HaloItem &t = up_item(P);
+  ui_text(t, f, s, halo_text_mid(f, s), align ? x - (l + r) / 2 * sc : x - l * sc, y, sc, 0, c, a, on);
+  t.on_black = on == &halo_black;
+  up_commit(t, v);
+  return t;
+}
+// A round button: its disc, its glyph's ink in the middle
+static void rpg_button(UpPage &P, float x, float y, float r, const char *icon, const HaloFont &f, uint32_t bg, uint32_t fg,
+                       float a, const HaloView &v, float sc = 1) {
+  HaloItem &d = up_disc(P, x, y, r, bg, a, v);
+  rpg_text(P, f, icon, x, y, 1, fg, a, v, &d, sc);
+}
+static inline HaloItem &rpg_card(UpPage &P, float x0, float y0, float x1, float y1, float r, uint32_t c, float a,
+                                 const HaloView &v) {
+  up_rrect(P, x0, y0, x1, y1, r, c, a, v);
+  return P.it[P.n - 1];
+}
+
+// ---------- Names and badges ----------
+// The name shown: "Radio Swiss Classic" → "Swiss Classic" (a leading "Radio " goes when two words or more follow it;
+// "Radio Paradise" stays)
+static const char *rpg_disp(const char *name) {
+  if (!strncasecmp(name, "radio ", 6) && strchr(name + 6, ' ')) return name + 6;
+  return name;
+}
+// A letter's UTF-8 bytes in capitals (Latin and Cyrillic) into o; its length
+static int rpg_upper(const char *p, char *o) {
+  const int n = rd_char_len(p);
+  memcpy(o, p, n);
+  const uint8_t a = o[0], b = n > 1 ? o[1] : 0;
+  if (n == 1 && a >= 'a' && a <= 'z') o[0] = a - 32;
+  else if (n == 2 && a == 0xD0 && b >= 0xB0 && b <= 0xBF) o[1] = b - 0x20;                // а … п
+  else if (n == 2 && a == 0xD1 && b >= 0x80 && b <= 0x8F) o[0] = 0xD0, o[1] = b + 0x20;   // р … я
+  else if (n == 2 && a == 0xD1 && b == 0x91) o[0] = 0xD0, o[1] = 0x81;                     // ё
+  return n;
+}
+// The badge's letters: two words' first ("Radio Paradise" → RP), a short word in capitals itself (FIP, KEXP), else its
+// first two; a two-letter prefix in capitals before two more words is the brand, not the station ("RP Mellow Mix" → MM)
+static void rpg_badge(const char *name, char *out, size_t cap) {
+  const char *w[4];
+  int n = 0;
+  for (const char *p = rpg_disp(name); *p && n < 4;) {
+    while (*p == ' ' || *p == '-' || *p == '_' || *p == '.' || *p == '(') p++;
+    if (!*p) break;
+    w[n++] = p;
+    while (*p && *p != ' ' && *p != '-' && *p != '_' && *p != '.' && *p != '(') p++;
+  }
+  out[0] = 0;
+  if (!n) return (void)strlcpy(out, "R", cap);
+  if (n >= 3 && isupper((uint8_t)w[0][0]) && isupper((uint8_t)w[0][1]) && (w[0][2] == ' ' || w[0][2] == '-')) {
+    for (int k = 0; k < n - 1; k++) w[k] = w[k + 1];
+    n--;
+  }
+  char b[16];
+  int o = 0;
+  if (n == 1) {
+    int len = 0;
+    bool caps = true;
+    for (const char *p = w[0]; *p && *p != ' ' && *p != '-'; p++) caps &= !(*p >= 'a' && *p <= 'z'), len++;
+    const char *p = w[0];
+    for (int k = 0; k < (caps && len <= 4 ? len : 2) && *p && *p != ' ' && o < 12; k++) {
+      o += rpg_upper(p, b + o);
+      p += rd_char_len(p);
+    }
+  } else {
+    o += rpg_upper(w[0], b + o);
+    o += rpg_upper(w[1], b + o);
+  }
+  b[o] = 0;
+  strlcpy(out, b, cap);
+}
+
+// ---------- State ----------
+enum { RPG_DIAL, RPG_FOLDERS, RPG_FOLDER };  // the Stations page's views
+static int rpg_route, rpg_sl_dial, rpg_sl_folders, rpg_sl[RD_FOLDER_N];  // the view; the last slice in each
+static bool rpg_retry = true, rpg_tinfo = true, rpg_prefs_in;
+static float rpg_morph, rpg_m_from;
+static uint32_t rpg_m_at;
+static bool rpg_m_to;
+static int rpg_lp = -1;     // a row held (its index in the view's list): a long press — the heart
+static bool rpg_lp_done;    // … done: the release is not a tap
+static char rpg_name_of[RD_NAME], rpg_name[RD_NAME + 8], rpg_mono[16], rpg_meta[RD_TITLE + 24], rpg_vol_s[4];
+static const HaloFont *rpg_name_f = &gl_rpg_title;
+static char rpg_rn[3][RD_NAME + 8], rpg_rm[3][72], rpg_rb[3][16], rpg_count[12], rpg_title_s[40];
+static Preferences rpg_prefs;
+
+static void rpg_prefs_load() {
+  if (rpg_prefs_in) return;
+  rpg_prefs_in = true;
+  rpg_prefs.begin("radio", false);
+  rpg_retry = rpg_prefs.getBool("retry", true), rpg_tinfo = rpg_prefs.getBool("tinfo", true);  // (a new one: both on)
+  rn_retry = rpg_retry;
+}
+static void rpg_set(bool &pref, const char *key) {
+  pref = !pref;
+  rpg_prefs.putBool(key, pref);
+  rn_retry = rpg_retry;
+}
+
+// The view's list: how many, and row i's station (nullptr — a folder: rpg_route RPG_FOLDERS)
+static int rpg_n() {
+  if (rpg_route == RPG_DIAL) return rd_list_n;
+  if (rpg_route == RPG_FOLDERS) return RD_FOLDER_N;
+  return ru->s_state == 1 ? ru->s_n : 0;
+}
+static const RdSt *rpg_st(int i) {
+  if (rpg_route == RPG_DIAL) return i < rd_list_n ? &rd_list[i] : nullptr;
+  if (rpg_route == RPG_FOLDER) return i < ru->s_n ? &ru->s_rows[i] : nullptr;
+  return nullptr;
+}
+static int &rpg_slice() {
+  return rpg_route == RPG_DIAL ? rpg_sl_dial : rpg_route == RPG_FOLDERS ? rpg_sl_folders : rpg_sl[ru->s_folder % RD_FOLDER_N];
+}
+static int rpg_slices() { return max(1, (rpg_n() + 2) / 3); }
+static inline bool rpg_is_cur(const RdSt &s) { return rd_has_cur && !strcmp(rd_cur.url, s.url); }
+
+// A folder opened (the folders' view): the favourites at once, else the catalog asked (its answer: rpg_take)
+static void rpg_open_folder(int i) {
+  RdUi &u = *ru;
+  u.s_folder = i, u.s_n = 0, u.s_state = 0;
+  const RdFolder &f = RD_FOLDER[i];
+  if (f.kind == RF_FAV) {
+    u.s_n = min(rd_fav_n, RD_RES), u.s_state = 1;
+    memcpy(u.s_rows, rd_fav, u.s_n * sizeof(RdSt));
+  } else {
+    rd_folder_path(f, u.s_path, sizeof(u.s_path));
+    u.s_gen = rn_fetch_gen;
+    rn_fetch(u.s_path, i);
+  }
+  rpg_route = RPG_FOLDER;
+  rpg_sl[i] = constrain(rpg_sl[i], 0, rpg_slices() - 1);
+}
+static void rpg_take() {  // the catalog answered: its stations into the folder's rows
+  RdUi &u = *ru;
+  if (u.s_state != 0 || rn_fetch_gen == u.s_gen || rn_fetch_st == 1) return;
+  u.s_gen = rn_fetch_gen;
+  if (rn_fetch_st == 2) u.s_n = min((int)rn_res_n, RD_RES), memcpy(u.s_rows, rn_res, u.s_n * sizeof(RdSt)), u.s_state = 1;
+  else u.s_state = 2;
+}
+// A station of a folder picked: the folder onto the dial, it plays (the view stays, the row highlighted)
+static void rpg_pick_folder(int i) {
+  RdUi &u = *ru;
+  if (i >= u.s_n) return;
+  rd_folder = u.s_folder;
+  if (RD_FOLDER[rd_folder].kind == RF_FAV) {
+    rd_list_favs();
+    for (int k = 0; k < rd_list_n; k++)
+      if (!strcmp(rd_list[k].url, u.s_rows[i].url)) return rd_tune(k);
+  } else {
+    rd_list_n = u.s_n;
+    memcpy(rd_list, u.s_rows, u.s_n * sizeof(RdSt));
+    rd_tune(i);
+  }
+}
+static void rpg_heart(int i) {  // a long press on a station's row: in the favourites or out (radio.h)
+  const RdSt *s = rpg_st(i);
+  if (!s) return;
+  const RdSt keep = *s;  // (the list may shift under it)
+  rd_fav_toggle(keep);
+  if (rpg_route == RPG_FOLDER && RD_FOLDER[ru->s_folder].kind == RF_FAV) {
+    ru->s_n = min(rd_fav_n, RD_RES);
+    memcpy(ru->s_rows, rd_fav, ru->s_n * sizeof(RdSt));
+  }
+  rpg_slice() = constrain(rpg_slice(), 0, rpg_slices() - 1);
+}
+
+// ---------- 1 Station ----------
+static void rpg_station_strings() {
+  const RdSt *s = rd_has_cur ? &rd_cur : rd_list_n ? &rd_list[0] : nullptr;
+  const char *name = s ? s->name : "Radio";
+  if (strcmp(rpg_name_of, name)) {  // the name: the title's cut, else narrower, else cut with "…" — 272 px of ink
+    strlcpy(rpg_name_of, name, sizeof(rpg_name_of));
+    const char *d = rpg_disp(name);
+    rpg_name_f = &gl_rpg_title;
+    strlcpy(rpg_name, d, sizeof(rpg_name));
+    if (rpg_ink_w(gl_rpg_title, d) > 272) {
+      rpg_name_f = &gl_rpg_tnar;
+      if (rpg_ink_w(gl_rpg_tnar, d) > 272) rd_fit(gl_rpg_tnar, d, 268, rpg_name, sizeof(rpg_name));
+    }
+    rpg_badge(name, rpg_mono, sizeof(rpg_mono));
+  }
+  // LIVE / READY / how it goes, then the song (Track info) or the bitrate
+  const bool on = rd_on && s;
+  const char *st = !on ? "READY" : rn_playing ? "LIVE" : rn_net == RN_NOWIFI ? "NO WI-FI" : rn_net == RN_FAILED ? "RETRYING"
+                 : rn_net == RN_JOINING ? "JOINING WI-FI" : rn_net == RN_STREAMING ? "BUFFERING" : "CONNECTING";
+  char tail[RD_TITLE];
+  tail[0] = 0;
+  if (on && rn_playing && rpg_tinfo) rn_title_copy(tail, sizeof(tail));
+  if (!tail[0] && s) snprintf(tail, sizeof(tail), "%d KBPS", s->kbps);
+  char m[RD_TITLE + 24];
+  if (!s) strlcpy(m, "NO STATIONS", sizeof(m));
+  else snprintf(m, sizeof(m), "%s" RPG_SEP "%s", st, tail);
+  rd_fit(gl_rpg_meta, m, 272, rpg_meta, sizeof(rpg_meta));
+}
+static void rpg_lay_station(UpPage &P, float a, const HaloView &v) {
+  up_title(P, "Radio", a, v);
+  rpg_station_strings();
+  HaloItem &post = rpg_card(P, 79, 132, 387, 289, 35, RPG_PANEL, a, v);
+  // The paired level bars (x 233 ± 108, 92, 76; 5 px, round ends, on y 190): ready — 12 px each; live — the sound's
+  // bands (radio.h's smoothed levels) up to 16, 28, 48 px
+  static const float OFF[3] = {108, 92, 76}, MAX[3] = {16, 28, 48};
+  static const uint8_t BAND[2][3] = {{15, 8, 1}, {17, 10, 3}};
+  const bool live = rd_on && rn_playing;
+  for (int k = 0; k < 3; k++)
+    for (int sd = 0; sd < 2; sd++) {
+      const float len = live ? fmaxf(5, MAX[k] * halo_clamp01(ru->lv[BAND[sd][k]] * 1.15f)) : 12;
+      const float x = CX + (sd ? OFF[k] : -OFF[k]);
+      up_rrect(P, x - 2.5f, 190 - len / 2, x + 2.5f, 190 + len / 2, 2.5f, RPG_WAVE, a, v);
+    }
+  // The monogram (a wide one smaller: 132 px of ink at most — RP's — clear of the inner bars)
+  const float mw = rpg_ink_w(gl_rpg_mono, rpg_mono);
+  rpg_text(P, gl_rpg_mono, rpg_mono, CX, 190, 1, RPG_ACC, a, v, &post, mw > 132 ? 132 / mw : 1);
+  rpg_text(P, *rpg_name_f, rpg_name, CX, 250, 1, UP_WHITE, a, v, &post);
+  rpg_text(P, gl_rpg_meta, rpg_meta, CX, 274, 1, RPG_SOFT, a, v, &post);
+  rpg_button(P, 108, 346, 34, RPG_IC_PREV, gl_rpg_ic32, RPG_CARD, RPG_ACC, a, v);
+  rpg_button(P, 358, 346, 34, RPG_IC_NEXT, gl_rpg_ic32, RPG_CARD, RPG_ACC, a, v);
+  up_primary(P, CX, 354, 55, rpg_morph, rd_on ? UP_IC_PAUSE : UP_IC_PLAY, RPG_ACC, RPG_INK, a, v, &gl_rpg_ic44);
+}
+
+// ---------- 2 Stations ----------
+static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
+  const int n = rpg_n(), cnt = rpg_slices();
+  int &sl = rpg_slice();
+  sl = constrain(sl, 0, cnt - 1);
+  if (rpg_route == RPG_DIAL) up_title(P, "Stations", a, v);
+  else if (rpg_route == RPG_FOLDERS) up_title(P, "Folders", a, v);
+  else strlcpy(rpg_title_s, RD_FOLDER[ru->s_folder].name, sizeof(rpg_title_s)), up_title(P, rpg_title_s, a, v);
+  for (int r = 0; r < 3; r++) {
+    const int i = sl * 3 + r;
+    if (i >= n) continue;
+    const float y = 163 + 68 * r;
+    bool sel;
+    const char *icon = nullptr;
+    char meta[64];
+    if (rpg_route == RPG_FOLDERS) {  // a folder: its icon, its name, what it is
+      const RdFolder &fd = RD_FOLDER[i];
+      sel = i == rd_folder;
+      icon = RD_FIC[fd.icon % 5];
+      rd_fit(gl_rpg_row, fd.name, 244, rpg_rn[r], sizeof(rpg_rn[r]));
+      if (fd.kind == RF_FAV) snprintf(meta, sizeof(meta), "%d STATION%s", rd_fav_n, rd_fav_n == 1 ? "" : "S");
+      else if (fd.kind == RF_TOP) strlcpy(meta, "MOST LISTENED", sizeof(meta));
+      else if (fd.kind == RF_TAG) strlcpy(meta, "GENRE", sizeof(meta));
+      else snprintf(meta, sizeof(meta), "COUNTRY" RPG_SEP "%s", fd.arg);
+      if (sel) {
+        char t[64];
+        snprintf(t, sizeof(t), "ON THE DIAL" RPG_SEP "%s", meta);
+        strlcpy(meta, t, sizeof(meta));
+      }
+    } else {  // a station: its badge, its name, its country and bitrate (selected, or a favourite in a folder)
+      const RdSt &s = *rpg_st(i);
+      sel = rpg_is_cur(s);
+      rpg_badge(s.name, rpg_rb[r], sizeof(rpg_rb[r]));
+      rd_fit(gl_rpg_row, rpg_disp(s.name), 244, rpg_rn[r], sizeof(rpg_rn[r]));
+      const bool fav = rpg_route == RPG_FOLDER && RD_FOLDER[ru->s_folder].kind != RF_FAV && rd_fav_find(s.url) >= 0;
+      snprintf(meta, sizeof(meta), "%s%s%s%d KBPS", sel ? "SELECTED" RPG_SEP : fav ? "FAVORITE" RPG_SEP : "", s.cc,
+               s.cc[0] ? RPG_SEP : "", s.kbps);
+    }
+    rd_fit(gl_rpg_meta, meta, 244, rpg_rm[r], sizeof(rpg_rm[r]));
+    HaloItem &card = rpg_card(P, 66, y - 30, 400, y + 30, 21, sel ? RPG_CUR : RPG_CARD, a, v);
+    HaloItem &badge = up_disc(P, 105, y, 22, sel ? RPG_ACC : RPG_PANEL, a, v);
+    if (icon) rpg_text(P, gl_rpg_ic22, icon, 105, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge, 0.82f);
+    else rpg_text(P, gl_rpg_meta, rpg_rb[r], 105, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge);
+    rpg_text(P, gl_rpg_row, rpg_rn[r], 139, y - 9, 0, UP_WHITE, a, v, &card);
+    rpg_text(P, gl_rpg_meta, rpg_rm[r], 139, y + 15, 0, sel ? RPG_ACC : RPG_SOFT, a, v, &card);
+  }
+  // Empty, loading, failed: a word in the middle of the rows
+  const char *msg = nullptr, *sub = nullptr;
+  if (rpg_route == RPG_FOLDER && ru->s_state == 0) msg = "Loading";
+  else if (rpg_route == RPG_FOLDER && ru->s_state == 2) msg = rn_net == RN_NOWIFI ? "No Wi-Fi" : "No connection", sub = "TAP TO RETRY";
+  else if (!n) msg = rpg_route == RPG_DIAL || RD_FOLDER[ru->s_folder].kind == RF_FAV ? "No favorites yet" : "Nothing here";
+  if (msg) rpg_text(P, gl_rpg_row, msg, CX, sub ? 220 : 231, 1, RPG_SOFT, a, v);
+  if (sub) rpg_text(P, gl_rpg_meta, sub, CX, 252, 1, RPG_ACC, a, v);
+  // ‹ (folder or back) › and the slice count; an arrow at its end is shown, dimmed, and not a target
+  const bool pv = sl > 0, nx = sl < cnt - 1;
+  rpg_button(P, 153, 373, 26, RPG_IC_LEFT, gl_rpg_ic22, pv ? RPG_CARD : RPG_PANEL, pv ? RPG_ACC : RPG_WAVE, a, v);
+  rpg_button(P, CX, 373, 26, rpg_route == RPG_DIAL ? RPG_IC_FOLDER : RPG_IC_BACK, gl_rpg_ic22, RPG_CARD, RPG_ACC, a, v);
+  rpg_button(P, 313, 373, 26, RPG_IC_RIGHT, gl_rpg_ic22, nx ? RPG_CARD : RPG_PANEL, nx ? RPG_ACC : RPG_WAVE, a, v);
+  snprintf(rpg_count, sizeof(rpg_count), "%d / %d", sl + 1, cnt);
+  rpg_text(P, gl_rpg_meta, rpg_count, CX, 415, 1, RPG_SOFT, a, v);
+}
+static int rpg_row_at(float x, float y) {  // the row under (x, y) in the view, or −1
+  const int sl = rpg_slice(), n = rpg_n();
+  for (int r = 0; r < 3; r++) {
+    const float cy = 163 + 68 * r;
+    if (up_in(x, y, 66, cy - 30, 400, cy + 30) && sl * 3 + r < n) return sl * 3 + r;
+  }
+  return -1;
+}
+static void rpg_tap_stations(float x, float y) {
+  int &sl = rpg_slice();
+  const int cnt = rpg_slices();
+  if (up_in(x, y, 127, 347, 179, 399)) return void(sl > 0 ? sl-- : 0);
+  if (up_in(x, y, 287, 347, 339, 399)) return void(sl < cnt - 1 ? sl++ : 0);
+  if (up_in(x, y, 207, 347, 259, 399)) {  // the folders, or back one level (the last view of each kept)
+    rpg_route = rpg_route == RPG_DIAL ? RPG_FOLDERS : rpg_route == RPG_FOLDER ? RPG_FOLDERS : RPG_DIAL;
+    if (rpg_route == RPG_FOLDERS && rpg_sl_folders * 3 > rd_folder + 2) rpg_sl_folders = rd_folder / 3;
+    return;
+  }
+  if (rpg_route == RPG_FOLDER && ru->s_state == 2 && up_in(x, y, 66, 193, 400, 269)) {  // Retry: ask the catalog again
+    ru->s_state = 0, ru->s_gen = rn_fetch_gen;
+    return rn_fetch(ru->s_path, ru->s_folder);
+  }
+  const int i = rpg_row_at(x, y);
+  if (i < 0) return;
+  if (rpg_route == RPG_FOLDERS) rpg_open_folder(i);
+  else if (rpg_route == RPG_DIAL) rd_tune(i);
+  else if (!(rd_on && rpg_is_cur(ru->s_rows[i]))) rpg_pick_folder(i);
+}
+
+// ---------- 3 Volume ----------
+static void rpg_lay_volume(UpPage &P, float a, const HaloView &v) {
+  up_title(P, "Volume", a, v);
+  const float A0 = 41 * HALO_PI / 180, SW = 278 * HALO_PI / 180;
+  up_arc(P, 214, 8, A0, A0 + SW, RPG_RING, a, v);
+  up_arc(P, 214, 8, A0, A0 + SW * vol_level / 10.0f, RPG_ACC, vol_level > 0 ? a : 0, v);
+  snprintf(rpg_vol_s, sizeof(rpg_vol_s), "%d", vol_level * 10);
+  // The value and its % — 8 px between their inks, the pair centred on x 233
+  const float wv = rpg_ink_w(gl_rpg_vol, rpg_vol_s), wu = rpg_ink_w(gl_up_title, "%"), x0 = CX - (wv + 8 + wu) / 2;
+  rpg_text(P, gl_rpg_vol, rpg_vol_s, x0, 209, 0, UP_WHITE, a, v);
+  rpg_text(P, gl_up_title, "%", x0 + wv + 8, 237, 0, RPG_ACC, a, v);
+  rpg_text(P, gl_rpg_meta, "SPEAKER", CX, 278, 1, RPG_SOFT, a, v);
+  rpg_button(P, 160, 348, 42, RPG_IC_MINUS, gl_rpg_ic31, RPG_CARD, RPG_ACC, a, v);
+  rpg_button(P, 306, 348, 42, RPG_IC_PLUS, gl_rpg_ic31, RPG_ACC, RPG_INK, a, v);
+}
+
+// ---------- 4 Radio settings ----------
+static void rpg_lay_settings(UpPage &P, float a, const HaloView &v) {
+  up_title(P, "Radio settings", a, v);
+  static const char *const LAB[2] = {"Auto-retry", "Track info"}, *const SUB[2] = {"Reconnect on drop", "Show song titles"};
+  for (int k = 0; k < 2; k++) {
+    const float y = k ? 242 : 164;
+    const bool on = k ? rpg_tinfo : rpg_retry;
+    HaloItem &card = rpg_card(P, 69, y - 32, 397, y + 32, 23, RPG_CARD, a, v);
+    rpg_text(P, gl_rpg_row, LAB[k], 94, y - 9, 0, UP_WHITE, a, v, &card);
+    rpg_text(P, gl_rpg_meta, SUB[k], 94, y + 15, 0, RPG_SOFT, a, v, &card);
+    up_rrect(P, 312, y - 16, 374, y + 16, 16, on ? RPG_ACC : RPG_RING, a, v);
+    up_disc(P, on ? 357 : 329, y, 11, on ? RPG_INK : RPG_SOFT, a, v);
+  }
+  HaloItem &src = rpg_card(P, 69, 288, 397, 352, 23, RPG_PANEL, a, v);
+  rpg_button(P, 107, 320, 21, RPG_IC_GLOBE, gl_rpg_ic20, RPG_CARD, RPG_ACC, a, v);
+  rpg_text(P, gl_rpg_row, "Radio Browser", 143, 311, 0, UP_WHITE, a, v, &src);
+  rpg_text(P, gl_rpg_meta, "STATION CATALOG", 143, 335, 0, RPG_SOFT, a, v, &src);
+}
+
+// ---------- The app ----------
+static int rpg_count_pages() { return 4; }
+static void rpg_lay(int p, UpPage &P, float a, const HaloView &v) {
+  if (!ru) return;
+  if (p == 0) rpg_lay_station(P, a, v);
+  else if (p == 1) rpg_lay_stations(P, a, v);
+  else if (p == 2) rpg_lay_volume(P, a, v);
+  else rpg_lay_settings(P, a, v);
+}
+static void rpg_tap(int p, float x, float y) {
+  if (!ru) return;
+  if (p == 0) {
+    const int at = rd_at >= 0 ? rd_at : 0;
+    if (up_in(x, y, 74, 312, 142, 380) && rd_list_n) rd_tune(rd_mod(at - 1, rd_list_n));
+    else if (up_in(x, y, 324, 312, 392, 380) && rd_list_n) rd_tune(rd_mod(rd_at >= 0 ? at + 1 : 0, rd_list_n));
+    else if (up_in(x, y, 178, 299, 288, 409)) rd_toggle();
+  } else if (p == 1) {
+    if (!rpg_lp_done) rpg_tap_stations(x, y);
+  } else if (p == 2) {
+    if (up_in(x, y, 118, 306, 202, 390)) vol_set(vol_level - 1, false);
+    else if (up_in(x, y, 264, 306, 348, 390)) vol_set(vol_level + 1, false);
+  } else {
+    if (up_in(x, y, 69, 132, 397, 196)) rpg_set(rpg_retry, "retry");
+    else if (up_in(x, y, 69, 210, 397, 274)) rpg_set(rpg_tinfo, "tinfo");
+  }
+}
+static void rpg_update(int p, float dt) {
+  if (!ru) return;
+  rpg_take();
+  // Play ↔ Pause: the primary's shape over 180 ms, ease-out cubic
+  if (rpg_m_to != rd_on) rpg_m_to = rd_on, rpg_m_from = rpg_morph, rpg_m_at = halo_ms();
+  const float u = halo_clamp01((halo_ms() - rpg_m_at) / 180.0f), e = 1 - (1 - u) * (1 - u) * (1 - u);
+  rpg_morph = rpg_m_from + ((rpg_m_to ? 1 : 0) - rpg_m_from) * e;
+  // A long press on a station's row: the heart (the release then is not a tap)
+  const HaloFinger &f = halo_finger;
+  if (f.pressed) rpg_lp_done = false, rpg_lp = p == 1 && rpg_route != RPG_FOLDERS ? rpg_row_at(f.x0, f.y0) : -1;
+  if (f.dragging || !f.down) rpg_lp = -1;
+  if (rpg_lp >= 0 && halo_ms() - f.t0 > 550) rpg_heart(rpg_lp), rpg_lp = -1, rpg_lp_done = true;
+}
+static const UpApp RPG_APP = {rpg_count_pages, rpg_lay, rpg_tap, rpg_update, nullptr, RPG_ACC};
+
+// The screen (settings.h calls these for FL_RADIO)
+static void rapp_enter() {
+  rpg_prefs_load();
+  if (ru && !rd_has_cur && rd_list_n) rd_cur = rd_list[0], rd_has_cur = true, rd_at = 0;  // (Ready: the dial's first)
+  rpg_m_to = rd_on, rpg_morph = rpg_m_from = rd_on ? 1 : 0;
+  up_open(&RPG_APP);
+}
+static void rapp_update(float dt) { up_update(dt); }
+static void rapp_layout(const HaloView &v) { up_layout(v); }
+static void rapp_draw() { up_draw(); }
+#endif

@@ -46,6 +46,9 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #if HAS_WXAPP
 #include "wxapp.h"    // Weather: one long page on the kit — hero, 12 hours, 7 days, details, location
 #endif
+#if HAS_RAPP
+#include "radioapp.h"  // the Radio as four pages: Station, Stations, Volume, Radio settings (upager.h)
+#endif
 #if HAS_CLOCKS
 #include "clocks.h"   // Stopwatch, Timer, World clock — paged apps (upager.h)
 #endif

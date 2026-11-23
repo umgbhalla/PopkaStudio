@@ -584,7 +584,21 @@ ROUND_APP_FONTS["radio"] = [  # the Radio (radio.h): names and songs from anywhe
     f"font  gl_ra_t24   GoogleSansFlex.ttf  24  {RADIO_LETTERS} @wght=620,wdth=104,ROND=100 +else=Nunito.ttf:700   # Radio: the cards, the time, the button",
     f"font  gl_ra_t20   GoogleSansFlex.ttf  20  {RADIO_LETTERS} @wght=620,wdth=104,ROND=100 +else=Nunito.ttf:700   # Radio: the song, the cards' lines",
     f"font  gl_ra_t14   GoogleSansFlex.ttf  14  {RADIO_LETTERS} @wght=620,wdth=104,ROND=100 +else=Nunito.ttf:700   # Radio: the small words",
-    "font  gl_ra_ic24  fa-solid-900.ttf    24  0xf004 0xf06d 0xf001 0xf0ac 0xf130 0xf04b 0xf04d 0xf0c9 0xf028   # Radio: icons"]
+    "font  gl_ra_ic24  fa-solid-900.ttf    24  0xf004 0xf06d 0xf001 0xf0ac 0xf130 0xf04b 0xf04d 0xf0c9 0xf028   # Radio: icons",
+    # The paged Radio (radioapp.h; Codex's design/SPEC_radio.md, 23 Nov 2026): the station's title (and a narrower cut
+    # for a long one), the rows' names and the settings' labels, the small metadata, the monogram, the volume's value;
+    # Font Awesome at the design's sizes
+    f"font  gl_rpg_title GoogleSansFlex.ttf 35  digits {RADIO_LETTERS} @wght=775,wdth=98,ROND=50,opsz=35 +else=Nunito.ttf:700   # Radio: the station",
+    f"font  gl_rpg_tnar GoogleSansFlex.ttf  35  digits {RADIO_LETTERS} @wght=775,wdth=70,ROND=50,opsz=35 +else=Nunito.ttf:700   # Radio: a long station",
+    f"font  gl_rpg_row  GoogleSansFlex.ttf  35  digits {RADIO_LETTERS} @wght=760,wdth=79,ROND=43,opsz=35 +else=Nunito.ttf:700   # Radio: rows, labels",
+    f"font  gl_rpg_meta GoogleSansFlex.ttf  15  digits {RADIO_LETTERS} @wght=700,wdth=105,ROND=30,opsz=15 +else=Nunito.ttf:700   # Radio: metadata, badges",
+    "font  gl_rpg_mono GoogleSansFlex.ttf  103  digits \"ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ&+\" @wght=900,wdth=96,ROND=60,opsz=103 +else=Nunito.ttf:700   # Radio: the monogram",
+    "font  gl_rpg_vol  GoogleSansFlex.ttf  154  digits @wght=875,wdth=91,ROND=48,opsz=128   # Radio: the volume",
+    "font  gl_rpg_ic44 fa-solid-900.ttf    44  0xf04b 0xf04c   # Radio: play, pause",
+    "font  gl_rpg_ic32 fa-solid-900.ttf    32  0xf048 0xf051   # Radio: previous, next station",
+    "font  gl_rpg_ic31 fa-solid-900.ttf    31  0xf068 0xf067   # Radio: volume minus, plus",
+    "font  gl_rpg_ic22 fa-solid-900.ttf    22  0xf104 0xf105 0xf07b 0xf060 0xf004 0xf06d 0xf001 0xf130 0xf0ac   # Radio: slices, folders, back; the folders' icons",
+    "font  gl_rpg_ic20 fa-solid-900.ttf    20  0xf0ac   # Radio: the catalog's globe"]
 # A rectangle's Radio (radio_rect.h, variant 10 of web/mockups/radio-touch.html — two knobs, as on a radio set): the
 # station, the song and the logos' letters, the names under the scale, the knobs' words, the band keys; Font Awesome's
 # heart, backward-step, forward-step, play, stop
