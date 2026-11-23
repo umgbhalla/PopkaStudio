@@ -151,6 +151,9 @@ export const CLOCK_LOOKS = [
   ['weave', 'Weave', ['#5F7A70', '#3DDC84', '#F1F0F4'], ['Field', 'Pivot', 'Hands'], 0],
   ['words', 'Words', ['#E3E2E6', '#7FCFFF', '#5E5F64'], ['Minutes', 'Hour', null], 2],
   ['bigtype', 'Big type', ['#E8DEF8', '#CDB4FF', '#5E5F64'], ['Hours', 'Minutes', null], 1],
+  ['eyes', 'Eyes', ['#A8C7FA', '#A8C7FA', '#F1F0F4'], ['Field', 'Pivot', 'Hands'], 0],
+  ['plus', 'Plus', ['#FFB68A', '#FFB68A', '#F1F0F4'], ['Field', 'Pivot', 'Hands'], 0],
+  ['rings', 'Rings', ['#D0BCFF', '#D0BCFF', '#F1F0F4'], ['Field', 'Pivot', 'Hands'], 0],
 ];
 export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK_LOOKS[0];
 // What a live card or a device screen shows (device.h: DV_CPU …)

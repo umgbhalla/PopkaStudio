@@ -1266,88 +1266,6 @@
    ]
   },
   {
-   "id": "scene-lake",
-   "name": "Lake",
-   "layers": [
-    {
-     "id": "scene1",
-     "type": "scene",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Lake",
-     "look": "lake"
-    },
-    {
-     "id": "date1",
-     "type": "date",
-     "hidden": false,
-     "dx": 0,
-     "dy": 140,
-     "name": "Date",
-     "size": 24,
-     "weight": 650,
-     "width": 100,
-     "spacing": 1,
-     "color": "#E6E3DE"
-    },
-    {
-     "id": "clock1",
-     "type": "clock",
-     "hidden": false,
-     "dx": 0,
-     "dy": -72,
-     "name": "Clock",
-     "size": 104,
-     "weight": 360,
-     "width": 100,
-     "spacing": -1,
-     "color": "#FFFFFF"
-    }
-   ]
-  },
-  {
-   "id": "scene-coast",
-   "name": "Coast",
-   "layers": [
-    {
-     "id": "scene1",
-     "type": "scene",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Coast",
-     "look": "coast"
-    },
-    {
-     "id": "date1",
-     "type": "date",
-     "hidden": false,
-     "dx": 0,
-     "dy": 140,
-     "name": "Date",
-     "size": 24,
-     "weight": 650,
-     "width": 100,
-     "spacing": 1,
-     "color": "#E6E3DE"
-    },
-    {
-     "id": "clock1",
-     "type": "clock",
-     "hidden": false,
-     "dx": 0,
-     "dy": -72,
-     "name": "Clock",
-     "size": 104,
-     "weight": 360,
-     "width": 100,
-     "spacing": -1,
-     "color": "#FFFFFF"
-    }
-   ]
-  },
-  {
    "id": "scene-night",
    "name": "Night",
    "layers": [
@@ -1389,47 +1307,6 @@
    ]
   },
   {
-   "id": "scene-forest",
-   "name": "Forest",
-   "layers": [
-    {
-     "id": "scene1",
-     "type": "scene",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Forest",
-     "look": "forest"
-    },
-    {
-     "id": "date1",
-     "type": "date",
-     "hidden": false,
-     "dx": 0,
-     "dy": 140,
-     "name": "Date",
-     "size": 24,
-     "weight": 650,
-     "width": 100,
-     "spacing": 1,
-     "color": "#E6E3DE"
-    },
-    {
-     "id": "clock1",
-     "type": "clock",
-     "hidden": false,
-     "dx": 0,
-     "dy": -72,
-     "name": "Clock",
-     "size": 104,
-     "weight": 360,
-     "width": 100,
-     "spacing": -1,
-     "color": "#FFFFFF"
-    }
-   ]
-  },
-  {
    "id": "scene-peaks",
    "name": "Peaks",
    "layers": [
@@ -1441,47 +1318,6 @@
      "dy": 0,
      "name": "Peaks",
      "look": "peaks"
-    },
-    {
-     "id": "date1",
-     "type": "date",
-     "hidden": false,
-     "dx": 0,
-     "dy": 140,
-     "name": "Date",
-     "size": 24,
-     "weight": 650,
-     "width": 100,
-     "spacing": 1,
-     "color": "#E6E3DE"
-    },
-    {
-     "id": "clock1",
-     "type": "clock",
-     "hidden": false,
-     "dx": 0,
-     "dy": -72,
-     "name": "Clock",
-     "size": 104,
-     "weight": 360,
-     "width": 100,
-     "spacing": -1,
-     "color": "#FFFFFF"
-    }
-   ]
-  },
-  {
-   "id": "scene-arcs",
-   "name": "Arcs",
-   "layers": [
-    {
-     "id": "scene1",
-     "type": "scene",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Arcs",
-     "look": "arcs"
     },
     {
      "id": "date1",
@@ -1641,6 +1477,63 @@
      "color": "#E8DEF8",
      "color2": "#CDB4FF",
      "color3": "#5E5F64"
+    }
+   ]
+  },
+  {
+   "id": "lib-eyes",
+   "name": "Eyes",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Eyes",
+     "look": "eyes",
+     "scale": 1,
+     "color": "#A8C7FA",
+     "color2": "#A8C7FA",
+     "color3": "#F1F0F4"
+    }
+   ]
+  },
+  {
+   "id": "lib-plus",
+   "name": "Plus",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Plus",
+     "look": "plus",
+     "scale": 1,
+     "color": "#FFB68A",
+     "color2": "#FFB68A",
+     "color3": "#F1F0F4"
+    }
+   ]
+  },
+  {
+   "id": "lib-rings",
+   "name": "Rings",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Rings",
+     "look": "rings",
+     "scale": 1,
+     "color": "#D0BCFF",
+     "color2": "#D0BCFF",
+     "color3": "#F1F0F4"
     }
    ]
   }

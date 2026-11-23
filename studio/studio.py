@@ -183,18 +183,17 @@ SC_LOOKS = {
     # from one scale by the dial's diameter D = 466: hero ≈ 0.33 D, display ≈ 0.22 D, title ≈ 0.075 D, label ≈ 0.033 D
     # Pilot: the four numerals, the date's day
     "pilot": [("GoogleSansFlex.ttf", 64, 84, '"12369"', "wght=600,ROND=100", None),
-              ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=650,ROND=100", None)],
+              ("GoogleSansFlex.ttf", 32, 42, "digits", "wght=650,ROND=100", None)],
     # Analogue bold: the giant 12 and 6, the values, the labels
     "abold": [("GoogleSansFlex.ttf", 150, 200, '"126"', "wght=820,ROND=100", None),
-              ("GoogleSansFlex.ttf", 32, 42, 'digits "°-"', "wght=650,ROND=100", None),
-              ("GoogleSansFlex.ttf", 15, 20, '"NOWJAFEBMRPYULGSCTVD"', "wght=760,ROND=100", None)],
+              ("GoogleSansFlex.ttf", 38, 50, 'digits "°-"', "wght=680,ROND=100", None)],
     # Concentric: the hour, the ring's numbers, the slot's minutes
     "concentric": [("GoogleSansFlex.ttf", 150, 200, "digits", "wght=700,ROND=100", None),
                    ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=560,ROND=100", None),
                    ("GoogleSansFlex.ttf", 42, 56, "digits", "wght=700,ROND=100", None)],
     # Modular: the time, the gauges' values, the labels and the chip
     "modular": [("GoogleSansFlex.ttf", 104, 140, GSF_DIGITS, "wght=560,ROND=100", None),
-                ("GoogleSansFlex.ttf", 27, 36, 'digits "°%:-"', "wght=650,ROND=100", None),
+                ("GoogleSansFlex.ttf", 30, 40, 'digits "°%:-"', "wght=680,ROND=100", None),
                 ("GoogleSansFlex.ttf", 15, 20, '"NOWSUETBAYMDHFRI" digits', "wght=760,ROND=100", None)],
     # Weave: no text — the field, the hands
     "weave": [],
@@ -203,6 +202,10 @@ SC_LOOKS = {
               ("GoogleSansFlex.ttf", 66, 88, '"abcdefghijklmnopqrstuvwxyz\'"', "wght=340,ROND=100", None)],
     # Big type: the hours over the minutes
     "bigtype": [("GoogleSansFlex.ttf", 176, 240, "digits", "wght=860,ROND=100", None)],
+    # The textures (sclock.h wv_*): no text — the field, the hands
+    "eyes": [],
+    "plus": [],
+    "rings": [],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 # The Scene layer's pictures (scene.h; tools/scene_pack.py SCENES — the same order)

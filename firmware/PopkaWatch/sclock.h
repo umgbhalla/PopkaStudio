@@ -45,6 +45,9 @@
 #define SC_WEAVE 20       // a field of dashes swirling round the minute hand, made again once a minute
 #define SC_WORDS 21       // the time written out: the hour bold, the minutes light
 #define SC_BIGTYPE 22     // the hours over the minutes, heavy, two tones
+#define SC_EYES 23        // texture: dots filling their cells and leaning toward the minute hand's tip
+#define SC_PLUS 24        // texture: pluses growing near the tip
+#define SC_RINGS 25       // texture: concentric rings of blocks lighting up along the minute hand
 #ifdef __EMSCRIPTEN__
 #define SC_ON(n) 1
 #else
@@ -380,21 +383,117 @@ static int dl_hands(ScRun &c, int nc, float ax, float ay, float R, uint32_t ligh
   return nc;
 }
 
-// ---------- Weave's field: its dashes, made once a minute (one Weave on the watch at a time) ----------
-#define WV_MAX 420
-static ScCap *wv;
-static int wv_n, wv_min = -1;
-static float wv_k;
-static uint32_t wv_c;
+// ---------- The textures: a field of one primitive driven by the minute hand's tip ----------
+// (textures.dev's principle — a regular grid of one primitive whose size, offset, angle and ink follow the distance to
+// one point — with the hand's tip as the point: our own fields.) Each field is a list of capsules (a dash, a dot — a
+// capsule of no length —, a plus's two arms, a ring's block); at a new minute every capsule eases from where it was to
+// its new place over WV_EASE ms (the field breathes once a minute), and in between nothing is redrawn. One textured
+// face on the watch at a time
+#define WV_MAX 900
+#define WV_EASE 650.0f
+struct WvEl {
+  float x0, y0, x1, y1, hw, a;
+};
+static WvEl *wv_from, *wv_to;
+static ScCap *wv;  // what is drawn (from → to, eased)
+static int wv_n;
+static uint32_t wv_key, wv_t0;
+static bool wv_moving;
 static bool wv_alloc() {
   if (!wv) {
 #ifdef ESP_PLATFORM
     wv = (ScCap *)heap_caps_calloc(WV_MAX, sizeof(ScCap), MALLOC_CAP_SPIRAM);
+    wv_from = (WvEl *)heap_caps_calloc(WV_MAX, sizeof(WvEl), MALLOC_CAP_SPIRAM);
+    wv_to = (WvEl *)heap_caps_calloc(WV_MAX, sizeof(WvEl), MALLOC_CAP_SPIRAM);
 #else
     wv = (ScCap *)calloc(WV_MAX, sizeof(ScCap));
+    wv_from = (WvEl *)calloc(WV_MAX, sizeof(WvEl)), wv_to = (WvEl *)calloc(WV_MAX, sizeof(WvEl));
 #endif
   }
-  return wv;
+  return wv && wv_from && wv_to;
+}
+static inline void wv_add(int &n, float x0, float y0, float x1, float y1, float hw, float a) {
+  if (n < WV_MAX) wv_to[n++] = {x0, y0, x1, y1, hw, a};
+}
+// The field for a look, the tip at (tx, ty), the hand's angle hd (degrees): into wv_to, its count
+static int wv_field(int look, float ax, float ay, float R, float k, float tx, float ty, float hd) {
+  int n = 0;
+  const float rr = (R - 12 * k) * (R - 12 * k);
+  auto inside = [&](float x, float y) { return (x - ax) * (x - ax) + (y - ay) * (y - ay) <= rr; };
+  if (look == SC_WEAVE) {  // dashes turned round the tip, a swirl; fainter near it
+    const float step = 21 * k, len = 7 * k;
+    for (float y = ay - R + step / 2; y < ay + R; y += step)
+      for (float x = ax - R + step / 2; x < ax + R; x += step) {
+        if (!inside(x, y)) continue;
+        const float qx = x - tx, qy = y - ty, d = sqrtf(qx * qx + qy * qy) + 1;
+        const float an = atan2f(qy, qx) + HALO_PI / 2 + 0.6f * expf(-d / (R * 0.5f));
+        const float ux = cosf(an) * len, uy = sinf(an) * len;
+        wv_add(n, x - ux, y - uy, x + ux, y + uy, 2.2f * k, 0.35f + 0.65f * halo_clamp01((d - R * 0.12f) / (R * 0.5f)));
+      }
+  } else if (look == SC_EYES) {  // dots in cells: small at rest, filling their cells and leaning toward the tip near it
+    const float step = 26 * k, cell = 22 * k;
+    for (float y = ay - R + step / 2; y < ay + R; y += step)
+      for (float x = ax - R + step / 2; x < ax + R; x += step) {
+        if (!inside(x, y)) continue;
+        const float qx = tx - x, qy = ty - y, d = sqrtf(qx * qx + qy * qy) + 0.01f;
+        const float f = powf(halo_clamp01(1 - d / (R * 0.62f)), 1.6f);
+        const float r = 2.2f * k + (cell / 2 - 2.2f * k) * f, room = (cell / 2 - r) * 0.85f * halo_clamp01(f * 3);
+        const float cx = x + qx / d * room, cy = y + qy / d * room;
+        wv_add(n, cx, cy, cx, cy, r, 0.30f + 0.70f * f);
+      }
+  } else if (look == SC_PLUS) {  // pluses: grow near the tip and slide a little toward it
+    const float step = 30 * k;
+    for (float y = ay - R + step / 2; y < ay + R; y += step)
+      for (float x = ax - R + step / 2; x < ax + R; x += step) {
+        if (!inside(x, y)) continue;
+        const float qx = tx - x, qy = ty - y, d = sqrtf(qx * qx + qy * qy) + 0.01f;
+        const float f = powf(halo_clamp01(1 - d / (R * 0.7f)), 1.4f);
+        const float L = 3 * k + 7 * k * f, hw = 1.3f * k + 1.4f * k * f, sl = 5 * k * f;
+        const float cx = x + qx / d * sl, cy = y + qy / d * sl, a = 0.32f + 0.68f * f;
+        wv_add(n, cx - L, cy, cx + L, cy, hw, a), wv_add(n, cx, cy - L, cx, cy + L, hw, a);
+      }
+  } else if (look == SC_RINGS) {  // concentric rings of blocks; along the minute hand they lengthen and light up
+    for (float r = 34 * k; r < R - 14 * k; r += 21 * k) {
+      const int m = max(6, (int)(2 * HALO_PI * r / (22 * k)));
+      for (int j = 0; j < m; j++) {
+        const float an = j * 360.0f / m, da = fmodf(an - hd + 540, 360) - 180;
+        const float g = expf(-(da / 34) * (da / 34));
+        const float half = (2.6f + 4.6f * g) * k / r * (180 / HALO_PI);  // (the block's half length as an angle)
+        float x0, y0, x1, y1;
+        dl_at(ax, ay, an - half, r, x0, y0), dl_at(ax, ay, an + half, r, x1, y1);
+        wv_add(n, x0, y0, x1, y1, (1.6f + 1.4f * g) * k, 0.28f + 0.72f * g);
+      }
+    }
+  }
+  return n;
+}
+// Each frame (layout): a new minute (or look, size, colour) — a new field, eased in from the one shown; returns whether
+// it is still moving (the circle is drawn again then)
+static void wv_update(int look, float ax, float ay, float R, float k, uint32_t col) {
+  if (!wv_alloc()) return;
+  const uint32_t key = (uint32_t)look * 2654435761u ^ (uint32_t)(sc_tm.tm_hour * 60 + sc_tm.tm_min) * 40503u ^
+                       (uint32_t)(k * 1000) ^ col * 31u ^ (uint32_t)(ax * 7 + ay * 13);
+  if (key != wv_key) {
+    const bool same_look = wv_n > 0 && (wv_key >> 0) != 0 && wv_from;
+    float tx, ty;
+    const float hd = (sc_tm.tm_min + sc_sec / 60) * 6;
+    dl_at(ax, ay, hd, R * 0.55f, tx, ty);
+    const int n = wv_field(look, ax, ay, R, k, tx, ty, hd);
+    for (int i = 0; i < n; i++)  // (from: what is shown now — or, a new field of another size, itself)
+      wv_from[i] = same_look && n == wv_n ? WvEl{wv[i].x0, wv[i].y0, wv[i].x1, wv[i].y1, wv[i].hw, wv[i].a} : wv_to[i];
+    wv_n = n, wv_key = key, wv_t0 = halo_ms(), wv_moving = true;
+    for (int i = 0; i < n; i++) wv[i].c = col;
+  }
+  if (!wv_moving) return;
+  const float t = halo_clamp01((halo_ms() - wv_t0) / WV_EASE), e = 1 - (1 - t) * (1 - t) * (1 - t);
+  for (int i = 0; i < wv_n; i++) {
+    const WvEl &a = wv_from[i], &b = wv_to[i];
+    ScCap &c = wv[i];
+    c.x0 = a.x0 + (b.x0 - a.x0) * e, c.y0 = a.y0 + (b.y0 - a.y0) * e, c.x1 = a.x1 + (b.x1 - a.x1) * e;
+    c.y1 = a.y1 + (b.y1 - a.y1) * e, c.hw = a.hw + (b.hw - a.hw) * e, c.a = a.a + (b.a - a.a) * e;
+  }
+  halo_damage_f(ax - R, ay - R, ax + R, ay + R);
+  if (t >= 1) wv_moving = false;
 }
 
 // ---------- Built once a change (face_layer_build) ----------
@@ -548,6 +647,9 @@ static void sc_layer_build(const FaceScreen &S, int i) {
     case SC_CONCENTRIC:
     case SC_MODULAR:
     case SC_WEAVE:
+    case SC_EYES:
+    case SC_PLUS:
+    case SC_RINGS:
     case SC_BIGTYPE:
       c->g[0] = sc_mid(L.font), c->g[1] = sc_mid(L.font2), c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI0123");
       break;
@@ -599,6 +701,9 @@ static void sc_texts(const FaceLayer &L, FaceRun &R, bool animate) {
       case SC_CONCENTRIC:
       case SC_MODULAR:
       case SC_WEAVE:
+      case SC_EYES:
+      case SC_PLUS:
+      case SC_RINGS:
       case SC_WORDS:
       case SC_BIGTYPE:
         break;
@@ -1078,7 +1183,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
         dl_text(c.it[n++], L.font, NUM[q], x, y, c.g[0], 1, light, a, v, &halo_black);
       }
       snprintf(c.txt[0], 8, "%d", sc_tm.tm_mday);
-      const float dx = ax + R * 0.50f, dw = R * 0.24f, dh = R * 0.17f;
+      const float dx = ax + R * 0.50f, dw = R * 0.31f, dh = R * 0.22f;  // (the date reads at a glance)
       sc_rrect(c.it[n++], dx, ay, dw, dh, R * 0.035f, acc, a, v);
       sc_rrect(c.it[n++], dx, ay, dw - 5 * k, dh - 5 * k, R * 0.025f, 0x000000, a, v);
       dl_text(c.it[n++], L.font2, c.txt[0], dx, ay, c.g[1], 1, light, a, v, &c.it[n - 1]);
@@ -1109,10 +1214,9 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       else snprintf(c.txt[0], 8, "%d\xC2\xB0", (int)w.now);
       strlcpy(c.txt[1], MONTH[sc_tm.tm_mon % 12], 8), snprintf(c.txt[2], 8, "%d", sc_tm.tm_mday);
       const float lx = ax - R * 0.60f, rx = ax + R * 0.60f;
-      dl_text(c.it[n++], L.font2, c.txt[0], lx, ay - cr * 0.12f, c.g[1], 1, light, a, v, disc[0]);
-      dl_text(c.it[n++], L.font3, "NOW", lx, ay + cr * 0.48f, c.g[2], 1, acc, a, v, disc[0], DL_TRACK);
-      dl_text(c.it[n++], L.font3, c.txt[1], rx, ay - cr * 0.42f, c.g[2], 1, acc, a, v, disc[1], DL_TRACK);
-      dl_text(c.it[n++], L.font2, c.txt[2], rx, ay + cr * 0.18f, c.g[1], 1, light, a, v, disc[1]);
+      // (one value a disc, nothing else: the weather now, the day — the user's rule, 23 Nov 2026)
+      dl_text(c.it[n++], L.font2, c.txt[0], lx, ay, c.g[1], 1, light, a, v, disc[0]);
+      dl_text(c.it[n++], L.font2, c.txt[2], rx, ay, c.g[1], 1, acc, a, v, disc[1]);
       sc_ob = false;
       const int dial = n;
       int nc = dl_hands(c, 0, ax, ay, R, light, 0x000000, acc, R * 0.50f, R * 0.86f, a, sa, v, 0, false);
@@ -1197,15 +1301,13 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       }
 #endif
       snprintf(c.txt[4], 8, "%d", pct);  // (the label says what it is: no % — 100 fits the disc)
-      static const char *const LAB[3] = {"NOW", "SUNSET", "BATTERY"};
       const uint32_t hue[3] = {L.color2, sc_mix(L.color2, 0xFFD580, 0.7f), 0xA4F9B5};
       const float gx[3] = {ax - R * 0.50f, ax, ax + R * 0.50f}, gy[3] = {ay + R * 0.30f, ay + R * 0.60f, ay + R * 0.30f};
       for (int g = 0; g < 3; g++) {
         HaloItem &disc = c.it[n++];
         sc_circle(disc, gx[g], gy[g], gr, 0x1B1C1F, a, v);
         dl_ring(c.it[n++], gx[g], gy[g], gr - 4 * k, 6 * k, fr[g], hue[g], 0x303238, a, v);
-        dl_text(c.it[n++], L.font2, c.txt[2 + g], gx[g], gy[g] - gr * 0.10f, c.g[1], 1, L.color, a, v, &disc);
-        dl_text(c.it[n++], L.font3, LAB[g], gx[g], gy[g] + gr * 0.42f, c.g[2], 1, hue[g], a, v, &disc, 1);
+        dl_text(c.it[n++], L.font2, c.txt[2 + g], gx[g], gy[g], c.g[1], 1, L.color, a, v, &disc);  // (one value: no label)
       }
       c.ncap = 0, c.d[10] = n, c.d[11] = 0;
       sc_hide_caps(c, 0);
@@ -1213,32 +1315,15 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       break;
     }
 #endif
-#if SC_ON(SC_WEAVE)
-    case SC_WEAVE: {
-      // Weave (our own): a field of short dashes over the whole dial, each turned round the minute hand's tip — a
-      // current flowing about the hand — and fainter near it, so the hand reads; the field is made again once a minute
-      // (the hands move only then), so it costs nothing in between. color — the dashes; color2 — the pivot; color3 —
-      // the hands
+#if SC_ON(SC_WEAVE) || SC_ON(SC_EYES) || SC_ON(SC_PLUS) || SC_ON(SC_RINGS)
+    case SC_WEAVE:
+    case SC_EYES:
+    case SC_PLUS:
+    case SC_RINGS: {
+      // The textures (wv_*): a field driven by the minute hand's tip, eased once a minute; the hands on top.
+      // color — the field; color2 — the pivot; color3 — the hands
       const float R = 228 * k;
-      if (wv_alloc() && (wv_min != sc_tm.tm_min + sc_tm.tm_hour * 60 || wv_k != k || wv_c != L.color)) {
-        wv_min = sc_tm.tm_min + sc_tm.tm_hour * 60, wv_k = k, wv_c = L.color;
-        float tx, ty;
-        dl_at(ax, ay, sc_tm.tm_min * 6, R * 0.55f, tx, ty);
-        wv_n = 0;
-        const float step = 21 * k, len = 7 * k;
-        for (float y = ay - R + step / 2; y < ay + R; y += step)
-          for (float x = ax - R + step / 2; x < ax + R; x += step) {
-            const float dx = x - ax, dy = y - ay;
-            if (dx * dx + dy * dy > (R - 10 * k) * (R - 10 * k) || wv_n >= WV_MAX) continue;
-            const float qx = x - tx, qy = y - ty, d = sqrtf(qx * qx + qy * qy) + 1;
-            const float an = atan2f(qy, qx) + HALO_PI / 2 + 0.6f * expf(-d / (R * 0.5f));  // (round the tip, a swirl)
-            const float ux = cosf(an) * len, uy = sinf(an) * len;
-            ScCap &s = wv[wv_n++];
-            s.x0 = x - ux, s.y0 = y - uy, s.x1 = x + ux, s.y1 = y + uy, s.hw = 2.2f * k, s.c = L.color;
-            s.a = 0.35f + 0.65f * halo_clamp01((d - R * 0.12f) / (R * 0.5f));
-          }
-        halo_damage_f(ax - R, ay - R, ax + R, ay + R);
-      }
+      wv_update(look, ax, ay, R, k, L.color);
       c.d[12] = a;
       sc_ob = false;
       const int dial = n;
@@ -1622,9 +1707,12 @@ static void sc_draw(const FaceScreen &S, int i) {
     case SC_MODULAR:
     case SC_WEAVE:
     case SC_WORDS:
+    case SC_EYES:
+    case SC_PLUS:
+    case SC_RINGS:
     case SC_BIGTYPE: {  // the dial's items, its ticks, the complications, the hands (dl_*: the order); Weave — its field first
-#if SC_ON(SC_WEAVE)
-      if ((int)L.p2 == SC_WEAVE && wv && c.d[12] > 0.004f)
+#if SC_ON(SC_WEAVE) || SC_ON(SC_EYES) || SC_ON(SC_PLUS) || SC_ON(SC_RINGS)
+      if (((int)L.p2 == SC_WEAVE || (int)L.p2 >= SC_EYES) && wv && c.d[12] > 0.004f)
         for (int j = 0; j < wv_n; j++) {
           ScCap d = wv[j];
           d.a *= c.d[12];
