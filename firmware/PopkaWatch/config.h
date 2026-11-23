@@ -7,7 +7,7 @@
 #define TZ "IST-5:30"  // Kolkata
 #define CLOCK_24H 1
 // The clocks of sixteen looks (sclock.h): a bit a look the project has (none — not in the firmware)
-#define FN_SCLOCK 0x3FF0000
+#define FN_SCLOCK 0x1FF0000
 #define FN_WXAPP 1  // the Weather app (wxapp.h)
 #define FN_CLOCKS 1  // the clock apps (clocks.h)
 // The weather widgets (wxwidgets.h): a bit a widget the project has, from wxdigits (none — not in the firmware)

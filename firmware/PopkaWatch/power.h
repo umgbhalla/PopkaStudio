@@ -78,6 +78,7 @@ static int pw_lock_btn;       // what locked: 0 — palm, 1 — BOOT or shade, 2
 static uint32_t pw_lock_ms;   // locked then: a long press of that same press does not unlock
 static HaloSpring pw_shift_amount = {1, 0, 1};  // 0 during lock and its wake-up, 1 for regular Always On
 static volatile bool pw_cmd_sleep, pw_cmd_wake;
+static volatile bool pw_debug;  // debug on: never idle into Always On or dark, no palm lock (testing; not kept)
 static volatile int pw_aod_on = FN_AOD, pw_idle_s = FN_AOD_IDLE, pw_aod_level = FN_AOD_BRIGHT, pw_aod_home = FN_AOD_HOME;
 static volatile int pw_aod_shift = FN_AOD_SHIFT;
 static volatile int pw_boot = FN_BOOT, pw_pwr = FN_PWR;
@@ -258,7 +259,7 @@ static void power_tick(float dt) {
 #endif
   const bool boot_held = halo_boot_long();
 #ifdef HALO_ROUND
-  if (halo_take_palm() && pw_palm_lock && !pw_locked) {
+  if (halo_take_palm() && pw_palm_lock && !pw_locked && !pw_debug) {
     halo_finger = {};
     pw_lock_set(true, 0);
     pw_locked_display(false);
@@ -285,7 +286,7 @@ static void power_tick(float dt) {
 #endif
   switch (pw_mode) {
     case PW_ACTIVE:
-      if (!pw_locked && (pw_cmd_sleep || (pw_aod_on && pw_idle_s && now - pw_active_us > pw_idle_s * 1000000ll)) &&
+      if (!pw_locked && (pw_cmd_sleep || (!pw_debug && pw_aod_on && pw_idle_s && now - pw_active_us > pw_idle_s * 1000000ll)) &&
           (pw_amb.x == 0 || pw_aod_way))
         pw_fade(true);
       break;
@@ -384,6 +385,12 @@ static void power_build() {  // after halo_begin: the motion sensor is on its I2
     else if (!strncmp(a, "home", 4)) pw_aod_home = !strstr(a, "off"), LOG("aod: back to face %s\n", pw_aod_home ? "on" : "off");
     else if (!strncmp(a, "shift", 5)) pw_aod_shift = !strstr(a, "off"), LOG("aod: burn-in shift %s\n", pw_aod_shift ? "on" : "off");
     else pw_aod_on = strcmp(a, "off") != 0, LOG("aod: %s\n", pw_aod_on ? "on" : "off");
+  });
+  // debug on | off — for testing over USB: the screen stays awake (no idle fade, no palm lock) until debug off or a
+  // restart; the settings are untouched
+  halo_command("debug", [](const char *a) {
+    pw_debug = strcmp(a, "off") != 0, pw_active_us = esp_timer_get_time();
+    LOG("debug: %s\n", pw_debug ? "on — the screen stays awake" : "off");
   });
   halo_command("idle", [](const char *a) { pw_idle_s = max(0, atoi(a)), LOG("idle: %d s\n", pw_idle_s); });
   halo_command("sleep", [](const char *) { pw_cmd_sleep = true; });

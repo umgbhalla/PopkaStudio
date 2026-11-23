@@ -4,10 +4,10 @@
 // screen (-1 — no link) with the transition, the radius of the clock along the top edge; the gallery's text.
 #pragma once
 
-#define SCREEN_N 39
+#define SCREEN_N 38
 #define MAIN_SCREEN 1 // the gallery: a swipe up on the face (-1 — none)
-#define FACE_N 14 // the watch faces a swipe from the side edge switches (face.h)
-static const int8_t FACE_LIST[FACE_N] = {0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38};
+#define FACE_N 13 // the watch faces a swipe from the side edge switches (face.h)
+static const int8_t FACE_LIST[FACE_N] = {0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37};
 // The Functions (power.h): Always On when idle, after idle s, the panel in it (of 255); BOOT and PWR: 0 — nothing,
 // 1 — screen off, 2 — lock, 3 — Always On, 4 — home
 #define FN_AOD 1
@@ -55,7 +55,7 @@ static const int8_t FACE_LIST[FACE_N] = {0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 
 #define FN_PARROT 0
 static const HaloImage *const icons0[4] = {&icons0_partly, &icons0_sun, &icons0_cloud, &icons0_rain};
 // Live (live.h): what this firmware has, for the editor's Live to check its project against
-#define LIVE_SHAPE "d7ce9f44"
+#define LIVE_SHAPE "86021184"
 #define LIVE_MAP "face=date1:0:6145,clock1:1:858e,weather1:2:0fd8,shade1:42:7add;gallery1=title1:10:bd81,card2:11:d5c2,card_stopwatch:11:bdc4,card_timer:11:cde2,card_world:11:b83f,card6:11:2d8b,card4:11:4b67,card5:11:9bd7,card7:11:3005,card13:11:1526,card_settings:11:b7ce,edge1:12:d862,arc1:3:edbe,scroll1:13:4ba8;wxappscr=wxapp1:64:01fe;screen4=music1:31:5219;screen5=recorder1:32:ceef;screen6=radio1:44:a6cb,rrays1:50:9f48,rtime1:45:0cb5,rname1:46:406f,rsong1:47:1352,rbtn1:48:ca11,rline1:49:06f2,rbtn2:48:f426,rplay1:51:3cd8;rbrowse1=rbrowse2:52:7753;rfolder1=rfolder2:53:af87;rvolume1=rvolume2:54:1e2d;screen7=title2:10:15ae,card8:11:dbc4,card9:11:c927,card10:11:943d,edge2:12:3c1f,arc4:3:edbe,scroll1:13:4ba8;screen8=snkdots1:33:049b;screen9=snkspace1:34:377b;screen10=snkiso1:35:ea32;screen11=display1:18:2999;screen12=battery1:19:0326;screen13=title3:10:83a4,devcard1:38:81d7,devcard2:38:1d1a,devcard3:38:12d9,devcard4:38:8a24,devcard5:38:79b1,devcard6:38:3367,scroll1:13:4ba8,arc11:3:edbe;screen14=arc5:3:edbe,device1:39:8c78;screen15=arc6:3:edbe,device2:39:8c78;screen16=arc7:3:edbe,charge1:40:b88b;screen17=arc8:3:edbe,device3:39:8c78;screen18=arc9:3:edbe,device4:39:8c78;screen19=arc10:3:edbe,device5:39:8c78;settingsapp=settings1:63:b7b2;swapp=stopwatch1:65:4a42;tmapp=timer1:66:c436;wcapp=world1:67:3fcc"
 
 // HaloWatch — the home
@@ -300,47 +300,41 @@ static FaceLayer screen31_layers[] = {
 };
 static FaceRun (&screen31_run)[1] = face_runs<1>();
 
-// Modular
+// Weave
 static FaceLayer screen32_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xF1F0F4, 0xFFB68A, 0, &font18, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xC4C7C5, &font19, 19.0f, 0.0f, &font20, &font21},  // Modular
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0x5F7A70, 0x3DDC84, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 19.0f, 0.0f, nullptr, nullptr},  // Weave
 };
 static FaceRun (&screen32_run)[1] = face_runs<1>();
 
-// Weave
+// Words
 static FaceLayer screen33_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0x5F7A70, 0x3DDC84, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 20.0f, 0.0f, nullptr, nullptr},  // Weave
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE3E2E6, 0x7FCFFF, 0, &font18, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, &font19, 20.0f, 0.0f, nullptr, nullptr},  // Words
 };
 static FaceRun (&screen33_run)[1] = face_runs<1>();
 
-// Words
+// Big type
 static FaceLayer screen34_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE3E2E6, 0x7FCFFF, 0, &font22, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, &font23, 21.0f, 0.0f, nullptr, nullptr},  // Words
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE8DEF8, 0xCDB4FF, 0, &font20, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, nullptr, 21.0f, 0.0f, nullptr, nullptr},  // Big type
 };
 static FaceRun (&screen34_run)[1] = face_runs<1>();
 
-// Big type
+// Eyes
 static FaceLayer screen35_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE8DEF8, 0xCDB4FF, 0, &font24, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, nullptr, 22.0f, 0.0f, nullptr, nullptr},  // Big type
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0xA8C7FA, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 22.0f, 0.0f, nullptr, nullptr},  // Eyes
 };
 static FaceRun (&screen35_run)[1] = face_runs<1>();
 
-// Eyes
+// Plus
 static FaceLayer screen36_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xA8C7FA, 0xA8C7FA, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 23.0f, 0.0f, nullptr, nullptr},  // Eyes
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xFFB68A, 0xFFB68A, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 23.0f, 0.0f, nullptr, nullptr},  // Plus
 };
 static FaceRun (&screen36_run)[1] = face_runs<1>();
 
-// Plus
+// Rings
 static FaceLayer screen37_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xFFB68A, 0xFFB68A, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 24.0f, 0.0f, nullptr, nullptr},  // Plus
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xD0BCFF, 0xD0BCFF, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 24.0f, 0.0f, nullptr, nullptr},  // Rings
 };
 static FaceRun (&screen37_run)[1] = face_runs<1>();
-
-// Rings
-static FaceLayer screen38_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xD0BCFF, 0xD0BCFF, 0, nullptr, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xF1F0F4, nullptr, 25.0f, 0.0f, nullptr, nullptr},  // Rings
-};
-static FaceRun (&screen38_run)[1] = face_runs<1>();
 
 static FaceScreen screens[SCREEN_N] = {
     {screen0_layers, screen0_run, 4, "HaloWatch"},  // HaloWatch
@@ -375,11 +369,10 @@ static FaceScreen screens[SCREEN_N] = {
     {screen29_layers, screen29_run, 1, "Pilot"},  // Pilot
     {screen30_layers, screen30_run, 1, "Analogue bold"},  // Analogue bold
     {screen31_layers, screen31_run, 1, "Concentric"},  // Concentric
-    {screen32_layers, screen32_run, 1, "Modular"},  // Modular
-    {screen33_layers, screen33_run, 1, "Weave"},  // Weave
-    {screen34_layers, screen34_run, 1, "Words"},  // Words
-    {screen35_layers, screen35_run, 1, "Big type"},  // Big type
-    {screen36_layers, screen36_run, 1, "Eyes"},  // Eyes
-    {screen37_layers, screen37_run, 1, "Plus"},  // Plus
-    {screen38_layers, screen38_run, 1, "Rings"},  // Rings
+    {screen32_layers, screen32_run, 1, "Weave"},  // Weave
+    {screen33_layers, screen33_run, 1, "Words"},  // Words
+    {screen34_layers, screen34_run, 1, "Big type"},  // Big type
+    {screen35_layers, screen35_run, 1, "Eyes"},  // Eyes
+    {screen36_layers, screen36_run, 1, "Plus"},  // Plus
+    {screen37_layers, screen37_run, 1, "Rings"},  // Rings
 };

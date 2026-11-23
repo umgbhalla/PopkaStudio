@@ -1405,25 +1405,6 @@
    ]
   },
   {
-   "id": "lib-modular",
-   "name": "Modular",
-   "layers": [
-    {
-     "id": "sclock1",
-     "type": "sclock",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Modular",
-     "look": "modular",
-     "scale": 1,
-     "color": "#F1F0F4",
-     "color2": "#FFB68A",
-     "color3": "#C4C7C5"
-    }
-   ]
-  },
-  {
    "id": "lib-weave",
    "name": "Weave",
    "layers": [

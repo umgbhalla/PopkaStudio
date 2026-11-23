@@ -41,13 +41,12 @@
 #define SC_PILOT 16       // four big numerals, a minute track, a framed date, a hollow hour hand (Pixel Pilot's family)
 #define SC_ABOLD 17       // two giant numerals (12, 6), weather and date discs at 9 and 3, solid hands
 #define SC_CONCENTRIC 18  // a ring of minutes turning so the minute sits in a slot at 3, the hour big in the middle
-#define SC_MODULAR 19     // weekday chip, the time, three gauges: weather, sunset, battery (no fitness)
-#define SC_WEAVE 20       // a field of dashes swirling round the minute hand, made again once a minute
-#define SC_WORDS 21       // the time written out: the hour bold, the minutes light
-#define SC_BIGTYPE 22     // the hours over the minutes, heavy, two tones
-#define SC_EYES 23        // texture: dots filling their cells and leaning toward the minute hand's tip
-#define SC_PLUS 24        // texture: pluses growing near the tip
-#define SC_RINGS 25       // texture: concentric rings of blocks lighting up along the minute hand
+#define SC_WEAVE 19       // a field of dashes swirling round the minute hand, made again once a minute
+#define SC_WORDS 20       // the time written out: the hour bold, the minutes light
+#define SC_BIGTYPE 21     // the hours over the minutes, heavy, two tones
+#define SC_EYES 22        // texture: dots filling their cells and leaning toward the minute hand's tip
+#define SC_PLUS 23        // texture: pluses growing near the tip
+#define SC_RINGS 24       // texture: concentric rings of blocks lighting up along the minute hand
 #ifdef __EMSCRIPTEN__
 #define SC_ON(n) 1
 #else
@@ -418,7 +417,7 @@ static inline void wv_add(int &n, float x0, float y0, float x1, float y1, float 
 // The field for a look, the tip at (tx, ty), the hand's angle hd (degrees): into wv_to, its count
 static int wv_field(int look, float ax, float ay, float R, float k, float tx, float ty, float hd) {
   int n = 0;
-  const float rr = (R - 12 * k) * (R - 12 * k);
+  const float rr = (R - 6 * k) * (R - 6 * k);  // (cells up to the rim: the edge fade below shapes it)
   auto inside = [&](float x, float y) { return (x - ax) * (x - ax) + (y - ay) * (y - ay) <= rr; };
   if (look == SC_WEAVE) {  // dashes turned round the tip, a swirl; fainter near it
     const float step = 21 * k, len = 7 * k;
@@ -464,6 +463,18 @@ static int wv_field(int look, float ax, float ay, float R, float k, float tx, fl
         wv_add(n, x0, y0, x1, y1, (1.6f + 1.4f * g) * k, 0.28f + 0.72f * g);
       }
     }
+  }
+  // The round edge (the user's review, 23 Nov 2026: the grid cut by the circle read as jagged blocks): every capsule
+  // shrinks and fades over the last 48 px to the rim, so the field ends in a soft circle, never in a staircase of
+  // whole cells; nothing reaches within 10 px of the rim
+  for (int i = 0; i < n; i++) {
+    WvEl &e = wv_to[i];
+    const float mx = (e.x0 + e.x1) / 2 - ax, my = (e.y0 + e.y1) / 2 - ay;
+    const float d = sqrtf(mx * mx + my * my) + fmaxf(fabsf(e.x1 - e.x0), fabsf(e.y1 - e.y0)) / 2 + e.hw;  // (its far side)
+    const float f = halo_clamp01((R - 10 * k - d) / (48 * k)), g = 0.25f + 0.75f * f;
+    const float cx = (e.x0 + e.x1) / 2, cy = (e.y0 + e.y1) / 2;
+    e.x0 = cx + (e.x0 - cx) * g, e.x1 = cx + (e.x1 - cx) * g, e.y0 = cy + (e.y0 - cy) * g, e.y1 = cy + (e.y1 - cy) * g;
+    e.hw *= g, e.a *= f;
   }
   return n;
 }
@@ -645,14 +656,12 @@ static void sc_layer_build(const FaceScreen &S, int i) {
     case SC_PILOT:
     case SC_ABOLD:
     case SC_CONCENTRIC:
-    case SC_MODULAR:
     case SC_WEAVE:
     case SC_EYES:
     case SC_PLUS:
     case SC_RINGS:
     case SC_BIGTYPE:
       c->g[0] = sc_mid(L.font), c->g[1] = sc_mid(L.font2), c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI0123");
-      c->g[3] = sc_mid(L.font4);
       break;
     case SC_WORDS:
       c->g[0] = sc_mid(L.font, "Twelve"), c->g[1] = sc_mid(L.font2, "oh twenty");
@@ -700,8 +709,7 @@ static void sc_texts(const FaceLayer &L, FaceRun &R, bool animate) {
       case SC_PILOT:
       case SC_ABOLD:
       case SC_CONCENTRIC:
-      case SC_MODULAR:
-      case SC_WEAVE:
+        case SC_WEAVE:
       case SC_EYES:
       case SC_PLUS:
       case SC_RINGS:
@@ -1269,61 +1277,6 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       break;
     }
 #endif
-#if SC_ON(SC_MODULAR)
-    case SC_MODULAR: {
-      // Modular (our own, no fitness): the weekday with the day in a chip, the time, and one row of three gauges — the
-      // weather now (−10 … 40°), the day gone by the sunset, the battery. Optical balance (the user's review, 23 Nov
-      // 2026): the three groups are one block centred on the dial with equal gaps between them; the row is no wider
-      // than the time; each disc holds one value (a time in the narrow cut); the gauges are 262° arcs open at the
-      // bottom. color — the time and values; color2 — the first gauge's hue; color3 — the weekday
-      const float gr = 40 * k, gap = 28 * k, chip_h = 36 * k, time_h = 86 * k;  // (the time leads: taller than a disc)
-      // (+7: the measured ink of the block — the time's digits sit below their box's middle — centred on the dial)
-      const float top = ay - (chip_h + gap + time_h + gap + 2 * gr) / 2 + 7 * k;
-      const float cy0 = top + chip_h / 2, ty = top + chip_h + gap + time_h / 2, ry = top + chip_h + gap + time_h + gap + gr;
-      sc_ob = ob;
-      strlcpy(c.txt[0], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[1], 8, "%d", sc_tm.tm_mday);
-      const float w1 = dl_width(L.font3, c.txt[0], DL_TRACK), cw = 52 * k, cgap = 12 * k, x0 = ax - (w1 + cgap + cw) / 2;
-      dl_text(c.it[n++], L.font3, c.txt[0], x0, cy0, c.g[2], 0, L.color3, a, v, &halo_black, DL_TRACK);
-      HaloItem &chip = c.it[n++];
-      sc_rrect(chip, x0 + w1 + cgap + cw / 2, cy0, cw, chip_h, 9 * k, 0x2E3036, a, v);
-      dl_text(c.it[n++], L.font3, c.txt[1], x0 + w1 + cgap + cw / 2, cy0, c.g[2], 1, L.color, a, v, &chip);
-      dl_text(c.it[n++], L.font, fc_time, ax, ty, c.g[0], 1, L.color, a, v, &halo_black);
-      const WxCity &w = wx_city[0];
-      const HaloBattery b = halo_battery();
-      const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
-      float fr[3] = {w.now == WX_NONE ? 0 : halo_clamp01((w.now + 10) / 50.0f), 0, pct / 100.0f};
-      if (w.now == WX_NONE) strlcpy(c.txt[2], "--", 8);
-      else snprintf(c.txt[2], 8, "%d\xC2\xB0", (int)w.now);
-      strlcpy(c.txt[3], "--:--", 8);
-#if WX_APP
-      if (w.set) {
-        struct tm st;
-        const time_t ts = w.set;
-        localtime_r(&ts, &st);
-        snprintf(c.txt[3], 8, fc_h24 ? "%02d:%02d" : "%d:%02d", fc_h24 ? st.tm_hour : (st.tm_hour + 11) % 12 + 1, st.tm_min);
-        const float now_m = sc_tm.tm_hour * 60 + sc_tm.tm_min, set_m = st.tm_hour * 60 + st.tm_min;
-        fr[1] = halo_clamp01((now_m - 360) / fmaxf(1, set_m - 360));  // (from 6 a.m. to the sunset)
-      }
-#endif
-      snprintf(c.txt[4], 8, "%d", pct);
-      // (three hues of one lightness — none pulls the eye: peach, gold, mint)
-      const uint32_t hue[3] = {L.color2, 0xE9C46A, 0x8FD9A8};
-      const float pitch = 2 * gr + 16 * k, A0 = -131 * HALO_PI / 180, SW = 262 * HALO_PI / 180;
-      for (int g = 0; g < 3; g++) {
-        const float gx = ax + (g - 1) * pitch;
-        HaloItem &disc = c.it[n++];
-        sc_circle(disc, gx, ry, gr, 0x161618, a, v);
-        dl_arc(c.it[n++], gx, ry, gr - 3 * k, 4 * k, A0, A0 + SW, 0x34363C, a, v);  // the track
-        dl_arc(c.it[n++], gx, ry, gr - 3 * k, 4 * k, A0, A0 + SW * fmaxf(0.001f, fr[g]), hue[g], fr[g] > 0 ? a : 0, v);
-        const bool narrow = strlen(c.txt[2 + g]) > 4 && L.font4;  // (17:59: the narrow cut)
-        dl_text(c.it[n++], narrow ? L.font4 : L.font2, c.txt[2 + g], gx, ry, narrow ? c.g[3] : c.g[1], 1, L.color, a, v, &disc);
-      }
-      c.ncap = 0, c.d[10] = n, c.d[11] = 0;
-      sc_hide_caps(c, 0);
-      sc_box_add(box, halo_view_x(v, ax - 228 * k), halo_view_y(v, ay - 228 * k), halo_view_x(v, ax + 228 * k), halo_view_y(v, ay + 228 * k));
-      break;
-    }
-#endif
 #if SC_ON(SC_WEAVE) || SC_ON(SC_EYES) || SC_ON(SC_PLUS) || SC_ON(SC_RINGS)
     case SC_WEAVE:
     case SC_EYES:
@@ -1713,7 +1666,6 @@ static void sc_draw(const FaceScreen &S, int i) {
     case SC_PILOT:
     case SC_ABOLD:
     case SC_CONCENTRIC:
-    case SC_MODULAR:
     case SC_WEAVE:
     case SC_WORDS:
     case SC_EYES:

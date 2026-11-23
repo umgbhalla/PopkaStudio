@@ -661,6 +661,9 @@ static void face_switch_build() {
   });
 }
 static bool fs_snap(int slot, int fi);  // (below, by the face's drawing)
+static void fs_swap_pics();             // (below: the two pictures change places)
+static bool fs_dirty;                    // re-based onto another face during a gesture: saved when it rests
+static int fs_start;                     // the face the finger went down on (the landing is decided from it)
 static int fs_pic_face[2] = {-1, -1};   // the faces the pictures are of (an index of face_ids; -1 — none)
 static bool fs_pics;                     // switching from the pictures in this frame
 // While switching: the shown face's picture, and the neighbor's once the move shows which one comes in
@@ -689,33 +692,57 @@ static void face_switch_tick(float dt) {
       else fc_face = to, halo_spring_set(fs_off, 0), face_switch_save(), halo_damage_all();
     }
   }
+  // Re-based onto the neighbor (d = ±1) while moving: it is the face now, the one left behind is the other picture —
+  // so swipes chain (a new one while the last still lands) and one long drag passes face after face
+  auto rebase = [&](int d) {
+    fc_face += d, fs_off.x -= d, fs_g0 -= d;
+    if (fs_off.target != 0) fs_off.target -= d;
+    fs_swap_pics(), fs_dirty = true;
+  };
   if (fs_on && face_n > 1 && f.drag_start && f.horiz &&
       halo_nav_on_face() && !halo_asleep() && halo_finger_claim(&fs_owner)) {
-    fs_drag = true, fs_x0 = f.x, fs_g0 = fs_off.x;
+    // (a swipe while the last one lands: past half way — that one is done, this one goes on from it)
+    if (fs_off.target != 0 && fabsf(fs_off.x) >= 0.5f) {
+      const int d = fs_off.x > 0 ? 1 : -1;
+      if (fc_face + d >= 0 && fc_face + d < face_n) rebase(d);
+    }
+    fs_off.target = 0;
+    fs_drag = true, fs_x0 = f.x, fs_g0 = fs_off.x, fs_start = fc_face;
     halo_heavy();  // the whole screen moves from this frame on
   }
   if (fs_drag) {
     if (f.down && f.owner == &fs_owner) {
-      const float lo = fc_face > 0 ? -1 : 0, hi = fc_face + 1 < face_n ? 1 : 0;
       float o = fs_g0 + (fs_x0 - f.x) / W;
+      while (o >= 0.5f && fc_face + 1 < face_n) rebase(1), o -= 1;  // (dragged past half the next: it is the face)
+      while (o <= -0.5f && fc_face > 0) rebase(-1), o += 1;
+      const float lo = fc_face > 0 ? -1 : 0, hi = fc_face + 1 < face_n ? 1 : 0;
       if (o > hi) o = hi + halo_rubber((o - hi) * W) / W;  // (past the last one: rubber)
       else if (o < lo) o = lo + halo_rubber((o - lo) * W) / W;
       fs_off.x = o, fs_off.v = -f.vx / W;
       return face_switch_pics();
     }
     fs_drag = false;
+    // Where it lands: by the whole way from the face the finger went down on (T faces) — past a third of the next one
+    // it goes on; flung, one past where it is. Never by the way from the face it re-based onto: a swipe of 0.54 is
+    // −0.46 from there, and it came back
     const float o = fs_off.x, v = fs_off.v;  // faces, faces a second
-    int to = fabsf(o) > 0.33f ? (o > 0 ? 1 : -1) : 0;
-    if (fabsf(v) > 0.9f && fabsf(o) > 0.02f) to = v > 0 ? 1 : -1;  // flung (~420 px/s on the round watch)
+    const float T = (fc_face - fs_start) + o, aT = fabsf(T);
+    const int sg = T >= 0 ? 1 : -1;
+    int dest = fs_start + sg * (int)floorf(aT + 0.67f);
+    if (fabsf(v) > 0.9f && aT > 0.02f) dest = fs_start + (v > 0 ? 1 : -1) * max(1, (int)ceilf(aT - 0.02f));  // flung
+    int to = constrain(dest - fc_face, -1, 1);
     if ((to > 0 && fc_face + 1 >= face_n) || (to < 0 && fc_face == 0)) to = 0;
     fs_off.target = to;
   }
-  if (fs_off.x == fs_off.target && fs_off.v == 0 && fs_off.target == 0) return face_switch_pics();
+  if (fs_off.x == fs_off.target && fs_off.v == 0 && fs_off.target == 0) {
+    if (fs_dirty) fs_dirty = false, face_switch_save();  // (re-based on the way, came back to rest: the default now)
+    return face_switch_pics();
+  }
   halo_spring_run(fs_off, fs_off.target != 0 ? K_FS_IN : K_FS_BACK, dt);
   if (fs_off.target != 0 && fs_off.x == fs_off.target) {  // there: the neighbor is the face now
     fc_face += (int)fs_off.target;
     halo_spring_set(fs_off, 0);
-    face_switch_save();
+    face_switch_save(), fs_dirty = false;
   }
   face_switch_pics();
 }
@@ -1086,7 +1113,11 @@ static int screen_pages(const FaceScreen &S) {
 // the 1.75. Now when a switch starts each face is drawn once into a picture in PSRAM (as it stands: the faces stand still
 // while switching — sclock.h), and while it moves only the pictures are copied, moved and scaled (nearest pixel: it is
 // moving). Its cost no longer depends on what the face has on it
+#include <utility>
 static uint16_t *fs_pic[2];
+static void fs_swap_pics() {
+  std::swap(fs_pic[0], fs_pic[1]), std::swap(fs_pic_face[0], fs_pic_face[1]);
+}
 static bool fs_snap(int slot, int fi) {
   if (!fs_pic[slot]) {
 #ifdef __EMSCRIPTEN__

@@ -147,7 +147,6 @@ export const CLOCK_LOOKS = [
   ['pilot', 'Pilot', ['#E3E2E6', '#A8C7FA', '#5A6170'], ['Numerals & hands', 'Accent', 'Ticks'], 2],
   ['abold', 'Analogue bold', ['#B69DF8', '#D0BCFF', '#F1F0F4'], ['Numerals', 'Accent', 'Hands & values'], 3],
   ['concentric', 'Concentric', ['#FFFFFF', '#A4F9B5', '#8E9099'], ['Hour & minutes', 'Slot', 'Ring'], 3],
-  ['modular', 'Modular', ['#F1F0F4', '#FFB68A', '#C4C7C5'], ['Time', 'Accent', 'Labels'], 3],
   ['weave', 'Weave', ['#5F7A70', '#3DDC84', '#F1F0F4'], ['Field', 'Pivot', 'Hands'], 0],
   ['words', 'Words', ['#E3E2E6', '#7FCFFF', '#5E5F64'], ['Minutes', 'Hour', null], 2],
   ['bigtype', 'Big type', ['#E8DEF8', '#CDB4FF', '#5E5F64'], ['Hours', 'Minutes', null], 1],
