@@ -18,7 +18,7 @@
 
 #include <vector>
 
-#define ST_SCREENS 24  // room for screens and layers (studio.py: MAX_SCREENS, MAX_LAYERS)
+#define ST_SCREENS 32  // room for screens and layers (studio.py: MAX_SCREENS, MAX_LAYERS)
 #define ST_LAYERS 32
 static FaceLayer st_layers[ST_SCREENS][ST_LAYERS];
 static FaceRun st_run[ST_SCREENS][ST_LAYERS];

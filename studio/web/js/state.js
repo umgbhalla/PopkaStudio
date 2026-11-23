@@ -351,7 +351,7 @@ export const GAP = 260;   // between screens on the map
 export let PAGES = 1;                 // the pages of a screen with the Weather screen's parts: one a city (emit keeps it)
 export const PAGE_STEP = TW + GAP;  // on the map its pages stand in a row, as far apart as screens
 export const STEP_PAGES = ['Today', 'This week'];  // the Steps screen's pages (stepscreen.h)
-export const MAX_SCREENS = 24;        // what the engine has room for (studio.py: MAX_SCREENS)
+export const MAX_SCREENS = 32;        // what the engine has room for (studio.py: MAX_SCREENS)
 // A screen that pages sideways: the Weather screen (a city a page) or the Steps screen (today, the week)
 export const weatherPaged = (s) => !!s && s.layers.some((l) => PAGED.has(l.type));
 export const STEPS_PARTS = new Set(['stnum', 'stcap', 'stfoot', 'stchart']);  // the Steps screen's (stepscreen.h)

@@ -48,8 +48,9 @@ static void wa_hero_lay(float x0, float y0, float w, float h, float s, float a, 
   snprintf(wa_t_hilo, sizeof(wa_t_hilo), "H %s  L %s", hi, lo);
   const float cy = y0 + 70 * s, tw = halo_text_width(gl_wa_n80, wa_t_now) * s, iw = 64 * s, gap = 18 * s;
   const float gx = CX - (iw + gap + tw) / 2;  // (the icon and the number centered as one)
-  ui_circle(wa_hero[0], gx + iw / 2, cy, 32, s, 0xFFB030, a);
-  ui_text(wa_hero[1], gl_ic24, wa_icon(c.kind), wa_mid_ic, gx + iw / 2, cy, 1.25f * s, 1, 0x3D2600, a, &wa_hero[0]);
+  wa_hero[0].alpha = 0;  // (M3: the sky as a glyph in the accent — no disc behind it)
+  ui_text(wa_hero[1], gl_ic24, wa_icon(c.kind), wa_mid_ic, gx + iw / 2, cy, 2.1f * s, 1, 0xFFB030, a, &halo_black);
+  wa_hero[1].on_black = true;
   ui_text(wa_hero[2], gl_wa_n80, wa_t_now, wa_mid_n80, gx + iw + gap, cy, s, 0, GL_TEXT, a, &halo_black);
   wa_hero[2].on_black = true;
   ui_text(wa_hero[3], gl_t20, wa_t_line, ui_mid_t20, CX, y0 + 130 * s, s, 1, GL_DIM, a, &halo_black, 340);
@@ -162,11 +163,12 @@ static void wa_uv(char *o, int n) {
 static void wa_rise(char *o, int n) { wa_hhmm(o, n, wx_city[0].rise); }
 static void wa_set(char *o, int n) { wa_hhmm(o, n, wx_city[0].set); }
 static void wa_city(char *o, int n) { strlcpy(o, wx_city[0].name, n); }
-static void wa_refresh_label(char *o, int n) {
-  if (!wx_fetched_ms) return (void)strlcpy(o, "Refresh", n);
+// The city and how fresh the weather is (the edge button says only "Refresh": Wear OS's edge labels are a word or two)
+static void wa_city_fresh(char *o, int n) {
+  if (!wx_fetched_ms) return (void)strlcpy(o, wx_city[0].name, n);
   const uint32_t m = (halo_ms() - wx_fetched_ms) / 60000;
-  if (m < 1) strlcpy(o, "Refresh · just now", n);
-  else snprintf(o, n, "Refresh · %u min ago", (unsigned)m);
+  if (m < 1) snprintf(o, n, "%s · updated just now", wx_city[0].name);
+  else snprintf(o, n, "%s · updated %u min ago", wx_city[0].name, (unsigned)m);
 }
 static void wa_refresh() {
 #if SS_WIFI
@@ -187,7 +189,7 @@ static void wa_build() {
   UiPage &p = wa_page;
   p.rows[p.n++] = ur_custom(184, wa_hero_lay, wa_hero_draw);
   p.rows[p.n++] = ur_custom(150, wa_chart_lay, wa_chart_draw);
-  p.rows[p.n++] = ur_head("NEXT 7 DAYS");
+  p.rows[p.n++] = ur_head("Next 7 days");
   static void (*const DAY[7])(char *, int) = {wa_day_line<0>, wa_day_line<1>, wa_day_line<2>, wa_day_line<3>,
                                               wa_day_line<4>, wa_day_line<5>, wa_day_line<6>};
   for (int d = 0; d < 7 && p.n < UI_ROWS; d++)
@@ -195,25 +197,21 @@ static void wa_build() {
   // (the page has room for UI_ROWS: the details go on their own short page under NOW)
   wa_locs = {"Weather", {}, 0, 0xFFB030};
   UiPage &l = wa_locs;
-  l.rows[l.n++] = ur_head("NOW");
+  l.rows[l.n++] = ur_head("Now");
   l.rows[l.n++] = ur_info(WA_IC_DROP, "Humidity", wa_hum);
   l.rows[l.n++] = ur_info(WA_IC_WIND, "Wind", wa_wind);
   l.rows[l.n++] = ur_info(WA_IC_SUN, "UV index", wa_uv);
   l.rows[l.n++] = ur_info(WA_IC_SUN, "Sunrise", wa_rise);
   l.rows[l.n++] = ur_info(WA_IC_MOON, "Sunset", wa_set);
-  l.rows[l.n++] = ur_head("LOCATION");
+  l.rows[l.n++] = ur_head("Location");
   l.rows[l.n++] = ur_info(WA_IC_LOC, "Showing", wa_city);
 #if SS_WIFI
   l.rows[l.n++] = ur_action("Use my location", wa_here, 0xFFB030);
 #endif
-#if SS_WIFI
-  if (p.n < UI_ROWS) {
-    UiRow r = ur_action("Refresh", wa_refresh, 0xFFB030);
-    r.text = wa_refresh_label;
-    p.rows[p.n++] = r;
-  }
+  if (p.n < UI_ROWS) p.rows[p.n++] = ur_nav(WA_IC_LOC, "Details and location", &wa_locs, wa_city_fresh, 0xFFB030);
+#if SS_WIFI  // (the page's main action: the edge button hugging the bottom — Wear OS's "View all")
+  p.edge = ur_action("Refresh", wa_refresh, 0xFFB030);
 #endif
-  if (p.n < UI_ROWS) p.rows[p.n++] = ur_nav(WA_IC_DROP, "Details and location", &wa_locs, wa_city, 0xFFB030);
   wa_built_ms = wx_fetched_ms;
 }
 

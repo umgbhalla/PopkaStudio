@@ -197,13 +197,13 @@ static void sy_build() {
 #if HAS_DISPLAY
   sy_add(sy_display, ur_slider("Brightness", 0, DP_STEPS, sy_bright, sy_set_bright));
 #endif
-  sy_add(sy_display, ur_head("ALWAYS ON"));
+  sy_add(sy_display, ur_head("Always On"));
   sy_add(sy_display, ur_toggle(SS_IC_SUN, "Always On", sy_aod, sy_set_aod));
   static const char *const *idle = SS_IDLE_NAMES;
   sy_add(sy_display, ur_choice(SS_IC_CLOCK, "Screen timeout", idle, 4, sy_idle, sy_set_idle));
   sy_add(sy_display, ur_choice(SS_IC_CONTRAST, "Always On brightness", SS_DIM_NAMES, 3, sy_dim, sy_set_dim));
   sy_add(sy_display, ur_toggle(SS_IC_CONTRAST, "Burn-in shift", sy_shift, sy_set_shift));
-  sy_add(sy_display, ur_head("WAKE UP"));
+  sy_add(sy_display, ur_head("Wake up"));
   sy_add(sy_display, ur_toggle(SS_IC_SUN, "Tap to wake", sy_tap, sy_set_tap));
   sy_add(sy_display, ur_toggle(SS_IC_BOLT, "Raise to wake", sy_raise, sy_set_raise));
 
@@ -219,7 +219,7 @@ static void sy_build() {
   sy_add(sy_wifi, ur_info(SS_IC_WIFI, "Network", sy_wifi_net));
   sy_add(sy_wifi, ur_info(SS_IC_CLOCK, "Status", sy_wifi_status));
   sy_add(sy_wifi, ur_info(SS_IC_WRENCH, "Remembered", sy_wifi_saved));
-  sy_add(sy_wifi, ur_action("Sync now", sy_wifi_sync));
+  sy_wifi.edge = ur_action("Sync now", sy_wifi_sync);
 #endif
 
 #if SS_SOUND
@@ -251,7 +251,7 @@ static void sy_build() {
   sy_add(sy_weather, ur_info(SS_IC_LOCATION, "Location", sy_weather_city));
   sy_add(sy_weather, ur_choice(SY_IC_CLOUD, "Units", SY_UNIT_NAMES, 2, sy_units, sy_set_units));
 #if SS_WIFI
-  sy_add(sy_weather, ur_action("Refresh now", sy_wifi_sync, 0xFFB030));
+  sy_weather.edge = ur_action("Refresh now", sy_wifi_sync, 0xFFB030);
 #endif
 
   sy_system = {"System", {}, 0, 0xC7BFFF};

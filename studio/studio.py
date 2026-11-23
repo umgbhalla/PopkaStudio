@@ -234,7 +234,7 @@ def uses_steps(layer, rect=False):
     return not rect and (kind in ("steps", "stepring", "infoline") or kind in STEPS_SCREEN
             or (kind == "curve" and layer.get("what") in ("steps", "datesteps")))
 FX = {"zoom": "HALO_FX_ZOOM", "fade": "HALO_FX_FADE", "slide": "HALO_FX_SLIDE"}  # lib/Halo: halo_nav_face_open
-MAX_SCREENS, MAX_LAYERS = 24, 32  # what the page's engine has room for (engine/studio_api.h)
+MAX_SCREENS, MAX_LAYERS = 32, 32  # what the page's engine has room for (engine/studio_api.h)
 # The watch's Functions (firmware/PopkaWatch/power.h; the page: state.js FUNCTIONS — the same): Always On when idle
 # (after idle s, the panel at bright of 255), what BOOT and PWR do (on: False — nothing) — act: "off" (the screen off),
 # "aod" (Always On at once; the button again — back) or "lock" (Always On, locked; a long press of that button unlocks)

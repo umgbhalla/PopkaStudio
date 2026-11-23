@@ -12,8 +12,15 @@
 enum : uint8_t { UR_HEAD, UR_NAV, UR_TOGGLE, UR_SLIDER, UR_CHOICE, UR_INFO, UR_ACTION, UR_CUSTOM };
 #define UI_ROWS 14
 #define UI_LEVELS 3  // pages open at once: a root and two deep (lib/Halo's stack has 4 over the gallery)
-#define UI_SURF 0x2E3034  // the rows' tonal surface (the gallery's cards')
-#define UI_TRACK 0x45474D
+// Material 3 for Wear OS, by role (the references: app-layout-scrolling-settings, -app-list, -mixed-list): rows are a quiet
+// grey surface; the page's one accent is its primary — the icons (a glyph, no disc), a switch, a slider's fill, the edge
+// button; an ON row fills with the accent's deep container (selection is fill, not a border); labels are small, left
+#define UI_SURF 0x2A2A2E   // a row (neutral: one 565 level for its three channels — no tint)
+#define UI_TRACK 0x48474C  // a switch off, a slider's empty part
+#define UI_DIM 0xC4C7C5    // a row's second line, a section's label
+#define UI_EB_FULL 104.0f  // the edge button's height (52 dp), its width (Wear OS: 247 × 126 at 466 px)
+#define UI_EB_W 272.0f
+#define UI_EB_R 227.0f     // its bottom follows the screen's circle 3 dp in (the gallery's EB_R)
 
 struct UiPage;
 struct UiRow {
@@ -36,7 +43,8 @@ struct UiPage {
   const char *title;
   UiRow rows[UI_ROWS];
   int n;
-  uint32_t accent;
+  uint32_t accent;  // the primary (a pastel): its deep container and light on-container come from it
+  UiRow edge;       // the page's main action, the edge button hugging the bottom (kind UR_ACTION; act nullptr — none)
 };
 static inline UiRow ur_head(const char *title) {
   UiRow r = {};
@@ -95,6 +103,9 @@ struct UiRun {
   HaloList list;
   int armed;  // the row the finger came down on (−1 — none)
   HaloItem title, clock;  // (the time along the top edge: it goes up and shrinks as the page scrolls, as the gallery's)
+  HaloItem eb, eb_label;  // the edge button
+  char eb_buf[32];
+  bool eb_armed;
   HaloItem it[UI_ROWS][UI_IT];
   char buf[UI_ROWS][32];
 };
@@ -137,7 +148,7 @@ static void ui_set_page(int k, const UiPage *pg) {
   float h[UI_ROWS + 1];
   h[0] = GL_HEAD_H;
   for (int i = 0; i < pg->n; i++) h[i + 1] = ur_height(pg->rows[i]);
-  halo_list_init(R.list, h, pg->n + 1, 64, 466 - 70, true);
+  halo_list_init(R.list, h, pg->n + 1, 64, pg->edge.act ? CY + UI_EB_R - UI_EB_FULL - 10 : 466 - 56, true);
 }
 
 static void ui_text(HaloItem &it, const HaloFont &f, const char *s, float mid, float x, float y, float sc, int align,
@@ -155,12 +166,26 @@ static void ui_circle(HaloItem &it, float x, float y, float r, float sc, uint32_
   it.on = nullptr;
 }
 
+// The accent's roles (Material 3's tonal palette from one seed, simply): the primary itself, its deep container (an ON row,
+// a secondary action), a light tone on that container, a dark one on the primary
+static inline uint32_t ui_container(uint32_t p) { return ui_mix(p, 0x000000, 0.66f); }
+static inline uint32_t ui_on_container(uint32_t p) { return ui_mix(p, 0xFFFFFF, 0.6f); }
+static inline uint32_t ui_on_primary(uint32_t p) { return ui_mix(p, 0x000000, 0.8f); }
+// How much of the edge button shows: all of it at the list's end, nothing 140 px before (it grows in as the end comes,
+// as the gallery's)
+static float ui_eb_height(const UiRun &R) {
+  if (!R.pg || !R.pg->edge.act) return 0;
+  const float to_end = R.list.scroll - halo_list_min(R.list);
+  return UI_EB_FULL * halo_clamp01(1 - to_end / 140);
+}
+
 static void ui_layout(int k, const HaloView &v) {
   if (!ui_run || !ui_run[k].pg) return;
   UiRun &R = ui_run[k];
   const UiPage &pg = *R.pg;
+  const uint32_t pri = pg.accent;
   const HaloListFx &hf = R.list.fx[0];
-  ui_text(R.title, gl_title, pg.title, ui_mid_title, CX, hf.top + GL_HEAD_H * hf.s / 2, hf.s, 1, GL_TEXT, hf.a_bg, &halo_black);
+  ui_text(R.title, gl_t24, pg.title, ui_mid_t24, CX, hf.top + GL_HEAD_H * hf.s / 2, hf.s, 1, GL_TEXT, hf.a_bg, &halo_black, 300);
   R.title.on_black = true;
   halo_view_commit(R.title, v);
   // The time along the top edge: over the first 36 dp of scrolling it goes up 24 dp and shrinks to 0.5, then is gone
@@ -170,11 +195,11 @@ static void ui_layout(int k, const HaloView &v) {
     strlcpy(ui_clock_of, fc_time, sizeof(ui_clock_of));
   }
   {
-    const float tt = 1 - halo_clamp01((R.list.top - R.list.scroll) / (36 * DP)), k = 0.5f + 0.5f * tt;
+    const float tt = 1 - halo_clamp01((R.list.top - R.list.scroll) / (36 * DP)), kk = 0.5f + 0.5f * tt;
     HaloItem &c = R.clock;
-    c.kind = HI_MASK, c.mask = &ui_clock_mask, c.color = GL_TEXT, c.on_black = true, c.on = &halo_black, c.scale = k;
-    c.x = CX - (CX - ui_clock_x) * k + ui_clock_mask.w * k / 2, c.y = ui_clock_y - 24 * DP * (1 - tt) + ui_clock_mask.h * k / 2;
-    c.alpha = tt > 0.02f && ui_clock_mask.bits ? k : 0;
+    c.kind = HI_MASK, c.mask = &ui_clock_mask, c.color = GL_TEXT, c.on_black = true, c.on = &halo_black, c.scale = kk;
+    c.x = CX - (CX - ui_clock_x) * kk + ui_clock_mask.w * kk / 2, c.y = ui_clock_y - 24 * DP * (1 - tt) + ui_clock_mask.h * kk / 2;
+    c.alpha = tt > 0.02f && ui_clock_mask.bits ? kk : 0;
     halo_view_commit(c, v);
   }
   for (int i = 0; i < pg.n; i++) {
@@ -184,57 +209,63 @@ static void ui_layout(int k, const HaloView &v) {
     const bool vis = halo_list_item_visible(R.list, i + 1);
     const float s = f.s, hh = ur_height(r), h = hh * s, w = GL_ITEM_W * s, x0 = CX - w / 2, y0 = f.top, cy = y0 + h / 2;
     const float ab = vis ? f.a_bg : 0, ac = vis ? f.a_c : 0;
-    const uint32_t acc = r.accent ? r.accent : pg.accent, on_acc = ui_mix(acc, 0x000000, 0.78f);
+    const uint32_t acc = r.accent ? r.accent : pri;
     for (int j = 0; j < UI_IT; j++) it[j].alpha = 0;
     char *buf = R.buf[i];
     buf[0] = 0;
     if (r.kind == UR_CUSTOM) {  // (the app's own: it is told where, it draws)
       if (r.clay) r.clay(x0, y0, w, h, s, ac, v);
-    } else if (r.kind == UR_HEAD) {  // a section's label: small, dim, centered — not in a pill
-      ui_text(it[3], gl_t20, r.title, ui_mid_t20, CX, cy, s, 1, GL_DIM, ac, &halo_black);
+    } else if (r.kind == UR_HEAD) {  // a section's label: small, left, in sentence case — not in a pill
+      ui_text(it[3], gl_t20, r.title, ui_mid_t20, x0 + 30 * s, y0 + h * 0.62f, s, 0, UI_DIM, ac, &halo_black);
       it[3].on_black = true;
-    } else if (r.kind == UR_ACTION) {  // a pill of its own: pastel with a dark label (the primary action)
-      ui_rrect(it[0], CX, cy, GL_ITEM_W * 0.72f, hh, hh / 2, s, acc, ab);
+    } else if (r.kind == UR_ACTION) {  // a secondary action in the list: the accent's container, a light label
+      ui_rrect(it[0], CX, cy, GL_ITEM_W, hh, hh / 2, s, ui_container(acc), ab);
       if (r.text) r.text(buf, 32);
-      ui_text(it[3], gl_t24, buf[0] ? buf : r.title, ui_mid_t24, CX, cy, s, 1, on_acc, ac, &it[0], GL_ITEM_W * 0.62f);
-    } else if (r.kind == UR_SLIDER) {  // the title over a pill: − and + at its ends, the bar between
+      ui_text(it[3], gl_t24, buf[0] ? buf : r.title, ui_mid_t24, CX, cy, s, 1, ui_on_container(acc), ac, &it[0], GL_ITEM_W - 80);
+    } else if (r.kind == UR_SLIDER) {  // its label over a pill: − and + at the ends, a bar with a thumb between
       const int lo = r.lo, hi = r.hi, val = r.get ? constrain(r.get(), lo, hi) : lo;
-      ui_text(it[3], gl_t20, r.title, ui_mid_t20, CX, y0 + 18 * s, s, 1, GL_DIM, ac, &halo_black);
+      ui_text(it[3], gl_t20, r.title, ui_mid_t20, x0 + 30 * s, y0 + 20 * s, s, 0, UI_DIM, ac, &halo_black);
       it[3].on_black = true;
-      const float py = y0 + 36 * s + 48 * s;
+      const float py = y0 + 36 * s + 48 * s, bw = (GL_ITEM_W - 196) * s, bx = CX - bw / 2;
       ui_rrect(it[0], CX, py, GL_ITEM_W, 96, 48, s, UI_SURF, ab);
-      const float bw = (GL_ITEM_W - 200) * s, bx = CX - bw / 2;
-      ui_rrect(it[5], CX, py, GL_ITEM_W - 200, 12, 6, s, UI_TRACK, ac);
+      ui_rrect(it[5], CX, py, GL_ITEM_W - 196, 8, 4, s, UI_TRACK, ac);
       const float fw = bw * (hi > lo ? (float)(val - lo) / (hi - lo) : 0);
-      ui_rrect(it[6], bx + fw / 2, py, fmaxf(12, fw / s), 12, 6, s, acc, fw > 0.5f ? ac : 0);
-      ui_text(it[7], gl_ic24, "\xEF\x81\xA8", ui_mid_ic, x0 + 52 * s, py, s, 1, GL_TEXT, ac, &it[0]);   // −
-      ui_text(it[8], gl_ic24, "\xEF\x81\xA7", ui_mid_ic, x0 + w - 52 * s, py, s, 1, GL_TEXT, ac, &it[0]);  // +
-    } else {  // NAV, TOGGLE, CHOICE, INFO: the surface, the chip, the title and the line, the end
-      ui_rrect(it[0], CX, cy, GL_ITEM_W, hh, hh / 2, s, UI_SURF, ab);
-      const float tx = x0 + (r.icon ? 104 : 36) * s;
-      if (r.icon) {
-        ui_circle(it[1], x0 + 56 * s, cy, 30, s, acc, ac);
-        ui_text(it[2], gl_ic24, r.icon, ui_mid_ic, x0 + 56 * s, cy, s, 1, on_acc, ac, &it[1]);
-      }
+      ui_rrect(it[6], bx + fw / 2, py, fmaxf(8, fw / s), 8, 4, s, acc, fw > 0.5f ? ac : 0);
+      ui_circle(it[4], bx + fw, py, 11, s, acc, ac);  // (the thumb)
+      ui_text(it[7], gl_ic24, "\xEF\x81\xA8", ui_mid_ic, x0 + 50 * s, py, 0.85f * s, 1, GL_TEXT, ac, &it[0]);   // −
+      ui_text(it[8], gl_ic24, "\xEF\x81\xA7", ui_mid_ic, x0 + w - 50 * s, py, 0.85f * s, 1, GL_TEXT, ac, &it[0]);  // +
+    } else {  // NAV, TOGGLE, CHOICE, INFO: a quiet surface (an ON toggle: the container), a glyph, the title, the line
+      const bool on = r.kind == UR_TOGGLE && r.get && r.get();
+      const uint32_t surf = on ? ui_container(acc) : UI_SURF;
+      ui_rrect(it[0], CX, cy, GL_ITEM_W, hh, hh / 2, s, surf, ab);
+      const float tx = x0 + (r.icon ? 78 : 32) * s;
+      if (r.icon) ui_text(it[2], gl_ic24, r.icon, ui_mid_ic, x0 + 44 * s, cy, s, 1, on ? ui_on_container(acc) : acc, ac, &it[0]);
       if (r.kind == UR_CHOICE && r.choices && r.get) strlcpy(buf, r.choices[constrain(r.get(), 0, r.hi - 1)], 32);
       else if (r.text) r.text(buf, 32);
       const bool two = buf[0] != 0;
-      const float end = r.kind == UR_TOGGLE ? 116 : r.kind == UR_NAV ? 64 : 36;  // (room for what is at the end)
-      const float fit = GL_ITEM_W - (r.icon ? 104 : 36) - end;
+      const float fit = GL_ITEM_W - (r.icon ? 78 : 32) - (r.kind == UR_TOGGLE ? 96 : 32);
       ui_text(it[3], gl_t24, r.title, ui_mid_t24, tx, two ? y0 + 38 * s : cy, s, 0, GL_TEXT, ac, &it[0], fit);
       if (two)
-        ui_text(it[4], gl_t20, buf, ui_mid_t20, tx, y0 + 70 * s, s, 0, r.kind == UR_CHOICE ? acc : GL_DIM, ac, &it[0], fit);
-      if (r.kind == UR_NAV)
-        ui_text(it[7], gl_ic24, "\xEF\x81\x94", ui_mid_ic, x0 + w - 40 * s, cy, 0.8f * s, 1, GL_DIM, ac, &it[0]);  // ›
-      if (r.kind == UR_TOGGLE) {  // the switch: on — the accent's track, a dark thumb at its end; off — grey, thumb left
-        const bool on = r.get && r.get();
-        const float sx = x0 + w - 64 * s;
-        ui_rrect(it[5], sx, cy, 68, 40, 20, s, on ? acc : UI_TRACK, ac);
-        ui_circle(it[8], sx + (on ? 14 : -14) * s, cy, on ? 14 : 11, s, on ? on_acc : 0x9A9CA3, ac);
+        ui_text(it[4], gl_t20, buf, ui_mid_t20, tx, y0 + 70 * s, s, 0, r.kind == UR_CHOICE ? acc : on ? ui_on_container(acc) : UI_DIM,
+                ac, &it[0], fit);
+      if (r.kind == UR_TOGGLE) {  // the switch: on — the primary's track, a dark thumb at its end; off — grey, small thumb left
+        const float sx = x0 + w - 54 * s;
+        ui_rrect(it[5], sx, cy, 52, 32, 16, s, on ? acc : UI_TRACK, ac);
+        ui_circle(it[8], sx + (on ? 10 : -10) * s, cy, on ? 12 : 8, s, on ? ui_on_primary(acc) : 0x8E9099, ac);
       }
     }
     for (int j = 0; j < UI_IT; j++) halo_view_commit(it[j], v);
   }
+  // The edge button: the page's main action, hugging the bottom (grows in as the end comes)
+  const float eh = ui_eb_height(R);
+  HaloItem &e = R.eb;
+  e.kind = HI_EDGE, e.x = CX, e.y = CY, e.r = UI_EB_R, e.h = eh, e.w = UI_EB_W, e.v = 48, e.scale = 1;
+  e.color = pri, e.alpha = eh > 4 ? halo_clamp01((eh - 8) / 52) : 0, e.on_black = true, e.on = nullptr;
+  if (pg.edge.text) pg.edge.text(R.eb_buf, 32);
+  else strlcpy(R.eb_buf, pg.edge.title ? pg.edge.title : "", 32);
+  ui_text(R.eb_label, gl_t24, R.eb_buf, ui_mid_t24, CX, CY + UI_EB_R - eh + fminf(eh, UI_EB_FULL) * 0.42f, 1, 1, ui_on_primary(pri),
+          eh > 40 ? halo_clamp01((eh - 40) / 30) : 0, &R.eb, UI_EB_W - 70);
+  halo_view_commit(e, v), halo_view_commit(R.eb_label, v);
 }
 
 static void ui_draw(int k) {
@@ -245,6 +276,7 @@ static void ui_draw(int k) {
     for (int j = 0; j < UI_IT; j++) halo_item_draw(R.it[i][j]);
     if (R.pg->rows[i].kind == UR_CUSTOM && R.pg->rows[i].cdraw) R.pg->rows[i].cdraw();
   }
+  halo_item_draw(R.eb), halo_item_draw(R.eb_label);  // (over the list)
 }
 
 static void ui_open(const UiPage *pg);
@@ -255,10 +287,13 @@ static void ui_update(int k, float dt) {
   HaloFinger &f = halo_finger;
   halo_list_update(R.list, dt, true, false);
   if (f.pressed) {
-    const int i = halo_list_hit(R.list, f.y0) - 1;
+    const float eh = ui_eb_height(R);
+    R.eb_armed = eh > 40 && f.y0 > CY + UI_EB_R - eh && fabsf(f.x0 - CX) < UI_EB_W / 2;  // (the edge button is over the list)
+    const int i = R.eb_armed ? -1 : halo_list_hit(R.list, f.y0) - 1;
     R.armed = i >= 0 && i < R.pg->n && R.pg->rows[i].kind != UR_HEAD && R.pg->rows[i].kind != UR_INFO ? i : -1;
   }
-  if (f.dragging) R.armed = -1;
+  if (f.dragging) R.armed = -1, R.eb_armed = false;
+  if (f.tap && R.eb_armed && !f.owner && R.pg->edge.act) R.pg->edge.act();
   if (f.tap && R.armed >= 0 && !f.owner) {
     const UiRow &r = R.pg->rows[R.armed];
     switch (r.kind) {
@@ -283,7 +318,7 @@ static void ui_update(int k, float dt) {
         break;
     }
   }
-  if (!f.down) R.armed = -1;
+  if (!f.down) R.armed = -1, R.eb_armed = false;
 }
 
 // The screens of the levels over the root (the root is a screen of the project: sysset.h draws its level 0)
