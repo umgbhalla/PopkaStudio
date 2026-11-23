@@ -441,6 +441,20 @@ GALLERY_FONTS = [
     "font  gl_wx_val  GoogleSansFlex.ttf  35  digits \"°%:-CF\" @wght=830,wdth=91,ROND=55,opsz=35   # card readings",
     "font  gl_wx_week GoogleSansFlex.ttf  35  digits \"°-\" @wght=775,wdth=67,ROND=43,opsz=35   # a day's low, high",
     "font  gl_wx_ic38 fa-solid-900.ttf    38  0xf185 0xf6c4 0xf0c2 0xf73d 0xf2dc   # the sky now",
+    # Settings (sysset.h; design/SPEC_settings.md): the level's digit, the condensed row label, the icons at their sizes
+    "font  gl_sg_digit GoogleSansFlex.ttf 154  digits \"-\" @wght=850,wdth=84,ROND=46,opsz=128   # Settings: a level, the battery",
+    "font  gl_sg_row  GoogleSansFlex.ttf  35  latin punct @wght=745,wdth=61,ROND=48,opsz=35   # Settings: a row's label",
+    "font  gl_sg_ic15 fa-solid-900.ttf    15  0xf00c   # the picked card's check",
+    "font  gl_sg_ic20 fa-solid-900.ttf    20  0xf054   # App settings' chevron",
+    "font  gl_sg_ic21 fa-solid-900.ttf    21  0xf185 0xf06e   # Display's cards",
+    "font  gl_sg_ic22 fa-solid-900.ttf    22  0xf054 0xf6a9 0xf028 0xf021 0xf067 0xf068   # chevrons, mute, sync, charge steps",
+    "font  gl_sg_ic23 fa-solid-900.ttf    23  0xf060   # back",
+    "font  gl_sg_ic24 fa-solid-900.ttf    24  0xf067 0xf068 0xf12a 0xf186 0xf023 0xf185 0xf015   # timeout steps, actions",
+    "font  gl_sg_ic25 fa-solid-900.ttf    25  0xf053 0xf054 0xf023 0xf011   # face arrows, the buttons' keys",
+    "font  gl_sg_ic26 fa-solid-900.ttf    26  0xf1de   # App settings",
+    "font  gl_sg_ic28 fa-solid-900.ttf    28  0xf185 0xf017 0xf011   # open-to cards, power off",
+    "font  gl_sg_ic29 fa-solid-900.ttf    29  0xf067 0xf068 0xf2ea   # level steps, restart",
+    "font  gl_sg_ic66 fa-solid-900.ttf    66  0xf1eb   # Wi-Fi",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)

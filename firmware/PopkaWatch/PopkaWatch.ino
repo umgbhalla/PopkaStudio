@@ -42,9 +42,8 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #include "wxfetch.h"  // fresh weather from Open-Meteo over Wi-Fi (only with Wi-Fi)
 #include "confirm.h"  // one confirm for the whole watch (Material 3 for Wear OS): power off first
 #include "power.h"    // the Functions: Always On, the BOOT and PWR buttons
-#include "sysset.h"   // Settings: one place for the watch's settings, many levels (on the UI kit, ui.h)
+#include "sysset.h"   // Settings: seven pages and their panels (upager.h, the paged app screens, comes in with it)
 #if HAS_WXAPP
-#include "upager.h"   // paged app screens: left and right pages, big icon buttons, pickers (Wear OS, M3 Expressive)
 #include "wxapp.h"    // Weather: one long page on the kit — hero, 12 hours, 7 days, details, location
 #endif
 #if HAS_CLOCKS
