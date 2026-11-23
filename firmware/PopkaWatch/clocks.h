@@ -100,12 +100,15 @@ static void tm_check() {
 // ---------- World clock ----------
 struct CkCity {
   const char *name, *tz;
+  float lat, lon;  // (the sun: sunrise and sunset for the day/night ring)
 };
 static const CkCity CK_CITIES[] = {
-    {"London", "GMT0BST,M3.5.0/1,M10.5.0"}, {"New York", "EST5EDT,M3.2.0,M11.1.0"},
-    {"San Francisco", "PST8PDT,M3.2.0,M11.1.0"}, {"Tokyo", "JST-9"}, {"Dubai", "<+04>-4"}, {"Singapore", "<+08>-8"},
-    {"Paris", "CET-1CEST,M3.5.0,M10.5.0/3"}, {"Sydney", "AEST-10AEDT,M10.1.0,M4.1.0/3"}, {"Hong Kong", "HKT-8"},
-    {"Moscow", "MSK-3"}, {"Sao Paulo", "<-03>3"}, {"Kolkata", "IST-5:30"}};
+    {"London", "GMT0BST,M3.5.0/1,M10.5.0", 51.51f, -0.13f}, {"New York", "EST5EDT,M3.2.0,M11.1.0", 40.71f, -74.01f},
+    {"San Francisco", "PST8PDT,M3.2.0,M11.1.0", 37.77f, -122.42f}, {"Tokyo", "JST-9", 35.68f, 139.69f},
+    {"Dubai", "<+04>-4", 25.20f, 55.27f}, {"Singapore", "<+08>-8", 1.35f, 103.82f},
+    {"Paris", "CET-1CEST,M3.5.0,M10.5.0/3", 48.86f, 2.35f}, {"Sydney", "AEST-10AEDT,M10.1.0,M4.1.0/3", -33.87f, 151.21f},
+    {"Hong Kong", "HKT-8", 22.32f, 114.17f}, {"Moscow", "MSK-3", 55.76f, 37.62f}, {"Sao Paulo", "<-03>3", -23.55f, -46.63f},
+    {"Kolkata", "IST-5:30", 22.57f, 88.36f}};
 #define CK_N (int)(sizeof(CK_CITIES) / sizeof(CK_CITIES[0]))
 static uint32_t ck_mask = 0x1 | 0x2 | 0x8 | 0x10;  // London, New York, Tokyo, Dubai
 static Preferences ck_prefs;
@@ -187,31 +190,46 @@ static int (*const CK_ON[])() = {ck_on<0>, ck_on<1>, ck_on<2>, ck_on<3>, ck_on<4
 static void (*const CK_SET[])(int) = {ck_set<0>, ck_set<1>, ck_set<2>, ck_set<3>, ck_set<4>, ck_set<5>,
                                       ck_set<6>, ck_set<7>, ck_set<8>, ck_set<9>, ck_set<10>, ck_set<11>};
 
-// ---------- The apps as pages (upager.h): non-scrolling, swiped left and right ----------
-// Stopwatch: page 1 — the time big, the hundredths in the accent, two buttons: the tonal Lap / Reset left, the primary
-//            Start / Pause right (a circle at rest, a rounded square while it runs); the rim sweeps each minute.
-//            Page 2 — the laps, newest first, the fastest green and the slowest red.
-#define SW_ACC 0xA8C7FA
-static char sw_main[16], sw_tail[8], sw_lap[SW_LAPS][2][16];
+// ---------- The apps as pages (upager.h) — Codex's measured study (apps/SPEC.md, 23 Nov 2026) ----------
+// Shared: the title at y 98, the secondary (r 38) at (161, 352), the primary (r 55, circle → four lobes while running)
+// at (287, 352), the rim from 26° to 334°.
+#define UP_SEC_X 161.0f
+#define UP_PRI_X 287.0f
+#define UP_ROW_Y 352.0f
+#define UP_SEC_R 38.0f
+#define UP_PRI_R 55.0f
+static HaloSpringK K_MORPH;
+static void ck_morph(HaloSpring &m, bool on, float dt) {
+  static bool k;
+  if (!k) K_MORPH = halo_spring(HALO_M3X_FAST), k = true;
+  m.target = on ? 1 : 0;
+  halo_spring_run(m, K_MORPH, dt);
+}
+
+// Stopwatch: page 1 — the time (white, the hundredths in the accent 8 px after it, bottoms aligned), Reset / Lap and
+// Start / Pause; page 2 — the newest three laps as cards, the fastest mint, the slowest amber, each said in words
+#define SW_ACC 0xD9CBFF
+#define SW_BG 0x29233A
+#define SW_INK 0x22163C
+static char sw_main[16], sw_tail[8], sw_lap[3][2][16];
 static HaloSpring sw_morph;
 static int sw_count() { return 2; }
-static void sw_primary() {
-  if (sw_run) sw_acc += ck_now() - sw_t0, sw_run = false;
-  else sw_t0 = ck_now(), sw_run = true;
-}
 static void sw_lay(int p, UpPage &P, float a, const HaloView &v) {
   if (p == 0) {
+    up_title(P, "Stopwatch", a, v);
     ck_hms(sw_main, sizeof(sw_main), sw_elapsed(), true, sw_tail, sizeof(sw_tail));
-    up_time(P, sw_main, sw_tail, 196, SW_ACC, a, v);
+    const float w1 = halo_text_width(gl_up_disp, sw_main), w2 = halo_text_width(gl_up_num, sw_tail);
+    const float x0 = CX - (w1 + 8 + w2) / 2;
+    up_text(P, gl_up_disp, sw_main, up_mid_disp, x0, 209, 0, UP_WHITE, a, v);
+    // (bottoms aligned: the small digits' baseline on the big ones')
+    const float base = 209 - up_mid_disp + gl_up_disp.ascent, y2 = base - gl_up_num.ascent + up_mid_num;
+    up_text(P, gl_up_num, sw_tail, up_mid_num, x0 + w1 + 8, y2, 0, SW_ACC, a, v);
     const bool any = sw_run || sw_elapsed() > 0;
-    up_button(P, 161, 322, 42, sw_run ? UP_IC_FLAG : UP_IC_RESET, false, 0, SW_ACC, any ? a : 0, v);
-    up_button(P, any ? 293 : 233, 322, 58, sw_run ? UP_IC_PAUSE : UP_IC_PLAY, true, sw_morph.x, SW_ACC, a, v);
+    up_secondary(P, UP_SEC_X, UP_ROW_Y, UP_SEC_R, sw_run ? UP_IC_FLAG : UP_IC_RESET, SW_BG, any ? SW_ACC : UP_DIM, a, v);
+    up_primary(P, UP_PRI_X, UP_ROW_Y, UP_PRI_R, sw_morph.x, sw_run ? UP_IC_PAUSE : UP_IC_PLAY, SW_ACC, SW_INK, a, v);
   } else {
-    up_text(P, gl_t24, "Laps", ui_mid_t24, CX, 92, 1, 1, GL_TEXT, a, v);
-    if (!sw_nlaps) {
-      up_text(P, gl_t20, "No laps yet", ui_mid_t20, CX, 233, 1, 1, UI_DIM, a, v);
-      return;
-    }
+    up_title(P, "Laps", a, v);
+    if (!sw_nlaps) return up_text(P, gl_up_lab, "NO LAPS YET", up_mid_lab, CX, 249, 1, UP_MUTED, a, v);
     int fast = 0, slow = 0;
     int64_t sp[SW_LAPS];
     for (int i = 0; i < sw_nlaps; i++) {
@@ -219,118 +237,164 @@ static void sw_lay(int p, UpPage &P, float a, const HaloView &v) {
       if (sp[i] < sp[fast]) fast = i;
       if (sp[i] > sp[slow]) slow = i;
     }
-    for (int r = 0; r < 5 && r < sw_nlaps; r++) {  // (the newest five: no scrolling)
+    static const float RY[3] = {167, 249, 331};
+    for (int r = 0; r < 3 && r < sw_nlaps; r++) {
       const int i = sw_nlaps - 1 - r;
-      const float y = 148 + r * 54;
-      snprintf(sw_lap[i][0], 16, "Lap %d", i + 1);
+      const bool f = sw_nlaps > 1 && i == fast, sl = sw_nlaps > 1 && i == slow;
+      const uint32_t bg = f ? 0x122720 : sl ? 0x2B211B : UP_ROW, ink = f ? 0xB7EBD6 : sl ? 0xF4C18B : UP_MUTED;
+      up_rrect(P, 76, RY[r] - 34, 390, RY[r] + 34, 24, bg, a, v);
+      HaloItem &card = P.it[P.n - 1];
+      snprintf(sw_lap[r][0], 16, "%02d", i + 1);
       char t[8];
-      ck_hms(sw_lap[i][1], 16, sp[i], true, t, sizeof(t)), strlcat(sw_lap[i][1], t, 16);
-      const uint32_t c = sw_nlaps > 1 && i == fast ? 0x8FD9A8 : sw_nlaps > 1 && i == slow ? 0xFFB4AB : GL_TEXT;
-      up_text(P, gl_t20, sw_lap[i][0], ui_mid_t20, 108, y, 1, 0, UI_DIM, a, v);
-      up_text(P, gl_t24, sw_lap[i][1], ui_mid_t24, 358, y, 1, 2, c, a, v);
+      ck_hms(sw_lap[r][1], 16, sp[i], true, t, sizeof(t)), strlcat(sw_lap[r][1], t, 16);
+      up_text(P, gl_up_num, sw_lap[r][0], up_mid_num, 101, RY[r] - (f || sl ? 9 : 0), 0, ink, a, v, &card);
+      if (f || sl) up_text(P, gl_up_lab, f ? "FASTEST" : "SLOWEST", up_mid_lab, 101, RY[r] + 17, 0, ink, a, v, &card);
+      up_text(P, gl_up_num, sw_lap[r][1], up_mid_num, 364, RY[r], 2, UP_WHITE, a, v, &card);
     }
   }
 }
 static void sw_tap(int p, float x, float y) {
   if (p) return;
-  const bool any = sw_run || sw_elapsed() > 0;
-  if (up_hit(x, y, any ? 293 : 233, 322, 58)) sw_primary();
-  else if (any && up_hit(x, y, 161, 322, 42)) sw_second_act();
+  if (up_hit(x, y, UP_PRI_X, UP_ROW_Y, UP_PRI_R)) {
+    if (sw_run) sw_acc += ck_now() - sw_t0, sw_run = false;
+    else sw_t0 = ck_now(), sw_run = true;
+  } else if (up_hit(x, y, UP_SEC_X, UP_ROW_Y, UP_SEC_R) && (sw_run || sw_elapsed() > 0)) {
+    sw_second_act();
+  }
 }
 static void sw_upd(int, float dt) {
-  static HaloSpringK k;
-  static bool kk;
-  if (!kk) k = halo_spring(HALO_M3X_DEFAULT), kk = true;
-  sw_morph.target = sw_run ? 1 : 0;
-  halo_spring_run(sw_morph, k, dt);
-  if (sw_run) halo_damage(60, 140, 406, 250);  // (the time runs: its line every frame)
+  ck_morph(sw_morph, sw_run, dt);
+  if (sw_run) halo_damage(40, 160, 426, 260);  // (the time runs: its line every frame)
 }
-static const UpApp SW_APP = {sw_count, sw_lay, sw_tap, sw_upd, sw_ring, SW_ACC};
+static float sw_ring_f() {
+  const int64_t e = sw_elapsed();
+  return e > 0 ? (float)(e % 60000000) / 60000000.0f : -1;
+}
+static const UpApp SW_APP = {sw_count, sw_lay, sw_tap, sw_upd, sw_ring_f, SW_ACC};
 
-// Timer: page 1 — set: two picker columns (minutes : seconds) and a Start button; running: the time left big, the rim
-//        running down, Cancel (tonal, left), Pause / Resume (primary, morphing), +1 min (tonal, right).
-//        Page 2 — six presets as round chips; a tap starts it and turns back to page 1.
-#define TM_ACC 0xFFB68A
+// Timer: page 1 — set: minutes and seconds as picker columns (panels, a tile round the value, the field in focus
+// outlined in the accent; drag, or tap the number above or below), Presets and Start; running — the time left, "OF 05:30",
+// +1 min (paused: Cancel) and Pause / Resume; page 2 — six presets
+#define TM_ACC 0xD9F28F
+#define TM_BG 0x242B18
+#define TM_INK 0x232D0C
 static UpPicker tm_pm, tm_ps;
-static char tm_pbuf[2][4][4], tm_main[16], tm_tail[8], tm_chip[6][4];
+static int tm_focus;  // 0 — minutes, 1 — seconds
+static char tm_pv[2][3][4], tm_main[16], tm_tail[8], tm_of[16], tm_chip[6][4];
 static HaloSpring tm_morph;
+static const int TM_PRESETS[6] = {1, 3, 5, 10, 15, 30};
 static int tm_count() { return 2; }
 static void tm_go_secs(int secs) {
   if (secs <= 0) return;
   tm_total = (int64_t)secs * 1000000, tm_end = ck_now() + tm_total, tm_state = TM_RUN;
 }
-static const int TM_PRESETS[6] = {1, 3, 5, 10, 15, 30};
+static void tm_column(UpPage &P, UpPicker &k, int col, float cx, float a, const HaloView &v) {
+  const bool foc = tm_focus == col;
+  up_text(P, gl_up_lab, col ? "SEC" : "MIN", up_mid_lab, cx, 118, 1, foc ? TM_ACC : UP_MUTED, a, v);
+  up_rrect(P, cx - 62, 133, cx + 62, 300, 30, UP_ROW, a, v);
+  if (foc) up_rrect(P, cx - 57, 170, cx + 57, 256, 21, TM_ACC, a, v), up_rrect(P, cx - 55, 172, cx + 55, 254, 19, TM_BG, a, v);
+  else up_rrect(P, cx - 57, 170, cx + 57, 256, 21, UP_TRACK, a, v);
+  HaloItem &tile = P.it[P.n - 1];
+  const int val = up_picker_value(k);
+  const float frac = k.pos.x - roundf(k.pos.x);  // (sliding while dragged)
+  for (int j = -1; j <= 1; j++) {
+    const int vv = val + j;
+    const bool ok = vv >= k.lo && vv <= k.hi;
+    snprintf(tm_pv[col][j + 1], 4, "%02d", ok ? vv : 0);
+    if (!j) up_text(P, gl_up_pick, tm_pv[col][1], up_mid_pick, cx, 213 - frac * 62, 1, foc ? TM_ACC : UP_WHITE, a, v, &tile);
+    else up_text(P, gl_up_num, tm_pv[col][j + 1], up_mid_num, cx, (j < 0 ? 151 : 275) - frac * 62, 1, UP_DIM, ok ? a : 0, v);
+  }
+}
 static void tm_lay(int p, UpPage &P, float a, const HaloView &v) {
   if (p == 0) {
+    up_title(P, "Timer", a, v);
     if (tm_state == TM_IDLE) {
-      up_picker_lay(P, tm_pm, 150, 206, tm_pbuf[0], a, v);
-      up_text(P, gl_up_n96, ":", up_mid_n96, CX, 206, 1, 1, UI_DIM, a, v);
-      up_picker_lay(P, tm_ps, 316, 206, tm_pbuf[1], a, v);
-      up_text(P, gl_t20, "MIN", ui_mid_t20, 150, 78, 1, 1, UI_DIM, a * 0.8f, v);  // (above the number before)
-      up_text(P, gl_t20, "SEC", ui_mid_t20, 316, 78, 1, 1, UI_DIM, a * 0.8f, v);
+      tm_column(P, tm_pm, 0, 155, a, v);
+      up_text(P, gl_up_num, ":", up_mid_num, CX, 213, 1, UP_MUTED, a, v);
+      tm_column(P, tm_ps, 1, 311, a, v);
       const bool ok = up_picker_value(tm_pm) * 60 + up_picker_value(tm_ps) > 0;
-      up_button(P, CX, 364, 46, UP_IC_PLAY, true, 0, TM_ACC, ok ? a : a * 0.35f, v);
+      up_secondary(P, UP_SEC_X, 360, UP_SEC_R, UP_IC_GRID, TM_BG, TM_ACC, a, v);
+      up_primary(P, UP_PRI_X, 360, UP_PRI_R, 0, UP_IC_PLAY, TM_ACC, TM_INK, ok ? a : a * 0.35f, v);
     } else {
       ck_hms(tm_main, sizeof(tm_main), tm_left() + 999999, false, tm_tail, sizeof(tm_tail));
-      up_time(P, tm_main, nullptr, 196, TM_ACC, a, v);
-      up_button(P, 120, 318, 40, UP_IC_X, false, 0, 0xFFB4AB, a, v);
-      up_button(P, CX, 330, 58, tm_state == TM_RUN ? UP_IC_PAUSE : UP_IC_PLAY, true, tm_morph.x, TM_ACC, a, v);
-      up_button(P, 346, 318, 40, UP_IC_PLUS, false, 0, TM_ACC, a, v);
+      up_text(P, gl_up_hero, tm_main, up_mid_hero, CX, 206, 1, UP_WHITE, a, v);
+      char tot[16];
+      ck_hms(tot, sizeof(tot), tm_total, false);
+      snprintf(tm_of, sizeof(tm_of), "OF %s", tot);
+      up_text(P, gl_up_lab, tm_of, up_mid_lab, CX, 280, 1, UP_MUTED, a, v);
+      if (tm_state == TM_PAUSED) {
+        up_secondary(P, UP_SEC_X, UP_ROW_Y, UP_SEC_R, UP_IC_X, TM_BG, 0xFFB4AB, a, v);
+      } else {
+        HaloItem &d = up_disc(P, UP_SEC_X, UP_ROW_Y, UP_SEC_R, TM_BG, a, v);
+        up_text(P, gl_up_ic24, UP_IC_PLUS, halo_text_mid(gl_up_ic24, "+"), UP_SEC_X, 343, 1, TM_ACC, a, v, &d);
+        up_text(P, gl_up_lab, "1 min", up_mid_lab, UP_SEC_X, 368, 1, TM_ACC, a, v, &d);
+      }
+      up_primary(P, UP_PRI_X, UP_ROW_Y, UP_PRI_R, tm_morph.x, tm_state == TM_RUN ? UP_IC_PAUSE : UP_IC_PLAY, TM_ACC,
+                 TM_INK, a, v);
     }
   } else {
-    up_text(P, gl_t24, "Quick start", ui_mid_t24, CX, 96, 1, 1, GL_TEXT, a, v);
+    up_title(P, "Presets", a, v);
     for (int i = 0; i < 6; i++) {
-      const float x = 133 + (i % 3) * 100, y = 196 + (i / 3) * 108;
+      const float x = 124 + (i % 3) * 109, y = i < 3 ? 191 : 301;
       snprintf(tm_chip[i], 4, "%d", TM_PRESETS[i]);
-      HaloItem &d = up_item(P);
-      d.kind = HI_CIRCLE, d.x = x, d.y = y, d.r = 44, d.scale = 1, d.color = ui_container(TM_ACC), d.alpha = a;
-      d.on_black = true, d.on = nullptr;
-      up_commit(d, v);
-      HaloItem &t = up_item(P);
-      ui_text(t, gl_up_n36, tm_chip[i], up_mid_n36, x, y - 6, 1, 1, ui_on_container(TM_ACC), a, &d);
-      up_commit(t, v);
-      HaloItem &l = up_item(P);
-      ui_text(l, gl_t20, "min", ui_mid_t20, x, y + 22, 0.8f, 1, ui_on_container(TM_ACC), a * 0.8f, &d);
-      up_commit(l, v);
+      HaloItem &d = up_disc(P, x, y, 46, TM_BG, a, v);
+      up_text(P, gl_up_pre, tm_chip[i], up_mid_pre, x, y - 9, 1, TM_ACC, a, v, &d);
+      up_text(P, gl_up_lab, "min", up_mid_lab, x, y + 18, 1, UP_MUTED, a, v, &d);
     }
   }
 }
 static void tm_tap(int p, float x, float y) {
   if (p == 0) {
     if (tm_state == TM_IDLE) {
-      if (up_hit(x, y, CX, 364, 46)) tm_go_secs(up_picker_value(tm_pm) * 60 + up_picker_value(tm_ps));
-    } else if (up_hit(x, y, CX, 330, 58)) {
+      for (int col = 0; col < 2; col++) {
+        const float cx = col ? 311 : 155;
+        UpPicker &k = col ? tm_ps : tm_pm;
+        if (x < cx - 62 || x > cx + 62) continue;
+        if (up_in(x, y, cx - 62, 122, cx + 62, 170)) up_picker_step(k, -1), tm_focus = col;
+        else if (up_in(x, y, cx - 62, 256, cx + 62, 304)) up_picker_step(k, 1), tm_focus = col;
+        else if (up_in(x, y, cx - 62, 170, cx + 62, 256)) tm_focus = col;
+      }
+      if (up_hit(x, y, UP_SEC_X, 360, UP_SEC_R)) up_go(1);
+      else if (up_hit(x, y, UP_PRI_X, 360, UP_PRI_R)) tm_go_secs(up_picker_value(tm_pm) * 60 + up_picker_value(tm_ps));
+    } else if (up_hit(x, y, UP_PRI_X, UP_ROW_Y, UP_PRI_R)) {
       if (tm_state == TM_RUN) tm_left_p = tm_left(), tm_state = TM_PAUSED;
       else tm_end = ck_now() + tm_left_p, tm_state = TM_RUN;
-    } else if (up_hit(x, y, 120, 318, 40)) {
-      tm_state = TM_IDLE;
-    } else if (up_hit(x, y, 346, 318, 40)) {
-      tm_total += 60000000;
-      if (tm_state == TM_RUN) tm_end += 60000000;
-      else tm_left_p += 60000000;
+    } else if (up_hit(x, y, UP_SEC_X, UP_ROW_Y, UP_SEC_R)) {
+      if (tm_state == TM_PAUSED) tm_state = TM_IDLE;  // (paused: Cancel)
+      else tm_total += 60000000, tm_end += 60000000;  // (+1 min, to what is left and to the total)
     }
   } else {
     for (int i = 0; i < 6; i++)
-      if (up_hit(x, y, 133 + (i % 3) * 100, 196 + (i / 3) * 108, 44)) tm_go_secs(TM_PRESETS[i] * 60), up_go(0);
+      if (up_hit(x, y, 124 + (i % 3) * 109, i < 3 ? 191 : 301, 46)) tm_go_secs(TM_PRESETS[i] * 60), up_go(0);
   }
 }
 static void tm_upd(int p, float dt) {
-  static HaloSpringK k;
-  static bool kk;
-  if (!kk) k = halo_spring(HALO_M3X_DEFAULT), kk = true, tm_pm = {}, tm_ps = {}, tm_pm.hi = 99, tm_ps.hi = 59,
-           halo_spring_set(tm_pm.pos, 5), halo_spring_set(tm_ps.pos, 0);
-  tm_morph.target = tm_state == TM_RUN ? 1 : 0;
-  halo_spring_run(tm_morph, k, dt);
-  if (p == 0 && tm_state == TM_IDLE) up_picker_update(tm_pm, 150, 70, dt), up_picker_update(tm_ps, 316, 70, dt);
+  static bool init;
+  if (!init) {
+    init = true, tm_pm.hi = 99, tm_ps.hi = 59;
+    halo_spring_set(tm_pm.pos, 5), halo_spring_set(tm_ps.pos, 0);
+  }
+  ck_morph(tm_morph, tm_state == TM_RUN, dt);
+  if (p == 0 && tm_state == TM_IDLE) {
+    const bool was = tm_pm.drag || tm_ps.drag;
+    up_picker_update(tm_pm, 155, 62, dt), up_picker_update(tm_ps, 311, 62, dt);
+    if (!was && tm_pm.drag) tm_focus = 0;
+    if (!was && tm_ps.drag) tm_focus = 1;
+  }
 }
-static const UpApp TM_APP = {tm_count, tm_lay, tm_tap, tm_upd, tm_ring, TM_ACC};
+static float tm_ring_f() { return tm_state == TM_IDLE ? -1 : tm_total > 0 ? (float)tm_left() / tm_total : -1; }
+static const UpApp TM_APP = {tm_count, tm_lay, tm_tap, tm_upd, tm_ring_f, TM_ACC};
 
-// World clock: a page a place — here first, then each city picked: its name, its time big, how far from here, the sun
-// or the moon; the last page — Cities (a tap: the kit's list of cities to pick).
-#define CK_ACC 0xC7BFFF
+// World clock: a page a place — here (the weather's city), then each city picked: its name, its time big, its UTC
+// offset, DAYLIGHT or NIGHT; round the rim the day — night along the track, the daylight from sunrise to sunset over it
+// (worked out for the place and the date), and a dot at the time it is there. The last page opens the list of cities.
+#define CK_ACC 0xCCC7FF
+#define CK_DAY 0xFFCA8A
+#define CK_NIGHT 0x5F5A88
 static int ck_idx[CK_N + 1], ck_n;
-static char ck_time[CK_N + 1][8], ck_off[CK_N + 1][16];
-static bool ck_day[CK_N + 1];
+static char ck_time[CK_N + 1][8], ck_utc[CK_N + 1][12];
+static bool ck_isday[CK_N + 1];
+static float ck_rise[CK_N + 1], ck_set_h[CK_N + 1], ck_now_h[CK_N + 1];
 static UiPage ck_pick;
 static void ck_list() {
   ck_n = 0;
@@ -339,45 +403,65 @@ static void ck_list() {
     if (ck_mask >> i & 1) ck_idx[ck_n++] = i;
 }
 static int ck_count() { return ck_n + 1; }
+// Sunrise and sunset in local hours (the sun's declination and hour angle; no equation of time: within ~15 min)
+static void ck_sun(float lat, float lon, float utc_h, int yday, float &rise, float &set) {
+  const float decl = 23.44f * sinf(2 * HALO_PI * (284 + yday + 1) / 365.0f) * (HALO_PI / 180), la = lat * (HALO_PI / 180);
+  const float c = -tanf(la) * tanf(decl);
+  const float noon = 12 - lon / 15 + utc_h;
+  if (c >= 1) rise = set = noon;            // (polar night)
+  else if (c <= -1) rise = 0, set = 24;     // (midnight sun)
+  else {
+    const float h = acosf(c) * (180 / HALO_PI) / 15;
+    rise = noon - h, set = noon + h;
+  }
+}
 static void ck_fill(int p) {
   const time_t now = time(nullptr);
-  struct tm here, t;
-  ck_tz_local(TZ, now, here);
+  struct tm u, t;
+  gmtime_r(&now, &u);
   const int i = ck_idx[p];
-  if (i < 0) t = here;
-  else ck_tz_local(CK_CITIES[i].tz, now, t);
+  ck_tz_local(i < 0 ? TZ : CK_CITIES[i].tz, now, t);
   snprintf(ck_time[p], 8, fc_h24 ? "%02d:%02d" : "%d:%02d", fc_h24 ? t.tm_hour : (t.tm_hour + 11) % 12 + 1, t.tm_min);
-  int d = (t.tm_yday * 1440 + t.tm_hour * 60 + t.tm_min) - (here.tm_yday * 1440 + here.tm_hour * 60 + here.tm_min);
-  if (d > 1440) d -= 365 * 1440;
-  if (d < -1440) d += 365 * 1440;
-  if (i < 0) snprintf(ck_off[p], 16, "%s %d", WEEKDAY[here.tm_wday % 7], here.tm_mday);  // (here: the date — the title says Here)
-  else if (!d) strlcpy(ck_off[p], "Same time", 16);
-  else snprintf(ck_off[p], 16, d % 60 ? "%c%dh %02dm" : "%c%dh", d < 0 ? '-' : '+', abs(d) / 60, abs(d) % 60);
-  ck_day[p] = t.tm_hour >= 6 && t.tm_hour < 18;
+  int off = (t.tm_yday * 1440 + t.tm_hour * 60 + t.tm_min) - (u.tm_yday * 1440 + u.tm_hour * 60 + u.tm_min);
+  if (off > 1440) off -= 365 * 1440;
+  if (off < -1440) off += 365 * 1440;
+  snprintf(ck_utc[p], 12, "UTC%c%02d:%02d", off < 0 ? '-' : '+', abs(off) / 60, abs(off) % 60);
+  const float lat = i < 0 ? wx_city[0].lat : CK_CITIES[i].lat, lon = i < 0 ? wx_city[0].lon : CK_CITIES[i].lon;
+  ck_sun(lat, lon, off / 60.0f, t.tm_yday, ck_rise[p], ck_set_h[p]);
+  ck_now_h[p] = t.tm_hour + t.tm_min / 60.0f;
+  ck_isday[p] = ck_now_h[p] >= ck_rise[p] && ck_now_h[p] < ck_set_h[p];
 }
+static inline float ck_ang(float h) { return UP_A0 + UP_SWEEP * halo_clamp01(h / 24); }
 static void ck_lay(int p, UpPage &P, float a, const HaloView &v) {
   if (p < ck_n) {
     ck_fill(p);
     const int i = ck_idx[p];
-    up_text(P, gl_title, i < 0 ? "Here" : CK_CITIES[i].name, ui_mid_title, CX, 132, 1, 1, GL_TEXT, a, v);
-    up_text(P, gl_up_n96, ck_time[p], up_mid_n96, CX, 228, 1, 1, GL_TEXT, a, v);
-    up_text(P, gl_t24, ck_off[p], ui_mid_t24, CX, 312, 1, 1, CK_ACC, a, v);
-    up_text(P, gl_up_ic40, ck_day[p] ? UP_IC_SUN : UP_IC_MOON, up_mid_ic, CX, 374, 0.7f, 1, ck_day[p] ? 0xFFD580 : 0xC7BFFF, a, v);
+    const uint32_t tint = ck_isday[p] ? CK_DAY : CK_ACC;
+    up_arc(P, UP_RING_R, UP_RING_W, UP_A0, UP_A0 + UP_SWEEP, CK_NIGHT, a, v);              // the night
+    up_arc(P, UP_RING_R, UP_RING_W, ck_ang(ck_rise[p]), ck_ang(ck_set_h[p]), CK_DAY, a, v);  // the daylight
+    float mx, my;
+    const float an = ck_ang(ck_now_h[p]);
+    mx = CX + UP_RING_R * sinf(an), my = CY - UP_RING_R * cosf(an);
+    up_disc(P, mx, my, 10, 0x000000, a, v), up_disc(P, mx, my, 6, UP_WHITE, a, v);           // now
+    up_title(P, i < 0 ? "Here" : CK_CITIES[i].name, a, v);
+    up_text(P, gl_up_hero, ck_time[p], up_mid_hero, CX, 209, 1, UP_WHITE, a, v);
+    up_text(P, gl_up_num, ck_utc[p], up_mid_num, CX, 303, 1, UP_MUTED, a, v);
+    const char *lab = ck_isday[p] ? "DAYLIGHT" : "NIGHT";
+    const float lw = halo_text_width(gl_up_lab, lab), gx = CX - (24 + 10 + lw) / 2;
+    up_text(P, gl_up_ic24, ck_isday[p] ? UP_IC_SUN : UP_IC_MOON, halo_text_mid(gl_up_ic24, UP_IC_SUN), gx + 12, 350, 1, tint, a, v);
+    up_text(P, gl_up_lab, lab, up_mid_lab, gx + 34, 350, 0, tint, a, v);
   } else {
-    up_text(P, gl_t24, "Cities", ui_mid_t24, CX, 150, 1, 1, GL_TEXT, a, v);
-    up_button(P, CX, 250, 58, UP_IC_GLOBE, true, 0, CK_ACC, a, v);
-    up_text(P, gl_t20, "Pick the places", ui_mid_t20, CX, 344, 1, 1, UI_DIM, a, v);
+    up_title(P, "Cities", a, v);
+    up_primary(P, CX, 250, UP_PRI_R, 0, UP_IC_GLOBE, CK_ACC, 0x1C1A33, a, v);
+    up_text(P, gl_up_lab, "PICK THE PLACES", up_mid_lab, CX, 336, 1, UP_MUTED, a, v);
   }
 }
 static void ck_tap(int p, float x, float y) {
-  if (p == ck_n && up_hit(x, y, CX, 250, 58)) ui_cur = 0, ui_open(&ck_pick);
+  if (p == ck_n && up_hit(x, y, CX, 250, UP_PRI_R)) ui_cur = 0, ui_open(&ck_pick);
 }
 static uint32_t ck_listed = 0xFFFFFFFF;
 static void ck_upd(int, float) {
   if (ck_listed != ck_mask) ck_listed = ck_mask, ck_list();
-  static int min_was = -1;  // (a new minute: the times again)
-  const time_t now = time(nullptr);
-  if (now / 60 != min_was) min_was = now / 60, halo_damage_all();
 }
 static const UpApp CK_APP = {ck_count, ck_lay, ck_tap, ck_upd, nullptr, CK_ACC};
 

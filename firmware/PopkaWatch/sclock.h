@@ -417,7 +417,9 @@ static inline void wv_add(int &n, float x0, float y0, float x1, float y1, float 
 // The field for a look, the tip at (tx, ty), the hand's angle hd (degrees): into wv_to, its count
 static int wv_field(int look, float ax, float ay, float R, float k, float tx, float ty, float hd) {
   int n = 0;
-  const float rr = (R - 6 * k) * (R - 6 * k);  // (cells up to the rim: the edge fade below shapes it)
+  // (the field runs past the rim: the screen's own circle cuts it — whole cells cut at the edge, never a smaller
+  // circle or a fade: the user's call, 23 Nov 2026)
+  const float rr = (R + 30 * k) * (R + 30 * k);
   auto inside = [&](float x, float y) { return (x - ax) * (x - ax) + (y - ay) * (y - ay) <= rr; };
   if (look == SC_WEAVE) {  // dashes turned round the tip, a swirl; fainter near it
     const float step = 21 * k, len = 7 * k;
@@ -463,18 +465,6 @@ static int wv_field(int look, float ax, float ay, float R, float k, float tx, fl
         wv_add(n, x0, y0, x1, y1, (1.6f + 1.4f * g) * k, 0.28f + 0.72f * g);
       }
     }
-  }
-  // The round edge (the user's review, 23 Nov 2026: the grid cut by the circle read as jagged blocks): every capsule
-  // shrinks and fades over the last 48 px to the rim, so the field ends in a soft circle, never in a staircase of
-  // whole cells; nothing reaches within 10 px of the rim
-  for (int i = 0; i < n; i++) {
-    WvEl &e = wv_to[i];
-    const float mx = (e.x0 + e.x1) / 2 - ax, my = (e.y0 + e.y1) / 2 - ay;
-    const float d = sqrtf(mx * mx + my * my) + fmaxf(fabsf(e.x1 - e.x0), fabsf(e.y1 - e.y0)) / 2 + e.hw;  // (its far side)
-    const float f = halo_clamp01((R - 10 * k - d) / (48 * k)), g = 0.25f + 0.75f * f;
-    const float cx = (e.x0 + e.x1) / 2, cy = (e.y0 + e.y1) / 2;
-    e.x0 = cx + (e.x0 - cx) * g, e.x1 = cx + (e.x1 - cx) * g, e.y0 = cy + (e.y0 - cy) * g, e.y1 = cy + (e.y1 - cy) * g;
-    e.hw *= g, e.a *= f;
   }
   return n;
 }

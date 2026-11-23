@@ -20,6 +20,9 @@
 static uint16_t scene_px[256];
 static uint8_t scene_r[256], scene_g[256], scene_b[256];
 static int scene_pal_of = -1;
+static int16_t scene_sx[466];  // moving: the source column of each screen column (−1 — outside), for the view below
+static int scene_sx_of = -1;
+static float scene_sx_v[3] = {-1, -1, -1};
 static void scene_palette(int n) {
   if (n == scene_pal_of) return;
   const ScenePic &P = SCENE_PICS[n];
@@ -48,6 +51,14 @@ static void scene_layout(const FaceScreen &S, int i, float a, const HaloView &v)
     R.scn = want;
     for (int k = 0; k < 4; k++) R.scv[k] = nv[k];
     if (want >= 0) scene_palette(want);
+  }
+  if (want >= 0 && (scene_sx_v[0] != v.x || scene_sx_v[2] != v.s || scene_sx_of != want)) {  // (the columns' map)
+    const float cx = HALO_W / 2.0f + v.x, inv = v.s > 0.01f ? 1 / v.s : 0;
+    for (int x = 0; x < HALO_W; x++) {
+      const int sx = (int)floorf((x + 0.5f - cx) * inv + HALO_W / 2.0f);
+      scene_sx[x] = sx >= 0 && sx < HALO_W ? sx : -1;
+    }
+    scene_sx_v[0] = v.x, scene_sx_v[2] = v.s, scene_sx_of = want;
   }
   // (its place: the layers over it blend with it — face_over_others)
   if (want >= 0) R.box[0] = 0, R.box[1] = 0, R.box[2] = HALO_W - 1, R.box[3] = HALO_H - 1;
@@ -81,10 +92,11 @@ static void scene_draw(const FaceScreen &S, int i) {
     }
     return;
   }
-  // Moving: each band row samples one source row (nearest), decoded into a line of indices
+  // Moving: each band row samples one source row (nearest), decoded into a line of indices; the source column of each
+  // screen column comes from scene_sx (made once a frame in layout, not a division a pixel)
   uint8_t line[466];
-  const float cx = HALO_W / 2.0f + vx, cy = HALO_H / 2.0f + vy, inv = vs > 0.01f ? 1 / vs : 0;
-  if (!inv) return;
+  const float cy = HALO_H / 2.0f + vy, inv = vs > 0.01f ? 1 / vs : 0;
+  if (!inv || scene_sx_of != R.scn) return;
   for (int y = max(0, hb.y); y < min(HALO_H, hb.y + hb.rows); y++) {
     const int sy = (int)floorf((y + 0.5f - cy) * inv + HALO_H / 2.0f);
     if (sy < 0 || sy >= HALO_H) continue;
@@ -95,9 +107,16 @@ static void scene_draw(const FaceScreen &S, int i) {
       x += n;
     }
     uint16_t *row = halo_row(y);
-    for (int x = x0; x <= x1; x++) {
-      const int sx = (int)floorf((x + 0.5f - cx) * inv + HALO_W / 2.0f);
-      if (sx >= 0 && sx < HALO_W) put(row + x, line[sx]);
+    if (opaque) {
+      for (int x = x0; x <= x1; x++) {
+        const int sx = scene_sx[x];
+        if (sx >= 0 && P.pal[line[sx]]) row[x] = scene_px[line[sx]];
+      }
+    } else {
+      for (int x = x0; x <= x1; x++) {
+        const int sx = scene_sx[x];
+        if (sx >= 0) put(row + x, line[sx]);
+      }
     }
   }
 }

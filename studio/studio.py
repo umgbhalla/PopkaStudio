@@ -421,9 +421,19 @@ GALLERY_FONTS = [
     + " 0xf067 0xf068   # cards' icons; the player's + and −",
     "font  gl_back_ic fa-solid-900.ttf    24  0xf060   # Back arrow",
     "font  gl_cf_ic  fa-solid-900.ttf    30  0xf00d 0xf00c 0xf011 0xf1f8 0xf2f1   # the confirm (confirm.h): x, check, badges",
-    "font  gl_up_n96  GoogleSansFlex.ttf  96  digits \":\" @wght=560,ROND=100   # paged apps: the big time (upager.h)",
-    "font  gl_up_n36  GoogleSansFlex.ttf  36  digits \".\" @wght=620,ROND=100   # paged apps: hundredths, chips",
-    "font  gl_up_ic40 fa-solid-900.ttf    40  0xf04b 0xf04c 0xf024 0xf2f1 0x2b 0xf00d 0xf185 0xf186 0xf0ac   # paged apps: the buttons' icons",
+    # Paged apps (upager.h, clocks.h) — one type scale by the dial (154 / 103 / 35 / 15: 0.33, 0.22, 0.075, 0.033 D),
+    # the cuts of Codex's measured study (apps/SPEC.md, 23 Nov 2026): heavy, the widths tuned per use
+    "font  gl_up_hero GoogleSansFlex.ttf 154  digits \":\" @wght=850,wdth=67,ROND=46,opsz=128   # countdown, a city's time",
+    "font  gl_up_disp GoogleSansFlex.ttf 103  digits \":\" @wght=880,wdth=106,ROND=51,opsz=103   # the stopwatch's time",
+    "font  gl_up_pick GoogleSansFlex.ttf 103  digits @wght=740,wdth=55,ROND=40,opsz=100   # a picker's value",
+    "font  gl_up_title GoogleSansFlex.ttf 35  latin punct @wght=775,wdth=98,ROND=50,opsz=35   # titles, cities",
+    "font  gl_up_clock GoogleSansFlex.ttf 35  digits \":\" @wght=690,wdth=81,ROND=37,opsz=35   # the curved time on top",
+    "font  gl_up_num  GoogleSansFlex.ttf  35  digits \".:+-UTC\" @wght=740,wdth=88,ROND=31,opsz=35   # laps, offsets, hundredths",
+    "font  gl_up_pre  GoogleSansFlex.ttf  35  digits @wght=880,wdth=116,ROND=66,opsz=35   # presets",
+    "font  gl_up_lab  GoogleSansFlex.ttf  15  latin digits \":\" @wght=700,wdth=105,ROND=30,opsz=15   # small labels",
+    "font  gl_up_ic43 fa-solid-900.ttf    43  0xf04b 0xf04c 0xf0ac   # the primary's glyph",
+    "font  gl_up_ic32 fa-solid-900.ttf    32  0xf2ea 0xf024 0xf00a 0xf00d   # secondary glyphs",
+    "font  gl_up_ic24 fa-solid-900.ttf    24  0x2b 0xf185 0xf186   # small glyphs",
 ]
 # Display's and Battery's own (HaloWatch's ic32, n48, ic18): only in a firmware with them (and in the template — the
 # page's engine draws every project)
