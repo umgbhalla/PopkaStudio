@@ -83,12 +83,15 @@ struct UiRun {
   const UiPage *pg;
   HaloList list;
   int armed;  // the row the finger came down on (−1 — none)
-  HaloItem title;
+  HaloItem title, clock;  // (the time along the top edge: it goes up and shrinks as the page scrolls, as the gallery's)
   HaloItem it[UI_ROWS][UI_IT];
   char buf[UI_ROWS][32];
 };
 static UiRun *ui_run;  // [UI_LEVELS], in PSRAM (≈ 40 KB of items: internal memory is the Wi-Fi's)
 static int ui_cur;     // the level on top (its update runs)
+static HaloMask ui_clock_mask;  // the time along the top edge (Wear OS's time text), one for every page: made when it changes
+static char ui_clock_of[8];
+static float ui_clock_x, ui_clock_y, ui_mid_clock;
 static float ui_mid_title, ui_mid_t24, ui_mid_t20, ui_mid_ic;
 
 static bool ui_begin() {
@@ -149,6 +152,20 @@ static void ui_layout(int k, const HaloView &v) {
   ui_text(R.title, gl_title, pg.title, ui_mid_title, CX, hf.top + GL_HEAD_H * hf.s / 2, hf.s, 1, GL_TEXT, hf.a_bg, &halo_black);
   R.title.on_black = true;
   halo_view_commit(R.title, v);
+  // The time along the top edge: over the first 36 dp of scrolling it goes up 24 dp and shrinks to 0.5, then is gone
+  if (strcmp(ui_clock_of, fc_time)) {
+    if (!ui_mid_clock) ui_mid_clock = halo_text_mid(gl_t20, "0123456789");
+    halo_text_arc(ui_clock_mask, gl_t20, fc_time, ui_mid_clock, 213, 0, false, 1, &ui_clock_x, &ui_clock_y);
+    strlcpy(ui_clock_of, fc_time, sizeof(ui_clock_of));
+  }
+  {
+    const float tt = 1 - halo_clamp01((R.list.top - R.list.scroll) / (36 * DP)), k = 0.5f + 0.5f * tt;
+    HaloItem &c = R.clock;
+    c.kind = HI_MASK, c.mask = &ui_clock_mask, c.color = GL_TEXT, c.on_black = true, c.on = &halo_black, c.scale = k;
+    c.x = CX - (CX - ui_clock_x) * k + ui_clock_mask.w * k / 2, c.y = ui_clock_y - 24 * DP * (1 - tt) + ui_clock_mask.h * k / 2;
+    c.alpha = tt > 0.02f && ui_clock_mask.bits ? k : 0;
+    halo_view_commit(c, v);
+  }
   for (int i = 0; i < pg.n; i++) {
     const UiRow &r = pg.rows[i];
     HaloItem *it = R.it[i];
@@ -210,7 +227,7 @@ static void ui_layout(int k, const HaloView &v) {
 static void ui_draw(int k) {
   if (!ui_run || !ui_run[k].pg) return;
   const UiRun &R = ui_run[k];
-  halo_item_draw(R.title);
+  halo_item_draw(R.clock), halo_item_draw(R.title);
   for (int i = 0; i < R.pg->n; i++)
     for (int j = 0; j < UI_IT; j++) halo_item_draw(R.it[i][j]);
 }

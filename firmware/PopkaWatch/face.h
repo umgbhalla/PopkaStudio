@@ -310,6 +310,7 @@ static char fs_owner;            // (halo_finger_claim's: the swipe is the face 
 static int fs_other = -1;        // the neighbor on screen with the shown face in this frame (-1 — none)
 static bool fs_laid[FACE_MAX];   // laid out in the last frame (one no longer on screen — hidden once)
 static int fs_cmd = -1;          // the command faces N: go there
+static bool fs_on = true;        // switching by a swipe at all (Settings > Watch faces: kept)
 static inline int face_cur() {
   return fc_face < face_n && face_ids[fc_face] < face_scr_n ? face_ids[fc_face] : 0;
 }
@@ -671,7 +672,7 @@ static void face_switch_tick(float dt) {
       else fc_face = to, halo_spring_set(fs_off, 0), face_switch_save(), halo_damage_all();
     }
   }
-  if (face_n > 1 && f.drag_start && f.horiz &&
+  if (fs_on && face_n > 1 && f.drag_start && f.horiz &&
       halo_nav_on_face() && !halo_asleep() && halo_finger_claim(&fs_owner)) {
     fs_drag = true, fs_x0 = f.x, fs_g0 = fs_off.x;
     halo_heavy();  // the whole screen moves from this frame on

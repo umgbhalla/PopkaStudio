@@ -161,7 +161,7 @@ static void ww_box_add(float *box, float x0, float y0, float x1, float y1) {
 }
 // The degrees' color: cold blue, cool green, warm yellow, hot red (the mockup's; in °C)
 static uint32_t ww_tcol(float T) {
-  if (WXD_F) T = (T - 32) * (5 / 9.0f);
+  if (wx_fahr) T = (T - 32) * (5 / 9.0f);
   static const float tt[6] = {-15, 0, 10, 18, 25, 35};
   static const uint32_t cc[6] = {0x6FA8FF, 0x9CCBFF, 0x8FE0C0, 0xFFD27A, 0xFF9F5A, 0xFF6060};
   if (T <= tt[0]) return cc[0];
@@ -892,7 +892,7 @@ static const char *const WW_SAY[5] = {"LIGHT JACKET", "SUNGLASSES ON", "GRAB A H
 static const uint32_t WW_SAY_C[5] = {0xFFB36B, 0xFFC94D, 0xAEB8C8, 0x8AB8FF, 0xFF8A80};
 static int ww_garment(const WwSky &w) {
   float tc = w.now == WX_NONE ? 15 : w.now;
-  if (WXD_F) tc = (tc - 32) * (5 / 9.0f);
+  if (wx_fahr) tc = (tc - 32) * (5 / 9.0f);
   if (w.sky == WX_RAIN) return WG_UMBRELLA;
   if (w.sky == WX_SNOW || tc <= 4) return WG_HAT;
   if ((w.sky == WX_SUN || w.sky == WX_PARTLY) && tc >= 21) return WG_GLASSES;

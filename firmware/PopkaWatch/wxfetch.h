@@ -27,13 +27,13 @@ static void wx_fetch() {
            "&current=temperature_2m,apparent_temperature,weather_code,pressure_msl"
            "&hourly=weather_code,temperature_2m,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min"
            "&timezone=auto&forecast_days=%d&forecast_hours=%d&timeformat=unixtime%s",
-           WX_DAYS, WX_AHEAD, WXD_F ? "&temperature_unit=fahrenheit" : "");
+           WX_DAYS, WX_AHEAD, wx_fahr ? "&temperature_unit=fahrenheit" : "");
 #else
   snprintf(path + k, sizeof(path) - k,
            "&current=temperature_2m,apparent_temperature,weather_code&hourly=weather_code,temperature_2m"
            "&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=2&forecast_hours=%d"
            "&timeformat=unixtime%s",
-           WX_AHEAD, WXD_F ? "&temperature_unit=fahrenheit" : "");
+           WX_AHEAD, wx_fahr ? "&temperature_unit=fahrenheit" : "");
 #endif
   // Only what the screens use (one city — an object, several — an array of them)
   JsonDocument filter, doc(HaloPsram::instance());

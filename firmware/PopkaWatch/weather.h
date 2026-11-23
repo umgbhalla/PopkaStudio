@@ -69,6 +69,8 @@ static inline bool wx_snow_of(int wmo) {  // snow (its kind is WX_CLOUD)
 }
 
 #include "wxdata.h"  // WXD_N, WXD_F and wx_city[] — the editor's cities and their weather at Flash
+// The units now: the editor's at first, then Settings > Weather's (sysset.h: kept) — the next fetch asks in them
+static volatile bool wx_fahr = WXD_F;
 
 static int wx_pages = WXD_N;  // cities = pages
 static int wx_demo = -1;      // a fictional day on show (demo, wx N); -1 — the real weather

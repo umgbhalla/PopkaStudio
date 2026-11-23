@@ -44,6 +44,43 @@ static void sy_set_h24(int v) {
   fc_h24 = v != 0, sy_put("h24", fc_h24);
   fc_min = fc_hour = -1, fc_check = true;  // (the clock again, in its new form, on the next tick)
 }
+// Watch faces: which one is the default, switching by a swipe at all
+static const char *sy_face_names[FACE_MAX];
+static int sy_face() { return fc_face; }
+static void sy_set_face(int i) {
+  if (i < 0 || i >= face_n || i == fc_face) return;
+  fc_face = i, halo_spring_set(fs_off, 0), face_switch_save(), halo_damage_all();
+}
+static int sy_fswipe() { return fs_on; }
+static void sy_set_fswipe(int v) { fs_on = v != 0, sy_put("fswipe", fs_on); }
+// The buttons: what a press does (power.h's FN_*: nothing, screen off, lock, Always On, home)
+static const char *const SY_BTN_NAMES[] = {"Nothing", "Screen off", "Lock", "Always On", "Home"};
+static int sy_boot() { return constrain(pw_boot, 0, 4); }
+static void sy_set_boot(int v) { pw_boot = constrain(v, 0, 4), sy_put("boot", pw_boot); }
+static int sy_pwr() { return constrain(pw_pwr, 0, 4); }
+static void sy_set_pwr(int v) { pw_pwr = constrain(v, 0, 4), sy_put("pwr", pw_pwr); }
+// Weather: the units (the next fetch asks in them — fetched now, with Wi-Fi)
+static const char *const SY_UNIT_NAMES[] = {"Celsius", "Fahrenheit"};
+static int sy_units() { return wx_fahr ? 1 : 0; }
+static void sy_set_units(int v);
+// The charge limit (settings.h keeps it: 80 … 95 %)
+static const char *const SY_LIMIT_NAMES[] = {"80%", "85%", "90%", "95%"};
+static int sy_limit() { return constrain((charge_limit_selected() - 80) / 5, 0, 3); }
+static void sy_set_limit(int i) { __atomic_store_n(&bc_selected, 80 + 5 * constrain(i, 0, 3), __ATOMIC_RELAXED); }
+// A screen of the project with a layer of this kind, opened over this page (the Battery's own screen: its history)
+static int sy_screen_of(uint8_t kind) {
+  for (int s = 1; s < face_scr_n; s++)
+    for (int i = 0; i < face_scr[s].n; i++)
+      if (face_scr[s].layers[i].kind == kind) return s;
+  return -1;
+}
+static void sy_open_screen(int s) {
+  if (s < 0) return;
+  const int d = min(halo_nav_depth() + 1, NAV_LEVELS - 1);
+  nav_scr[d] = s, nav_stub[d] = face_scr[s].name;
+  halo_nav_open(level(d, 0));
+}
+static void sy_battery_details() { sy_open_screen(sy_screen_of(FL_BATTERY)); }
 #if HAS_DISPLAY
 static int sy_bright() { return dp_value; }
 static void sy_set_bright(int v) { dp_set(v); }  // (settings.h keeps it)
@@ -97,6 +134,16 @@ static void sy_bat_power(char *o, int n) {
   const HaloBattery b = halo_battery();
   strlcpy(o, !b.usb ? "On battery" : b.charging ? "USB · charging" : "USB · not charging", n);
 }
+static void sy_faces_line(char *o, int n) {
+  snprintf(o, n, "%s%s", sy_face_names[fc_face] ? sy_face_names[fc_face] : "Watch face", fs_on && face_n > 1 ? " · swipe to switch" : "");
+}
+static void sy_buttons_line(char *o, int n) { snprintf(o, n, "BOOT %s · PWR %s", SY_BTN_NAMES[sy_boot()], SY_BTN_NAMES[sy_pwr()]); }
+static void sy_weather_line(char *o, int n) {
+  char t[8];
+  wx_deg(t, sizeof(t), wx_city[0].now);
+  snprintf(o, n, "%s · %s", wx_city[0].name, t);
+}
+static void sy_weather_city(char *o, int n) { strlcpy(o, wx_city[0].name, n); }
 static void sy_fw(char *o, int n) {
 #ifdef POPKA_PROJECT
   snprintf(o, n, "PopkaWatch · %s", POPKA_PROJECT);
@@ -130,7 +177,18 @@ static void sy_restart() {
 #define SS_IC_SUN "\xEF\x86\x85"
 #define SS_IC_BOLT "\xEF\x83\xA7"
 #define SS_IC_LOCATION "\xEF\x8F\x85"
-static UiPage sy_root, sy_display, sy_time, sy_wifi, sy_sound, sy_battery, sy_system;
+static UiPage sy_root, sy_display, sy_time, sy_wifi, sy_sound, sy_battery, sy_system, sy_faces, sy_buttons, sy_weather;
+#define SY_IC_IMAGE "\xEF\x80\xBE"
+#define SY_IC_GAMEPAD "\xEF\x84\x9B"
+#define SY_IC_CLOUD "\xEF\x83\x82"
+#define SY_IC_LOCK "\xEF\x80\xA3"
+#define SY_IC_HOUSE "\xEF\x80\x95"
+static void sy_set_units(int v) {
+  wx_fahr = v != 0, sy_put("fahr", wx_fahr);
+#if SS_WIFI
+  xTaskNotifyGive(hclk_handle);  // (fresh weather in the new units)
+#endif
+}
 static void sy_add(UiPage &p, const UiRow &r) {
   if (p.n < UI_ROWS) p.rows[p.n++] = r;
 }
@@ -173,6 +231,28 @@ static void sy_build() {
   sy_add(sy_battery, ur_info(SS_IC_BATTERY, "Level", sy_bat_level));
   sy_add(sy_battery, ur_info(SS_IC_BOLT, "Power", sy_bat_power));
   sy_add(sy_battery, ur_info(SS_IC_BATTERY, "Voltage", sy_bat_volt));
+  sy_add(sy_battery, ur_choice(SS_IC_BOLT, "Charge limit", SY_LIMIT_NAMES, 4, sy_limit, sy_set_limit));
+  if (sy_screen_of(FL_BATTERY) >= 0) {
+    UiRow r = ur_nav(SS_IC_BATTERY, "History", nullptr, nullptr);
+    r.act = sy_battery_details;
+    sy_add(sy_battery, r);
+  }
+
+  sy_faces = {"Watch faces", {}, 0, 0xFFB68A};
+  for (int i = 0; i < face_n; i++) sy_face_names[i] = face_scr[face_ids[i]].name ? face_scr[face_ids[i]].name : "Watch face";
+  sy_add(sy_faces, ur_choice(SY_IC_IMAGE, "Watch face", sy_face_names, face_n, sy_face, sy_set_face));
+  if (face_n > 1) sy_add(sy_faces, ur_toggle(SY_IC_IMAGE, "Swipe to switch", sy_fswipe, sy_set_fswipe));
+
+  sy_buttons = {"Buttons", {}, 0, 0xC7BFFF};
+  sy_add(sy_buttons, ur_choice(SY_IC_LOCK, "BOOT button", SY_BTN_NAMES, 5, sy_boot, sy_set_boot));
+  sy_add(sy_buttons, ur_choice(SY_IC_HOUSE, "PWR button", SY_BTN_NAMES, 5, sy_pwr, sy_set_pwr));
+
+  sy_weather = {"Weather", {}, 0, 0xFFB030};
+  sy_add(sy_weather, ur_info(SS_IC_LOCATION, "Location", sy_weather_city));
+  sy_add(sy_weather, ur_choice(SY_IC_CLOUD, "Units", SY_UNIT_NAMES, 2, sy_units, sy_set_units));
+#if SS_WIFI
+  sy_add(sy_weather, ur_action("Refresh now", sy_wifi_sync, 0xFFB030));
+#endif
 
   sy_system = {"System", {}, 0, 0xC7BFFF};
   sy_add(sy_system, ur_info(SS_IC_WRENCH, "Firmware", sy_fw));
@@ -182,6 +262,9 @@ static void sy_build() {
 
   sy_root = {"Settings", {}, 0, 0xA8C7FA};
   sy_add(sy_root, ur_nav(SS_IC_CONTRAST, "Display", &sy_display, sy_display_line, 0xFFD27A));
+  sy_add(sy_root, ur_nav(SY_IC_IMAGE, "Watch faces", &sy_faces, sy_faces_line, 0xFFB68A));
+  sy_add(sy_root, ur_nav(SY_IC_LOCK, "Buttons", &sy_buttons, sy_buttons_line, 0xC7BFFF));
+  sy_add(sy_root, ur_nav(SY_IC_CLOUD, "Weather", &sy_weather, sy_weather_line, 0xFFB030));
   sy_add(sy_root, ur_nav(SS_IC_CLOCK, "Time", &sy_time, sy_time_line, 0xA4F9B5));
 #if SS_WIFI
   sy_add(sy_root, ur_nav(SS_IC_WIFI, "Wi-Fi", &sy_wifi, sy_wifi_line, 0xA8C7FA));
@@ -204,6 +287,10 @@ static void sysset_begin() {
   if (sy_prefs.isKey("wraise")) pw_wake_raise = sy_prefs.getInt("wraise", pw_wake_raise);
   if (sy_prefs.isKey("shift")) pw_aod_shift = sy_prefs.getInt("shift", pw_aod_shift);
   if (sy_prefs.isKey("h24")) fc_h24 = sy_prefs.getInt("h24", fc_h24) != 0;
+  if (sy_prefs.isKey("fswipe")) fs_on = sy_prefs.getInt("fswipe", 1) != 0;
+  if (sy_prefs.isKey("boot")) pw_boot = constrain(sy_prefs.getInt("boot", pw_boot), 0, 4);
+  if (sy_prefs.isKey("pwr")) pw_pwr = constrain(sy_prefs.getInt("pwr", pw_pwr), 0, 4);
+  if (sy_prefs.isKey("fahr")) wx_fahr = sy_prefs.getInt("fahr", wx_fahr) != 0;
 #if SS_SOUND
   if (sy_prefs.isKey("vol")) vol_level = constrain(sy_prefs.getInt("vol", vol_level), 0, 10);
 #endif
