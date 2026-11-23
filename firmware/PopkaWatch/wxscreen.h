@@ -348,6 +348,10 @@ static void wx_layout_static(const FaceScreen &S, int i, float a, const HaloView
   FaceRun &R = S.run[i];
   HaloView v = v0;
   v.x += L.dx * v0.s, v.y += L.dy * v0.s;
+  if (L.kind == FL_ARC && gal_grid(S)) {  // on the launcher: the pager's curved time instead (launcher.h)
+    R.pill.alpha = 0, halo_view_commit(R.pill, v);
+    return;
+  }
   if (L.kind == FL_ARC && S.gal && S.gal->list.n) {  // on a list: HaloWatch's gallery's (gallery.h)
     gal_arc(*S.gal, R, L.color, a, v);
     R.ax = R.tx + R.arc.w / 2.0f + L.dx, R.ay = R.ty + R.arc.h / 2.0f + L.dy;  // where it stands at rest

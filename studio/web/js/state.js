@@ -262,6 +262,7 @@ export const ICONS = {
   drop: 0xF043, cloud: 0xF0C2, fire: 0xF06D, star: 0xF005, bulb: 0xF0EB, car: 0xF1B9, plane: 0xF072, stopwatch: 0xF2F2,
   image: 0xF03E, chat: 0xF086, wrench: 0xF0AD, lock: 0xF023, menu: 0xF0C9, tv: 0xF26C, mic: 0xF130,
   chip: 0xF2DB, memory: 0xF538, thermo: 0xF2C9, reset: 0xF2F1, plus: 0x002B, xmark: 0xF00D, pause: 0xF04C,
+  info: 0xF05A, tower: 0xF519, grid: 0xF009, timer: 0xF252,
 };
 // The Android 16 transition (lib/Halo: halo_nav_open) — a card's link
 export const A16 = { name: 'Push', sub: 'as on HaloWatch: the screen comes in from the right growing from 0.8, the gallery shrinks to 0.85, moves left and dims' };

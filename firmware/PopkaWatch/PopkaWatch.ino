@@ -43,8 +43,12 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #include "confirm.h"  // one confirm for the whole watch (Material 3 for Wear OS): power off first
 #include "power.h"    // the Functions: Always On, the BOOT and PWR buttons
 #include "sysset.h"   // Settings: one place for the watch's settings, many levels (on the UI kit, ui.h)
+#include "upager.h"    // paged app screens: left and right pages, big icon buttons, pickers (Wear OS, M3 Expressive)
+#include "launcher.h"  // the Apps launcher: pages of round icons, its settings (the gallery screen, on the pager)
+#if HAS_SHADE && defined(HALO_ROUND)
+#include "qsapp.h"     // the quick settings panel's pages: Controls, Levels, Shade settings (shade_round.h pulls it)
+#endif
 #if HAS_WXAPP
-#include "upager.h"   // paged app screens: left and right pages, big icon buttons, pickers (Wear OS, M3 Expressive)
 #include "wxapp.h"    // Weather: one long page on the kit — hero, 12 hours, 7 days, details, location
 #endif
 #if HAS_CLOCKS

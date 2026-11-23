@@ -1358,7 +1358,7 @@ static void gallery_begin() {
   gallery.main_list = []() -> const HaloList * {
     const int i = nav_scr[0];
     const GalRun *g = i > 0 && i < face_scr_n ? face_scr[i].gal : nullptr;
-    return g && g->list.n ? &g->list : nullptr;
+    return g && g->list.n && !gal_grid(face_scr[i]) ? &g->list : nullptr;  // (the launcher: no list)
   };
 #endif
   halo_nav_begin(gallery);
