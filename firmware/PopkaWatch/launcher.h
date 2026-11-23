@@ -55,7 +55,9 @@ static void ln_collect() {
         std::swap(ln_tile[b - 1], ln_tile[b]);
   ln_tile[ln_n++] = -1;
 }
-static int ln_count() { return max(1, (ln_n + LN_PER - 1) / LN_PER); }
+// (one grid scrolled up and down, not pages: the user's call, 23 Nov 2026 — Wear OS's launcher scrolls)
+static int ln_count() { return 1; }
+static float ln_height(int) { return 179 + 129 * ((ln_n + 2) / 3 - 1) + 150; }
 static inline float ln_tx(int k) { return 122 + 111 * (k % 3); }
 static inline float ln_ty(int k) { return 179 + 129 * (k / 3); }
 
@@ -78,8 +80,8 @@ static void ln_lay(int p, UpPage &P, float a, const HaloView &v) {
       break;
     }
   up_title(P, title, a, v);
-  for (int k = 0; k < LN_PER && p * LN_PER + k < ln_n; k++) {
-    const int li = ln_tile[p * LN_PER + k];
+  for (int k = 0; k < ln_n; k++) {
+    const int li = ln_tile[k];
     const FaceLayer *L = li >= 0 ? &S.layers[li] : nullptr;
     const float x = ln_tx(k), y = ln_ty(k);
     const uint32_t ink = L ? L->color : LN_ACCENT;
@@ -92,16 +94,16 @@ static void ln_lay(int p, UpPage &P, float a, const HaloView &v) {
   }
 }
 static void ln_tap(int p, float x, float y) {
-  for (int k = 0; k < LN_PER && p * LN_PER + k < ln_n; k++) {
+  for (int k = 0; k < ln_n; k++) {
     const float tx = ln_tx(k), ty = ln_ty(k);
     if (!up_in(x, y, tx - 50, ty - 44, tx + 50, ty + 69)) continue;
-    const int li = ln_tile[p * LN_PER + k];
+    const int li = ln_tile[k];
     if (li < 0) ln_want_set = true;  // (opened after the pager's state is put back)
     else gl_req = &ln_scr->layers[li], gl_req_depth = ln_depth;
     return;
   }
 }
-static const UpApp LN_APP = {ln_count, ln_lay, ln_tap, nullptr, nullptr, LN_ACCENT};
+static const UpApp LN_APP = {ln_count, ln_lay, ln_tap, nullptr, nullptr, LN_ACCENT, ln_height, false};
 
 // ---------- Launcher settings ----------
 static int ln_set_count() { return 1; }

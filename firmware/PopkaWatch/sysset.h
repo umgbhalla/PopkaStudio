@@ -615,21 +615,35 @@ static void sg_more(int cat) {
 #endif
   if (pg) ui_cur = 0, ui_open(pg);
 }
-static void sg_update(int p, float dt) {
-  const HaloFinger &f = halo_finger;
-  // wrap: let go past an end (its rubber) — the page at the other end comes in from that side
-  static bool was_drag;
-  if (was_drag && !up_drag && sg_wrap && sg_n > 1) {
-    if (up_page == 0 && up_pos.x < -0.04f) up_page = sg_n - 1, up_pos.x = sg_n - 0.5f, up_pos.v = 0, up_pos.target = up_page;
-    else if (up_page == sg_n - 1 && up_pos.x > sg_n - 1 + 0.04f) up_page = 0, up_pos.x = -0.5f, up_pos.v = 0, up_pos.target = 0;
+// ---------- One scrolling list, not pages (the user's call, 23 Nov 2026: Settings is vertical, as Wear OS's) ----------
+// The seven categories one under another, SG_SEC apart, scrolled up and down; a tap goes to the category under it in
+// its own coordinates; a panel opens over the list as before
+#define SG_SEC 360.0f
+static int sgv_count() { return 1; }
+static float sgv_height(int) { return sg_n * SG_SEC + 106; }
+static inline int sgv_at(float y) { return constrain((int)((y - 40) / SG_SEC), 0, sg_n - 1); }
+static void sgv_lay(int, UpPage &P, float a, const HaloView &v) {
+  for (int k = 0; k < sg_n; k++) {
+    HaloView vv = v;
+    vv.y += k * SG_SEC * v.s;
+    if (vv.y + 440 * v.s < -40 || vv.y + 60 * v.s > HALO_H + 40) continue;  // (off screen: not laid out)
+    sg_lay(k, P, a, vv);
   }
-  was_drag = up_drag;
-  // the page seen last (Open to: Last category), kept once the page has settled
-  if (!up_drag && fabsf(up_pos.x - up_page) < 0.02f && sg_cat[up_page] != sg_last) sg_last = sg_cat[up_page], sy_put("sglast", sg_last);
-  // a long press (held still 0.6 s on nothing that took it): the page's full list
+}
+static void sgv_tap(int, float x, float y) {
+  const int k = sgv_at(y);
+  sg_tap(k, x, y - k * SG_SEC);
+}
+static void sgv_update(int, float dt) {
+  const HaloFinger &f = halo_finger;
+  const float sc = up_sy[0].x;
+  // the category seen last (Open to: Last category): the one at the middle of the screen once still
+  const int mid = sgv_at(sc + CY);
+  if (fabsf(up_sy[0].v) < 1 && sg_cat[mid] != sg_last) sg_last = sg_cat[mid], sy_put("sglast", sg_last);
+  // a long press (held still 0.6 s on nothing that took it): that category's full list
   static bool held;
   if (!f.down) held = false;
-  else if (!held && !f.dragging && !f.owner && halo_ms() - f.t0 > 600 && !up_drag) held = true, sg_more(sg_cat[p]);
+  else if (!held && !f.dragging && !f.owner && halo_ms() - f.t0 > 600) held = true, sg_more(sg_cat[sgv_at(f.y + sc)]);
   (void)dt;
 }
 
@@ -750,15 +764,16 @@ static void sg_child_open(int which) {
 // The screen (settings.h calls these): the pages, opened on Display or on the page seen last
 static void sysset_enter() {
   if (!sg_n) sg_cats();
-  SG_APP = {sg_count, sg_lay, sg_tap, sg_update, nullptr, SG_ACC[SG_DISPLAY]};
-  up_open(&SG_APP, sg_open_last ? sg_page_of(sg_last) : 0);
+  SG_APP = {sgv_count, sgv_lay, sgv_tap, sgv_update, nullptr, SG_ACC[SG_DISPLAY], sgv_height, false};
+  up_open(&SG_APP, 0);
+  if (sg_open_last) halo_spring_set(up_sy[0], sg_page_of(sg_last) * SG_SEC);  // (open at the category seen last)
 }
 static void sysset_update(float dt) {
   up_over = nullptr;  // (a panel closed: upcheck audits the pages again)
   up_update(dt);
 }
 static void sysset_layout(const HaloView &v) {
-  if (up_app == &SG_APP) SG_APP.accent = SG_ACC[sg_cat[constrain((int)roundf(up_pos.x), 0, sg_n - 1)]];  // (the dot's)
+  if (up_app == &SG_APP) SG_APP.accent = SG_ACC[sg_cat[sgv_at(up_sy[0].x + CY)]];
   up_layout(v);
 }
 static void sysset_draw() { up_draw(); }
