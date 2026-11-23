@@ -114,6 +114,7 @@ static float ur_height(const UiRow &r) {
 
 // ---------- A page on screen ----------
 #define UI_IT 9  // items a row: surface, chip, glyph, title, line, track, fill, and two at the end (chevron, −/+, thumb)
+extern const HaloFont gl_up_clock;  // (the time text: studio.py GALLERY_FONTS)
 struct UiRun {
   const UiPage *pg;
   HaloList list;
@@ -276,13 +277,14 @@ static void ui_layout(int k, const HaloView &v) {
   // The time along the top edge: over the first 36 dp of scrolling it goes up 24 dp and shrinks to 0.5, then is gone
   if (strcmp(ui_clock_of, fc_time)) {
     if (!ui_mid_clock) ui_mid_clock = halo_text_mid(gl_t20, "0123456789");
-    halo_text_arc(ui_clock_mask, gl_t20, fc_time, ui_mid_clock, 206, 0, false, 1, &ui_clock_x, &ui_clock_y);  // (inside the ring's lane)
+    // (one time text on every screen: the pager's cut and place — upager.h, the Apps list's Top clock layer)
+    halo_text_arc(ui_clock_mask, gl_up_clock, fc_time, halo_text_mid(gl_up_clock, "0123456789"), 197, 0, false, 1, &ui_clock_x, &ui_clock_y);
     strlcpy(ui_clock_of, fc_time, sizeof(ui_clock_of));
   }
   {
     const float tt = 1 - halo_clamp01((R.list.top - R.list.scroll) / (36 * DP)), kk = 0.5f + 0.5f * tt;
     HaloItem &c = R.clock;
-    c.kind = HI_MASK, c.mask = &ui_clock_mask, c.color = GL_TEXT, c.on_black = true, c.on = &halo_black, c.scale = kk;
+    c.kind = HI_MASK, c.mask = &ui_clock_mask, c.color = 0xB7B5C1, c.on_black = true, c.on = &halo_black, c.scale = kk;
     c.x = CX - (CX - ui_clock_x) * kk + ui_clock_mask.w * kk / 2, c.y = ui_clock_y - 24 * DP * (1 - tt) + ui_clock_mask.h * kk / 2;
     c.alpha = tt > 0.02f && ui_clock_mask.bits ? kk : 0;
     halo_view_commit(c, v);

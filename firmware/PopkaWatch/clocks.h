@@ -280,7 +280,7 @@ static const UpApp SW_APP = {sw_count, sw_lay, sw_tap, sw_upd, sw_ring_f, SW_ACC
 #define TM_INK 0x232D0C
 static UpPicker tm_pm, tm_ps;
 static int tm_focus;  // 0 — minutes, 1 — seconds
-static char tm_pv[2][3][4], tm_main[16], tm_tail[8], tm_of[16], tm_chip[6][4];
+static char tm_pv[2][5][4], tm_main[16], tm_tail[8], tm_of[16], tm_chip[6][4];
 static HaloSpring tm_morph;
 static const int TM_PRESETS[6] = {1, 3, 5, 10, 15, 30};
 static int tm_count() { return 2; }
@@ -288,33 +288,45 @@ static void tm_go_secs(int secs) {
   if (secs <= 0) return;
   tm_total = (int64_t)secs * 1000000, tm_end = ck_now() + tm_total, tm_state = TM_RUN;
 }
+// A picker column as Wear OS's (Google's picker references): bare numbers — the value big in the middle (white in the
+// column in focus, the accent in the other), the ones before and after smaller and fading toward the edges; no panels,
+// no tiles. Dragged, or a tap on the number above or below steps it
 static void tm_column(UpPage &P, UpPicker &k, int col, float cx, float a, const HaloView &v) {
   const bool foc = tm_focus == col;
-  up_text(P, gl_up_lab, col ? "SEC" : "MIN", up_mid_lab, cx, 118, 1, foc ? TM_ACC : UP_MUTED, a, v);
-  up_rrect(P, cx - 62, 133, cx + 62, 300, 30, UP_ROW, a, v);
-  if (foc) up_rrect(P, cx - 57, 170, cx + 57, 256, 21, TM_ACC, a, v), up_rrect(P, cx - 55, 172, cx + 55, 254, 19, TM_BG, a, v);
-  else up_rrect(P, cx - 57, 170, cx + 57, 256, 21, UP_TRACK, a, v);
-  HaloItem &tile = P.it[P.n - 1];
   const int val = up_picker_value(k);
   const float frac = k.pos.x - roundf(k.pos.x);  // (sliding while dragged)
-  for (int j = -1; j <= 1; j++) {
+  for (int j = -2; j <= 2; j++) {
     const int vv = val + j;
-    const bool ok = vv >= k.lo && vv <= k.hi;
-    snprintf(tm_pv[col][j + 1], 4, "%02d", ok ? vv : 0);
-    if (!j) up_text(P, gl_up_pick, tm_pv[col][1], up_mid_pick, cx, 213 - frac * 62, 1, foc ? TM_ACC : UP_WHITE, a, v, &tile);
-    else up_text(P, gl_up_num, tm_pv[col][j + 1], up_mid_num, cx, (j < 0 ? 151 : 275) - frac * 62, 1, UP_DIM, ok ? a : 0, v);
+    const float d = j - frac, ad = fabsf(d);
+    const bool ok = vv >= k.lo && vv <= k.hi && ad < 1.9f;
+    snprintf(tm_pv[col][j + 2], 4, "%02d", ok ? vv : 0);
+    const float y = 206 + d * 74;
+    if (ad < 0.5f)
+      up_text(P, gl_up_pick, tm_pv[col][j + 2], up_mid_pick, cx, y, 1, foc ? UP_WHITE : TM_ACC, a, v);
+    else
+      up_text(P, gl_up_num, tm_pv[col][j + 2], up_mid_num, cx, y, 1, UP_DIM, ok ? a * halo_clamp01(1.6f - ad) : 0, v);
   }
+}
+// The confirm hugging the bottom edge (Wear OS's edge button): the accent, a dark glyph
+static void tm_edge(UpPage &P, const char *icon, float a, const HaloView &v) {
+  HaloItem &e = up_item(P);
+  e.kind = HI_EDGE, e.x = CX, e.y = CY, e.r = UI_EB_R, e.h = 96, e.w = 236, e.v = 48, e.scale = 1;
+  e.color = TM_ACC, e.alpha = a, e.on_black = true, e.on = nullptr;
+  up_commit(e, v);
+  up_text(P, gl_up_ic43, icon, up_mid_ic, CX + 3, CY + UI_EB_R - 48, 1, TM_INK, a, v, &e);
+  P.edge = true;  // (the dots step aside: the edge button holds the bottom)
 }
 static void tm_lay(int p, UpPage &P, float a, const HaloView &v) {
   if (p == 0) {
-    up_title(P, "Timer", a, v);
+    if (tm_state != TM_IDLE) up_title(P, "Timer", a, v);
     if (tm_state == TM_IDLE) {
-      tm_column(P, tm_pm, 0, 155, a, v);
-      up_text(P, gl_up_num, ":", up_mid_num, CX, 213, 1, UP_MUTED, a, v);
-      tm_column(P, tm_ps, 1, 311, a, v);
+      // (Google's time picker: the focused field's name on top, the two columns, the confirm at the bottom edge)
+      up_text(P, gl_up_lab, tm_focus ? "SECONDS" : "MINUTES", up_mid_lab, CX, 108, 1, UP_MUTED, a, v);
+      tm_column(P, tm_pm, 0, 160, a, v);
+      up_text(P, gl_up_disp, ":", up_mid_disp, CX, 200, 1, UP_DIM, a, v);
+      tm_column(P, tm_ps, 1, 306, a, v);
       const bool ok = up_picker_value(tm_pm) * 60 + up_picker_value(tm_ps) > 0;
-      up_secondary(P, UP_SEC_X, 360, UP_SEC_R, UP_IC_GRID, TM_BG, TM_ACC, a, v);
-      up_primary(P, UP_PRI_X, 360, UP_PRI_R, 0, UP_IC_PLAY, TM_ACC, TM_INK, ok ? a : a * 0.35f, v);
+      tm_edge(P, UP_IC_PLAY, ok ? a : a * 0.35f, v);
     } else {
       ck_hms(tm_main, sizeof(tm_main), tm_left() + 999999, false, tm_tail, sizeof(tm_tail));
       up_text(P, gl_up_hero, tm_main, up_mid_hero, CX, 206, 1, UP_WHITE, a, v);
@@ -346,16 +358,15 @@ static void tm_lay(int p, UpPage &P, float a, const HaloView &v) {
 static void tm_tap(int p, float x, float y) {
   if (p == 0) {
     if (tm_state == TM_IDLE) {
+      if (y > CY + UI_EB_R - 100) return tm_go_secs(up_picker_value(tm_pm) * 60 + up_picker_value(tm_ps));  // (the edge)
       for (int col = 0; col < 2; col++) {
-        const float cx = col ? 311 : 155;
+        const float cx = col ? 306 : 160;
         UpPicker &k = col ? tm_ps : tm_pm;
-        if (x < cx - 62 || x > cx + 62) continue;
-        if (up_in(x, y, cx - 62, 122, cx + 62, 170)) up_picker_step(k, -1), tm_focus = col;
-        else if (up_in(x, y, cx - 62, 256, cx + 62, 304)) up_picker_step(k, 1), tm_focus = col;
-        else if (up_in(x, y, cx - 62, 170, cx + 62, 256)) tm_focus = col;
+        if (x < cx - 70 || x > cx + 70) continue;
+        if (up_in(x, y, cx - 70, 110, cx + 70, 170)) up_picker_step(k, -1), tm_focus = col;
+        else if (up_in(x, y, cx - 70, 244, cx + 70, 330)) up_picker_step(k, 1), tm_focus = col;
+        else tm_focus = col;
       }
-      if (up_hit(x, y, UP_SEC_X, 360, UP_SEC_R)) up_go(1);
-      else if (up_hit(x, y, UP_PRI_X, 360, UP_PRI_R)) tm_go_secs(up_picker_value(tm_pm) * 60 + up_picker_value(tm_ps));
     } else if (up_hit(x, y, UP_PRI_X, UP_ROW_Y, UP_PRI_R)) {
       if (tm_state == TM_RUN) tm_left_p = tm_left(), tm_state = TM_PAUSED;
       else tm_end = ck_now() + tm_left_p, tm_state = TM_RUN;
@@ -377,12 +388,12 @@ static void tm_upd(int p, float dt) {
   ck_morph(tm_morph, tm_state == TM_RUN, dt);
   if (p == 0 && tm_state == TM_IDLE) {
     const bool was = tm_pm.drag || tm_ps.drag;
-    up_picker_update(tm_pm, 155, 62, dt), up_picker_update(tm_ps, 311, 62, dt);
+    up_picker_update(tm_pm, 160, 70, dt), up_picker_update(tm_ps, 306, 70, dt);
     if (!was && tm_pm.drag) tm_focus = 0;
     if (!was && tm_ps.drag) tm_focus = 1;
   }
 }
-static float tm_ring_f() { return tm_state == TM_IDLE ? -1 : tm_total > 0 ? (float)tm_left() / tm_total : -1; }
+static float tm_ring_f() { return tm_state == TM_IDLE ? -2 : tm_total > 0 ? (float)tm_left() / tm_total : -1; }
 static const UpApp TM_APP = {tm_count, tm_lay, tm_tap, tm_upd, tm_ring_f, TM_ACC};
 
 // World clock: a page a place — here (the weather's city), then each city picked: its name, its time big, its UTC

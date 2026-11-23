@@ -272,7 +272,8 @@ DEFAULTS = {
     "clock": {"name": "Clock", "size": 148, "weight": 580, "width": 106, "spacing": -1, "color": "#F8F7F9"},
     "weather": {"name": "Weather", "scale": 1, "spacing": 0, "color": "#2D2F2F", "color2": "#F8F7F9", "pill": True},
     # The Weather screen (projects/HaloWatch/weather.h and halo.conf: t24, t_title, w_now, w_hl, w_hour)
-    "arc": {"name": "Top clock", "size": 24, "weight": 620, "width": 104, "spacing": 1, "radius": 219, "color": "#C6C6C6"},
+    # (the time along the top: the same cut and place as every app's — upager.h, ui.h — one look on every screen)
+    "arc": {"name": "Top clock", "size": 35, "weight": 690, "width": 81, "spacing": 0, "radius": 197, "color": "#B7B5C1"},
     "city": {"name": "City", "size": 34, "weight": 620, "width": 104, "spacing": 0, "color": "#F9F9F9"},
     "wxicon": {"name": "Weather icon", "scale": 1},
     "wxtemp": {"name": "Temperature", "size": 91, "weight": 660, "width": 100, "spacing": 0, "color": "#F9F9F9"},

@@ -31,7 +31,7 @@ export const KINDS = {
   // Not on HaloWatch: pixel art drawn cell by cell (pixelart.h) — Popka, the parrot, and the notes it sings
   parrot: { group: 'face', name: 'Popka', sub: 'Pixel art: the parrot flaps its wings and sings', scale: 1, angle: 0, sparkles: 'around' },
   steps: { group: 'face', name: 'Steps pill', sub: 'Pill: a ring to the goal round a shoe, and today\'s steps', scale: 1, spacing: 0, color: '#2D2F2F', color2: '#F8F7F9', color3: '#FF8A80', goal: 10000, pill: true },
-  arc: { group: 'weather', name: 'Top clock', sub: 'The time along the top edge', size: 24, weight: 620, width: 104, spacing: 1, radius: 219, color: '#C6C6C6' },
+  arc: { group: 'weather', name: 'Top clock', sub: 'The time along the top edge', size: 35, weight: 690, width: 81, spacing: 0, radius: 197, color: '#B7B5C1' },
   city: { group: 'weather', name: 'City', sub: 'The page\'s city', size: 34, weight: 620, width: 104, spacing: 0, color: '#F9F9F9' },
   wxicon: { group: 'weather', name: 'Weather icon', sub: 'Left of the temperature', scale: 1 },
   wxtemp: { group: 'weather', name: 'Temperature', sub: 'Now, in big digits', size: 91, weight: 660, width: 100, spacing: 0, color: '#F9F9F9' },

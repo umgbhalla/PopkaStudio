@@ -47,6 +47,7 @@ struct UpBlob {  // drawn per pixel, in the page's item order: a primary button'
 struct UpPage {
   HaloItem it[UP_IT];
   int n, nb;
+  bool edge;  // an edge button holds the bottom: no page dots over it
   UpBlob b[UP_BLOBS];
 };
 struct UpApp {
@@ -302,7 +303,7 @@ static void up_layout(const HaloView &v) {
     HaloView pv = v;
     pv.x += dx * v.s, pv.y -= up_sy[p].x * v.s;  // (moved by the swipe, and up by its scroll)
     const int was = P.n, wasb = P.nb;
-    P.n = 0, P.nb = 0;
+    P.n = 0, P.nb = 0, P.edge = false;
     up_app->lay(p, P, 1, pv);
     for (int i = P.n; i < was; i++) P.it[i].alpha = 0, halo_view_commit(P.it[i], pv);  // (fewer than last frame)
     for (int k = P.nb; k < wasb; k++) {  // (a shape no longer there)
@@ -329,7 +330,8 @@ static void up_layout(const HaloView &v) {
     HaloItem &d = up_dot[p];
     const float on = halo_clamp01(1 - fabsf(up_pos.x - p));
     d.kind = HI_CIRCLE, d.x = CX + (p - (n - 1) / 2.0f) * 19, d.y = UP_DOTS_Y, d.r = 4 + on, d.scale = 1;
-    d.color = ui_mix(UP_DOT, acc, on), d.alpha = n > 1 && p < n ? 1 - gone : 0, d.on_black = true, d.on = nullptr;  // (scrolled: away)
+    const bool edge = up_pg[up_page].edge;
+    d.color = ui_mix(UP_DOT, acc, on), d.alpha = n > 1 && p < n && !edge ? 1 - gone : 0, d.on_black = true, d.on = nullptr;  // (scrolled, an edge button: away)
     halo_view_commit(d, v);
   }
 }
