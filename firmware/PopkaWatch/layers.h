@@ -302,7 +302,7 @@ static FaceRun (&screen31_run)[1] = face_runs<1>();
 
 // Modular
 static FaceLayer screen32_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xF1F0F4, 0xFFB68A, 0, &font18, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xC4C7C5, &font19, 19.0f, 0.0f, &font20, nullptr},  // Modular
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xF1F0F4, 0xFFB68A, 0, &font18, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0xC4C7C5, &font19, 19.0f, 0.0f, &font20, &font21},  // Modular
 };
 static FaceRun (&screen32_run)[1] = face_runs<1>();
 
@@ -314,13 +314,13 @@ static FaceRun (&screen33_run)[1] = face_runs<1>();
 
 // Words
 static FaceLayer screen34_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE3E2E6, 0x7FCFFF, 0, &font21, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, &font22, 21.0f, 0.0f, nullptr, nullptr},  // Words
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE3E2E6, 0x7FCFFF, 0, &font22, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, &font23, 21.0f, 0.0f, nullptr, nullptr},  // Words
 };
 static FaceRun (&screen34_run)[1] = face_runs<1>();
 
 // Big type
 static FaceLayer screen35_layers[] = {
-    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE8DEF8, 0xCDB4FF, 0, &font23, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, nullptr, 22.0f, 0.0f, nullptr, nullptr},  // Big type
+    {FL_SCLOCK, 0.0f, 0.0f, 1.0f, 0xE8DEF8, 0xCDB4FF, 0, &font24, nullptr, -1, HALO_FX_FADE, 0.0f, false, nullptr, nullptr, nullptr, 0x5E5F64, nullptr, 22.0f, 0.0f, nullptr, nullptr},  // Big type
 };
 static FaceRun (&screen35_run)[1] = face_runs<1>();
 

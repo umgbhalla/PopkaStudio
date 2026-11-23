@@ -192,9 +192,11 @@ SC_LOOKS = {
                    ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=560,ROND=100", None),
                    ("GoogleSansFlex.ttf", 42, 56, "digits", "wght=700,ROND=100", None)],
     # Modular: the time, the gauges' values, the labels and the chip
-    "modular": [("GoogleSansFlex.ttf", 104, 140, GSF_DIGITS, "wght=560,ROND=100", None),
+    "modular": [("GoogleSansFlex.ttf", 118, 156, GSF_DIGITS, "wght=560,ROND=100", None),
                 ("GoogleSansFlex.ttf", 30, 40, 'digits "°%:-"', "wght=680,ROND=100", None),
-                ("GoogleSansFlex.ttf", 15, 20, '"NOWSUETBAYMDHFRI" digits', "wght=760,ROND=100", None)],
+                ("GoogleSansFlex.ttf", 18, 24, '"SUNMOTEWDHFRIA" digits', "wght=720,ROND=100", None),
+                # (a value of more than three signs — a time, 17:59 — in the same size, narrower: it fits the disc)
+                ("GoogleSansFlex.ttf", 30, 40, 'digits ":-"', "wght=680,wdth=68,ROND=100", None)],
     # Weave: no text — the field, the hands
     "weave": [],
     # Words: the hour (bold) and the minutes (light), written out

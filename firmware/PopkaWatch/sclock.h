@@ -652,6 +652,7 @@ static void sc_layer_build(const FaceScreen &S, int i) {
     case SC_RINGS:
     case SC_BIGTYPE:
       c->g[0] = sc_mid(L.font), c->g[1] = sc_mid(L.font2), c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI0123");
+      c->g[3] = sc_mid(L.font4);
       break;
     case SC_WORDS:
       c->g[0] = sc_mid(L.font, "Twelve"), c->g[1] = sc_mid(L.font2, "oh twenty");
@@ -1270,19 +1271,23 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
 #endif
 #if SC_ON(SC_MODULAR)
     case SC_MODULAR: {
-      // Modular (our own, no fitness): the weekday with the day in a chip, the time big, three round gauges — the
-      // weather now (of −10 … 40°), the sunset (the day gone), the battery. color — the time; color2 — the gauges'
-      // accent (each has its own hue: warm, gold, green — from color2 as the first); color3 — the labels
-      const float R = 228 * k, gr = R * 0.19f;
-      sc_ob = ob;  // (over a scene or another layer: blended)
+      // Modular (our own, no fitness): the weekday with the day in a chip, the time, and one row of three gauges — the
+      // weather now (−10 … 40°), the day gone by the sunset, the battery. Optical balance (the user's review, 23 Nov
+      // 2026): the three groups are one block centred on the dial with equal gaps between them; the row is no wider
+      // than the time; each disc holds one value (a time in the narrow cut); the gauges are 262° arcs open at the
+      // bottom. color — the time and values; color2 — the first gauge's hue; color3 — the weekday
+      const float gr = 40 * k, gap = 28 * k, chip_h = 36 * k, time_h = 86 * k;  // (the time leads: taller than a disc)
+      // (+7: the measured ink of the block — the time's digits sit below their box's middle — centred on the dial)
+      const float top = ay - (chip_h + gap + time_h + gap + 2 * gr) / 2 + 7 * k;
+      const float cy0 = top + chip_h / 2, ty = top + chip_h + gap + time_h / 2, ry = top + chip_h + gap + time_h + gap + gr;
+      sc_ob = ob;
       strlcpy(c.txt[0], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[1], 8, "%d", sc_tm.tm_mday);
-      const float cy0 = ay - R * 0.60f, w1 = dl_width(L.font3, c.txt[0], DL_TRACK), cw = R * 0.20f, gap = 8 * k;
-      const float x0 = ax - (w1 + gap + cw) / 2;
+      const float w1 = dl_width(L.font3, c.txt[0], DL_TRACK), cw = 52 * k, cgap = 12 * k, x0 = ax - (w1 + cgap + cw) / 2;
       dl_text(c.it[n++], L.font3, c.txt[0], x0, cy0, c.g[2], 0, L.color3, a, v, &halo_black, DL_TRACK);
       HaloItem &chip = c.it[n++];
-      sc_rrect(chip, x0 + w1 + gap + cw / 2, cy0, cw, R * 0.14f, R * 0.04f, 0x2E3036, a, v);
-      dl_text(c.it[n++], L.font3, c.txt[1], x0 + w1 + gap + cw / 2, cy0, c.g[2], 1, L.color, a, v, &chip);
-      dl_text(c.it[n++], L.font, fc_time, ax, ay - R * 0.20f, c.g[0], 1, L.color, a, v, &halo_black);
+      sc_rrect(chip, x0 + w1 + cgap + cw / 2, cy0, cw, chip_h, 9 * k, 0x2E3036, a, v);
+      dl_text(c.it[n++], L.font3, c.txt[1], x0 + w1 + cgap + cw / 2, cy0, c.g[2], 1, L.color, a, v, &chip);
+      dl_text(c.it[n++], L.font, fc_time, ax, ty, c.g[0], 1, L.color, a, v, &halo_black);
       const WxCity &w = wx_city[0];
       const HaloBattery b = halo_battery();
       const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
@@ -1300,18 +1305,22 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
         fr[1] = halo_clamp01((now_m - 360) / fmaxf(1, set_m - 360));  // (from 6 a.m. to the sunset)
       }
 #endif
-      snprintf(c.txt[4], 8, "%d", pct);  // (the label says what it is: no % — 100 fits the disc)
-      const uint32_t hue[3] = {L.color2, sc_mix(L.color2, 0xFFD580, 0.7f), 0xA4F9B5};
-      const float gx[3] = {ax - R * 0.50f, ax, ax + R * 0.50f}, gy[3] = {ay + R * 0.30f, ay + R * 0.60f, ay + R * 0.30f};
+      snprintf(c.txt[4], 8, "%d", pct);
+      // (three hues of one lightness — none pulls the eye: peach, gold, mint)
+      const uint32_t hue[3] = {L.color2, 0xE9C46A, 0x8FD9A8};
+      const float pitch = 2 * gr + 16 * k, A0 = -131 * HALO_PI / 180, SW = 262 * HALO_PI / 180;
       for (int g = 0; g < 3; g++) {
+        const float gx = ax + (g - 1) * pitch;
         HaloItem &disc = c.it[n++];
-        sc_circle(disc, gx[g], gy[g], gr, 0x1B1C1F, a, v);
-        dl_ring(c.it[n++], gx[g], gy[g], gr - 4 * k, 6 * k, fr[g], hue[g], 0x303238, a, v);
-        dl_text(c.it[n++], L.font2, c.txt[2 + g], gx[g], gy[g], c.g[1], 1, L.color, a, v, &disc);  // (one value: no label)
+        sc_circle(disc, gx, ry, gr, 0x161618, a, v);
+        dl_arc(c.it[n++], gx, ry, gr - 3 * k, 4 * k, A0, A0 + SW, 0x34363C, a, v);  // the track
+        dl_arc(c.it[n++], gx, ry, gr - 3 * k, 4 * k, A0, A0 + SW * fmaxf(0.001f, fr[g]), hue[g], fr[g] > 0 ? a : 0, v);
+        const bool narrow = strlen(c.txt[2 + g]) > 4 && L.font4;  // (17:59: the narrow cut)
+        dl_text(c.it[n++], narrow ? L.font4 : L.font2, c.txt[2 + g], gx, ry, narrow ? c.g[3] : c.g[1], 1, L.color, a, v, &disc);
       }
       c.ncap = 0, c.d[10] = n, c.d[11] = 0;
       sc_hide_caps(c, 0);
-      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      sc_box_add(box, halo_view_x(v, ax - 228 * k), halo_view_y(v, ay - 228 * k), halo_view_x(v, ax + 228 * k), halo_view_y(v, ay + 228 * k));
       break;
     }
 #endif
