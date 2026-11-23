@@ -46,6 +46,7 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #include "launcher.h"  // the Apps launcher: pages of round icons, its settings (the gallery screen, on the pager)
 #if HAS_SHADE && defined(HALO_ROUND)
 #include "qsapp.h"     // the quick settings panel's pages: Controls, Levels, Shade settings (shade_round.h pulls it)
+#endif
 #if HAS_WXAPP
 #include "wxapp.h"    // Weather: one long page on the kit — hero, 12 hours, 7 days, details, location
 #endif
@@ -54,6 +55,7 @@ static inline bool halo_clock_valid() {  // no Wi-Fi: the time comes from the co
 #endif
 #if HAS_MUSIC && defined(HALO_ROUND)
 #include "muapp.h"    // Music on the round board: Now playing, Volume, Queue, Music settings — paged (upager.h)
+#endif
 #if HAS_RECORDER && defined(HALO_ROUND)
 #include "recapp.h"   // the Recorder's pages: capture, Recordings (and a clip's playback), its settings (upager.h)
 #endif

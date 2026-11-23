@@ -58,7 +58,8 @@
 #define FN_WAKE_RAISE 1
 #define FN_WAKE_BTN 1
 #endif
-enum { FN_NOTHING, FN_SCREEN_OFF, FN_LOCK, FN_AMBIENT, FN_HOME };  // what a button does
+enum { FN_NOTHING, FN_SCREEN_OFF, FN_LOCK, FN_AMBIENT, FN_HOME, FN_BACK };  // what a button does (Back — a level back,
+// then home; Home — straight to the clock; on the face both open Apps)
 #define PW_AWAKE 180        // the panel awake: HaloWatch's default brightness
 #define PW_AOD_SCALE 0.95f  // Always On and dark: everything 5 % smaller
 #define PW_LISTEN_S 3       // locked: awake this long after a wake-up, for the button's long press
@@ -169,7 +170,7 @@ static void pw_locked_display(bool on) {
 
 // A button pressed (1 — BOOT, 2 — PWR; held — its long press) with what it does
 static void pw_button(int btn, int fn, bool held, int64_t now) {
-  if (fn == FN_HOME && !held && !pw_locked && pw_mode != PW_AOD && pw_mode != PW_DARK) {  // (asleep or locked: below)
+  if ((fn == FN_HOME || fn == FN_BACK) && !held && !pw_locked && pw_mode != PW_AOD && pw_mode != PW_DARK) {  // (asleep or locked: below)
     const bool animate = !pw_locked && pw_mode == PW_ACTIVE && pw_amb.x == 0;
 #ifdef HALO_ROUND
     bool open_apps = btn == 2 && animate && halo_nav_on_face();
@@ -187,7 +188,7 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
 #ifdef HALO_ROUND
     // A pseudo back (the user's word, 23 Nov 2026): inside an app or a page opened over one — back a level; on the
     // Apps list itself, over the face, or with quick settings out — home to the clock (the face: Apps, as before)
-    if (btn == 2 && animate && !shade_was && !open_apps && (halo_nav_depth() > 0 || halo_nav_over())) {
+    if (fn == FN_BACK && animate && !shade_was && !open_apps && (halo_nav_depth() > 0 || halo_nav_over())) {
       halo_nav_back();
       if (!pw_locked) pw_wake(0);
       return;
@@ -262,7 +263,7 @@ static void power_tick(float dt) {
   if (halo_take_palm() && pw_palm_lock && !pw_locked && !pw_debug) {
     halo_finger = {};
     pw_lock_set(true, 0);
-    pw_locked_display(false);
+    pw_locked_display(true);  // (the locked Always On screen, not black: the user's call, 23 Nov 2026)
     return;  // the cover takes priority over other input in the same frame
   }
 #endif

@@ -1783,7 +1783,7 @@ function wakeGroup() {
 }
 
 const PRESS = [['none', 'Nothing'], ['off', 'Screen off'], ['aod', 'Always On'], ['lock', 'Lock']];
-if (ROUND) PRESS.push(['home', 'Clock']);
+if (ROUND) PRESS.push(['home', 'Clock'], ['back', 'Back']);  // (Back: a level back, then the clock)
 function pressOf(id) {
   const now = () => (fnOf(id).on ? fnOf(id).act : 'none');
   const buttons = PRESS.map(([v, t]) => {

@@ -63,11 +63,11 @@ static void sy_set_face(int i) {
 static int sy_fswipe() { return fs_on; }
 static void sy_set_fswipe(int v) { fs_on = v != 0, sy_put("fswipe", fs_on); }
 // The buttons: what a press does (power.h's FN_*: nothing, screen off, lock, Always On, home)
-static const char *const SY_BTN_NAMES[] = {"Nothing", "Screen off", "Lock", "Always On", "Home"};
-static int sy_boot() { return constrain(pw_boot, 0, 4); }
-static void sy_set_boot(int v) { pw_boot = constrain(v, 0, 4), sy_put("boot", pw_boot); }
-static int sy_pwr() { return constrain(pw_pwr, 0, 4); }
-static void sy_set_pwr(int v) { pw_pwr = constrain(v, 0, 4), sy_put("pwr", pw_pwr); }
+static const char *const SY_BTN_NAMES[] = {"Nothing", "Screen off", "Lock", "Always On", "Home", "Back"};
+static int sy_boot() { return constrain(pw_boot, 0, 5); }
+static void sy_set_boot(int v) { pw_boot = constrain(v, 0, 5), sy_put("boot", pw_boot); }
+static int sy_pwr() { return constrain(pw_pwr, 0, 5); }
+static void sy_set_pwr(int v) { pw_pwr = constrain(v, 0, 5), sy_put("pwr", pw_pwr); }
 // Weather: the units (the next fetch asks in them — fetched now, with Wi-Fi)
 static const char *const SY_UNIT_NAMES[] = {"Celsius", "Fahrenheit"};
 static int sy_units() { return wx_fahr ? 1 : 0; }
@@ -219,8 +219,8 @@ static void sy_build() {
   if (face_n > 1) sy_add(sy_faces, ur_toggle(SY_IC_IMAGE, "Swipe to switch", sy_fswipe, sy_set_fswipe));
 
   sy_buttons = {"Buttons", {}, 0, 0xC7BFFF};
-  sy_add(sy_buttons, ur_choice(SY_IC_LOCK, "BOOT button", SY_BTN_NAMES, 5, sy_boot, sy_set_boot));
-  sy_add(sy_buttons, ur_choice(SY_IC_HOUSE, "PWR button", SY_BTN_NAMES, 5, sy_pwr, sy_set_pwr));
+  sy_add(sy_buttons, ur_choice(SY_IC_LOCK, "BOOT button", SY_BTN_NAMES, 6, sy_boot, sy_set_boot));
+  sy_add(sy_buttons, ur_choice(SY_IC_HOUSE, "PWR button", SY_BTN_NAMES, 6, sy_pwr, sy_set_pwr));
 
   sy_system = {"System", {}, 0, 0xC7BFFF};
   sy_add(sy_system, ur_toggle(SS_IC_CLOCK, "24-hour clock", sy_h24, sy_set_h24));
@@ -244,8 +244,8 @@ static void sysset_begin() {
   if (sy_prefs.isKey("shift")) pw_aod_shift = sy_prefs.getInt("shift", pw_aod_shift);
   if (sy_prefs.isKey("h24")) fc_h24 = sy_prefs.getInt("h24", fc_h24) != 0;
   if (sy_prefs.isKey("fswipe")) fs_on = sy_prefs.getInt("fswipe", 1) != 0;
-  if (sy_prefs.isKey("boot")) pw_boot = constrain(sy_prefs.getInt("boot", pw_boot), 0, 4);
-  if (sy_prefs.isKey("pwr")) pw_pwr = constrain(sy_prefs.getInt("pwr", pw_pwr), 0, 4);
+  if (sy_prefs.isKey("boot")) pw_boot = constrain(sy_prefs.getInt("boot", pw_boot), 0, 5);
+  if (sy_prefs.isKey("pwr")) pw_pwr = constrain(sy_prefs.getInt("pwr", pw_pwr), 0, 5);
   if (sy_prefs.isKey("fahr")) wx_fahr = sy_prefs.getInt("fahr", wx_fahr) != 0;
   sg_open_last = sy_prefs.getInt("sgopen", 0) != 0, sg_wrap = sy_prefs.getInt("sgwrap", 0) != 0;
   sg_last = sy_prefs.getInt("sglast", 0);
@@ -643,8 +643,8 @@ static int sg_child_cat() { return sg_child == SGC_WAKE ? SG_DISPLAY : sg_child 
 static const char *sg_child_title() {
   return sg_child == SGC_WAKE ? "Wake options" : sg_child == SGC_BOOT ? "BOOT action" : sg_child == SGC_PWR ? "PWR action" : "Settings app";
 }
-static const float SG_ACT_XY[5][2] = {{151, 162}, {315, 162}, {151, 239}, {315, 239}, {233, 316}};
-static const char *const SG_ACT_IC[5] = {SG_IC_BANG, SG_IC_MOON, SG_IC_LOCK, SG_IC_SUN, SG_IC_HOME};
+static const float SG_ACT_XY[6][2] = {{151, 162}, {315, 162}, {151, 239}, {315, 239}, {151, 316}, {315, 316}};
+static const char *const SG_ACT_IC[6] = {SG_IC_BANG, SG_IC_MOON, SG_IC_LOCK, SG_IC_SUN, SG_IC_HOME, SG_IC_BACK};
 static void sg_child_lay(UpPage &P, float a, const HaloView &v) {
   const int cat = sg_child_cat();
   const uint32_t acc = SG_ACC[cat], tone = SG_TONE[cat];
@@ -660,7 +660,7 @@ static void sg_child_lay(UpPage &P, float a, const HaloView &v) {
     sg_text(P, gl_up_lab, "SCREEN TIMEOUT", CX, 343, 1, UP_MUTED, a, v);
   } else if (sg_child == SGC_BOOT || sg_child == SGC_PWR) {
     const int cur = sg_child == SGC_BOOT ? sy_boot() : sy_pwr();
-    for (int k = 0; k < 5; k++) {
+    for (int k = 0; k < 6; k++) {
       const float x = SG_ACT_XY[k][0], y = SG_ACT_XY[k][1];
       const bool on = k == cur;
       const uint32_t ink = on ? SG_INK : acc;
@@ -692,7 +692,7 @@ static void sg_child_tap(float x, float y) {
     else if (sg_in_disc(x, y, 109, 325, 30)) sy_set_idle(max(0, sy_idle() - 1));
     else if (sg_in_disc(x, y, 357, 325, 30)) sy_set_idle(min(3, sy_idle() + 1));
   } else if (sg_child == SGC_BOOT || sg_child == SGC_PWR) {
-    for (int k = 0; k < 5; k++)
+    for (int k = 0; k < 6; k++)
       if (up_in(x, y, SG_ACT_XY[k][0] - 72, SG_ACT_XY[k][1] - 33, SG_ACT_XY[k][0] + 72, SG_ACT_XY[k][1] + 33)) {
         (sg_child == SGC_BOOT ? sy_set_boot : sy_set_pwr)(k);
         return halo_nav_back();  // (picked: back to Buttons, which shows it)

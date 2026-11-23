@@ -412,10 +412,9 @@ ICONS = {"chevron": 0xF054, "bell": 0xF0F3, "music": 0xF001, "sun": 0xF185, "gea
          "cloud": 0xF0C2, "cloudsun": 0xF6C4, "rain": 0xF73D, "wind": 0xF72E, "hourglass": 0xF254, "globe": 0xF0AC, "flag": 0xF024, "fire": 0xF06D, "star": 0xF005, "bulb": 0xF0EB, "car": 0xF1B9, "plane": 0xF072,
          "stopwatch": 0xF2F2, "image": 0xF03E, "chat": 0xF086, "wrench": 0xF0AD, "lock": 0xF023, "menu": 0xF0C9,
          "tv": 0xF26C, "mic": 0xF130, "chip": 0xF2DB, "memory": 0xF538, "thermo": 0xF2C9,
-         "reset": 0xF2F1, "plus": 0x002B, "xmark": 0xF00D, "pause": 0xF04C}
-MU_ACCENTS = '"àáâãäåæçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßœŒ’"'  # (muapp.h: Latin letters with accents, as tracks' tags have them)
          "reset": 0xF2F1, "plus": 0x002B, "xmark": 0xF00D, "pause": 0xF04C,
          "info": 0xF05A, "tower": 0xF519, "grid": 0xF009, "timer": 0xF252}
+MU_ACCENTS = '"àáâãäåæçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßœŒ’"'  # (muapp.h: Latin letters with accents, as tracks' tags have them)
 # HaloWatch's fonts of the gallery (its halo.conf: t_title, t24, t20, ic24) — in every PopkaWatch, as gl_*
 GALLERY_FONTS = [
     "font  gl_title  GoogleSansFlex.ttf  34  latin punct \"é\"  @wght=620,wdth=104,ROND=100   # the gallery: titles, stubs",
@@ -452,7 +451,7 @@ GALLERY_FONTS = [
     "font  gl_sg_ic21 fa-solid-900.ttf    21  0xf185 0xf06e   # Display's cards",
     "font  gl_sg_ic22 fa-solid-900.ttf    22  0xf054 0xf6a9 0xf028 0xf021 0xf067 0xf068   # chevrons, mute, sync, charge steps",
     "font  gl_sg_ic23 fa-solid-900.ttf    23  0xf060   # back",
-    "font  gl_sg_ic24 fa-solid-900.ttf    24  0xf067 0xf068 0xf12a 0xf186 0xf023 0xf185 0xf015   # timeout steps, actions",
+    "font  gl_sg_ic24 fa-solid-900.ttf    24  0xf067 0xf068 0xf12a 0xf186 0xf023 0xf185 0xf015 0xf060   # timeout steps, actions",
     "font  gl_sg_ic25 fa-solid-900.ttf    25  0xf053 0xf054 0xf023 0xf011   # face arrows, the buttons' keys",
     "font  gl_sg_ic26 fa-solid-900.ttf    26  0xf1de   # App settings",
     "font  gl_sg_ic28 fa-solid-900.ttf    28  0xf185 0xf017 0xf011   # open-to cards, power off",
@@ -955,7 +954,7 @@ def clean_functions(project):
             for way in ("tap", "raise", "btn", "home", "shift"):
                 f[way] = bool(got.get(way, f[way]))
         elif "act" in f:
-            f["act"] = got.get("act") if got.get("act") in ("off", "aod", "lock", "home") else f["act"]
+            f["act"] = got.get("act") if got.get("act") in ("off", "aod", "lock", "home", "back") else f["act"]
     if not (out["aod"]["tap"] or out["aod"]["raise"] or out["aod"]["btn"]):  # (no way to wake: buttons do)
         out["aod"]["btn"] = True
     if out["wifi"]["on"] and out["bt"]["on"]:  # one at a time (internal memory: bt.h) — Wi-Fi keeps the time right
@@ -1847,7 +1846,7 @@ def write_sketch(project, folder, meta=None):
     wifi = fn["wifi"]["on"] or radio  # (the Radio brings Wi-Fi along — and Bluetooth goes: both don't fit)
     stscreen = any(layer["type"] in STEPS_SCREEN for layer in all_layers)
     steps = any(uses_steps(layer, rect) for layer in all_layers)  # (the pedometer runs)
-    act = lambda f: 0 if not f["on"] else {"off": 1, "lock": 2, "aod": 3, "home": 4}[f["act"]]
+    act = lambda f: 0 if not f["on"] else {"off": 1, "lock": 2, "aod": 3, "home": 4, "back": 5}[f["act"]]
     without = passport(project.get("board")).get("without", [])  # (what this board has not got)
     can_raise = fn["aod"]["raise"] and not steps and "raise" not in without
     h += ["// The Functions (power.h): Always On when idle, after idle s, the panel in it (of 255); BOOT and PWR: 0 — nothing,",

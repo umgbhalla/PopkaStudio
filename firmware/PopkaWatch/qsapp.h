@@ -40,15 +40,16 @@ static void qs_tile(UpPage &P, float x, float y, int ic, const char *icon, const
   up_rrect(P, x - 76, y - 53, x + 76, y + 53, 38 + (29 - 38) * k, ui_mix(QS_CARD, QS_MINT, k), a, v);
   HaloItem &t = P.it[P.n - 1];
   const uint32_t acc = dim ? UP_MUTED : ui_mix(QS_MINT, QS_INK, k);
-  ln_text(P, gl_qs_ic24, icon ? icon : QS_IC_TILE[ic], x, y - 28, 1, acc, a, v, &t);
-  ln_text(P, gl_qs_val, value, x, y + 3, 1, ui_mix(UP_WHITE, QS_INK, k), a, v, &t);
-  ln_text(P, gl_up_lab, label, x, y + 33, 1, acc, a, v, &t);
+  // (the icon says what it is, the value its state — no label: the user's rule, 23 Nov 2026)
+  (void)label;
+  ln_text(P, gl_qs_ic24, icon ? icon : QS_IC_TILE[ic], x, y - 20, 1, acc, a, v, &t);
+  ln_text(P, gl_qs_val, value, x, y + 15, 1, ui_mix(UP_WHITE, QS_INK, k), a, v, &t);
 }
 // A level: its card, − and +, the value, the marks (the first `n` of `cap` lit)
-static void qs_level(UpPage &P, float y, const char *label, const char *value, int n, int cap, float a, const HaloView &v) {
+static void qs_level(UpPage &P, float y, const char *icon, const char *value, int n, int cap, float a, const HaloView &v) {
   up_rrect(P, 65, y - 51, 401, y + 51, 36, QS_CARD, a, v);
   HaloItem &c = P.it[P.n - 1];
-  ln_text(P, gl_up_lab, label, CX, y - 29, 1, QS_MINT, a, v, &c);
+  ln_text(P, gl_qs_ic24, icon, CX, y - 29, 0.75f, QS_MINT, a, v, &c);  // (its icon, not its name)
   ln_text(P, gl_qs_lvl, value, CX, y + 1, 1, UP_WHITE, a, v, &c);
   up_secondary(P, 108, y, 28, QS_IC_MINUS, QS_TONAL, QS_MINT, a, v, gl_qs_ic24);
   up_secondary(P, 358, y, 28, QS_IC_PLUS, QS_MINT, QS_INK, a, v, gl_qs_ic24);
@@ -61,34 +62,31 @@ static void qs_level(UpPage &P, float y, const char *label, const char *value, i
 static void qs_lay(int p, UpPage &P, float a, const HaloView &v) {
   const int b = sh_bright(), vol = vol_level;
   if (p == 0) {  // Controls
-    up_title(P, "Quick Settings", a, v);
     snprintf(qs_bright_s, sizeof(qs_bright_s), "%d/8", b);
     snprintf(qs_vol_s, sizeof(qs_vol_s), "%d%%", vol * 10);
-    qs_tile(P, 151, 185, 0, nullptr, sh_wifi ? "Sync" : "Off", "WI-FI", 0, !sh_wifi, a, v);
-    qs_tile(P, 315, 185, 1, nullptr, qs_bright_s, "BRIGHTNESS", 0, false, a, v);
-    qs_tile(P, 151, 299, 2, nullptr, shade_aod_is_on() ? "On" : "Off", "ALWAYS ON", halo_clamp01(sh_on[SI_AOD].x), false, a, v);
-    qs_tile(P, 315, 299, 3, vol ? nullptr : QS_IC_MUTED, vol ? qs_vol_s : "Muted", "VOLUME", 0, false, a, v);
+    // (no heading: the tiles say it — the grid moves up into the room)
+    qs_tile(P, 151, 155, 0, nullptr, sh_wifi ? "Sync" : "Off", "WI-FI", 0, !sh_wifi, a, v);
+    qs_tile(P, 315, 155, 1, nullptr, qs_bright_s, "BRIGHTNESS", 0, false, a, v);
+    qs_tile(P, 151, 269, 2, nullptr, shade_aod_is_on() ? "On" : "Off", "ALWAYS ON", halo_clamp01(sh_on[SI_AOD].x), false, a, v);
+    qs_tile(P, 315, 269, 3, vol ? nullptr : QS_IC_MUTED, vol ? qs_vol_s : "Muted", "VOLUME", 0, false, a, v);
     const bool bat = qs_battery && sh_bat >= 0;  // (the chip: only with a reading, and when the setting keeps it)
     const int pct = constrain((int)sh_bat, 0, 100);
     snprintf(qs_bat_s, sizeof(qs_bat_s), "%d%%", pct);
-    up_rrect(P, 129, 371, 267, 407, 18, QS_TONAL, bat ? a : 0, v);
+    up_rrect(P, 129, 341, 267, 377, 18, QS_TONAL, bat ? a : 0, v);
     HaloItem &chip = P.it[P.n - 1];
     const int lv = pct >= 88 ? 4 : pct >= 63 ? 3 : pct >= 38 ? 2 : pct >= 13 ? 1 : 0;
-    ln_text(P, gl_qs_ic19, QS_IC_BAT[lv], 181, 389, 1, QS_MINT, bat ? a : 0, v, &chip);
+    ln_text(P, gl_qs_ic19, QS_IC_BAT[lv], 181, 359, 1, QS_MINT, bat ? a : 0, v, &chip);
     // the percent from where the study's "78%" (centred at 216) starts: a wider one grows to the right, off the icon
     static const float left = 216 - halo_text_width(gl_up_lab, "78%") / 2.0f;
-    ln_text(P, gl_up_lab, qs_bat_s, left, 389, 0, UP_WHITE, bat ? a : 0, v, &chip);
-    up_secondary(P, 310, 389, 25, QS_IC_GEAR, QS_CARD, QS_MINT, a, v, gl_qs_ic24);
+    ln_text(P, gl_up_lab, qs_bat_s, left, 359, 0, UP_WHITE, bat ? a : 0, v, &chip);
+    up_secondary(P, 310, 359, 25, QS_IC_GEAR, QS_CARD, QS_MINT, a, v, gl_qs_ic24);
   } else if (p == 1) {  // Levels
-    up_title(P, "Levels", a, v);
     snprintf(qs_lbright_s, sizeof(qs_lbright_s), "%d/8", b);
     snprintf(qs_lvol_s, sizeof(qs_lvol_s), "%d%%", vol * 10);
-    qs_level(P, 181, "BRIGHTNESS", qs_lbright_s, b, 8, a, v);
-    qs_level(P, 292, "VOLUME", qs_lvol_s, vol, 10, a, v);
-    up_secondary(P, 170, 377, 26, QS_IC_LOCK, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
-    up_secondary(P, 296, 377, 26, QS_IC_POWER, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
-    ln_text(P, gl_up_lab, "LOCK", 170, 412, 1, UP_MUTED, a, v);
-    ln_text(P, gl_up_lab, "SCREEN OFF", 296, 412, 1, UP_MUTED, a, v);
+    qs_level(P, 151, QS_IC_TILE[1], qs_lbright_s, b, 8, a, v);
+    qs_level(P, 262, vol ? QS_IC_TILE[3] : QS_IC_MUTED, qs_lvol_s, vol, 10, a, v);
+    up_secondary(P, 170, 357, 26, QS_IC_LOCK, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
+    up_secondary(P, 296, 357, 26, QS_IC_POWER, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
   } else {  // Shade settings
     up_title(P, "Shade settings", a, v);
     up_rrect(P, 72, 132, 394, 246, 34, QS_CARD, a, v);
@@ -114,21 +112,21 @@ static void qs_lay(int p, UpPage &P, float a, const HaloView &v) {
 
 static void qs_tap(int p, float x, float y) {
   if (p == 0) {
-    if (up_in(x, y, 75, 132, 227, 238)) sh_act(SI_WIFI);
-    else if (up_in(x, y, 239, 132, 391, 238)) sh_act(SI_BRIGHT);
-    else if (up_in(x, y, 75, 246, 227, 352)) sh_act(SI_AOD);
-    else if (up_in(x, y, 239, 246, 391, 352)) sh_act(SI_VOL);
-    else if (up_in(x, y, 285, 364, 335, 414)) up_go(2);
+    if (up_in(x, y, 75, 102, 227, 208)) sh_act(SI_WIFI);  // (the grid 30 px up: no heading)
+    else if (up_in(x, y, 239, 102, 391, 208)) sh_act(SI_BRIGHT);
+    else if (up_in(x, y, 75, 216, 227, 322)) sh_act(SI_AOD);
+    else if (up_in(x, y, 239, 216, 391, 322)) sh_act(SI_VOL);
+    else if (up_in(x, y, 285, 334, 335, 384)) up_go(2);
   } else if (p == 1) {
     for (int k = 0; k < 2; k++) {
-      const float y0 = k ? 264 : 153;
+      const float y0 = k ? 234 : 123;
       const int d = up_in(x, y, 80, y0, 136, y0 + 56) ? -1 : up_in(x, y, 330, y0, 386, y0 + 56) ? 1 : 0;
       if (!d) continue;
       if (k) sh_volume(vol_level + d);
       else sh_bright_set(constrain(sh_bright() + d, 0, SH_SEGS));
     }
-    if (up_in(x, y, 144, 351, 196, 403)) sh_act(SI_LOCK);
-    else if (up_in(x, y, 270, 351, 322, 403)) sh_act(SI_OFF);
+    if (up_in(x, y, 144, 331, 196, 383)) sh_act(SI_LOCK);
+    else if (up_in(x, y, 270, 331, 322, 383)) sh_act(SI_OFF);
   } else {
     if (up_in(x, y, 85, 181, 227, 232) && qs_on_levels) qs_on_levels = false, qs_prefs.putUChar("open", 0);
     else if (up_in(x, y, 239, 181, 381, 232) && !qs_on_levels) qs_on_levels = true, qs_prefs.putUChar("open", 1);
