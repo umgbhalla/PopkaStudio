@@ -11,7 +11,7 @@
 extern const HaloFont gl_up_hero, gl_up_disp, gl_up_pick, gl_up_title, gl_up_clock, gl_up_num, gl_up_pre, gl_up_lab,
     gl_up_ic43, gl_up_ic32, gl_up_ic24;  // (studio.py GALLERY_FONTS)
 #define UP_PAGES 8
-#define UP_IT 64
+#define UP_IT 128
 #define UP_BLOBS 3
 #define UP_IC_PLAY "\xEF\x81\x8B"
 #define UP_IC_PAUSE "\xEF\x81\x8C"
@@ -56,13 +56,18 @@ struct UpApp {
   void (*update)(int p, float dt);                            // every frame, the page in front (its own drags)
   float (*ring)();                                             // the rim's progress 0 … 1 (< 0 — the track alone)
   uint32_t accent;
+  float (*height)(int p);  // a page taller than the screen scrolls up and down (nullptr, ≤ 466 — it does not)
+  bool wrap;               // the pages go round: past the last — the first, before the first — the last
 };
 static const UpApp *up_app;
 static UpPage *up_pg;  // [UP_PAGES], PSRAM
 static HaloSpring up_pos;
 static HaloSpringK K_UP;
 static int up_page, up_owner;
-static bool up_drag, up_vis[UP_PAGES];
+static bool up_drag, up_vis[UP_PAGES], up_vdrag;
+static HaloSpring up_sy[UP_PAGES];  // each page's scroll (px; 0 — its top)
+static float up_vy0, up_vg0;
+static int up_vowner;
 static float up_x0, up_g0;
 static HaloItem up_track, up_fill, up_clock, up_dot[UP_PAGES];
 static HaloMask up_clock_mask;
@@ -92,7 +97,8 @@ static void up_open(const UpApp *app, int page = 0) {
   if (!up_begin() || !ui_begin()) return;
   up_app = app, up_page = page, up_drag = false;
   halo_spring_set(up_pos, page);
-  for (int p = 0; p < UP_PAGES; p++) up_vis[p] = true;  // (each hidden once below, if not seen)
+  up_vdrag = false;
+  for (int p = 0; p < UP_PAGES; p++) up_vis[p] = true, halo_spring_set(up_sy[p], 0);  // (each hidden once below, if not seen)
 }
 static inline int up_count() { return up_app && up_app->count ? constrain(up_app->count(), 1, UP_PAGES) : 1; }
 static void up_go(int page) { up_page = constrain(page, 0, up_count() - 1), up_pos.target = up_page; }
@@ -219,20 +225,44 @@ static void up_update(float dt) {
   if (up_drag) {
     if (f.down && f.owner == &up_owner) {
       float o = up_g0 + (up_x0 - f.x) / W;
-      if (o < 0) o = -halo_rubber(-o * W) / W;
-      else if (o > n - 1) o = n - 1 + halo_rubber((o - (n - 1)) * W) / W;
+      if (!up_app->wrap) {
+        if (o < 0) o = -halo_rubber(-o * W) / W;
+        else if (o > n - 1) o = n - 1 + halo_rubber((o - (n - 1)) * W) / W;
+      }
       up_pos.x = o, up_pos.v = -f.vx / W, up_pos.target = o;
     } else {
       up_drag = false;
       const float d = up_pos.x - up_page, v = up_pos.v;
       int to = up_page + (fabsf(d) > 0.33f ? (d > 0 ? 1 : -1) : 0);
       if (fabsf(v) > 0.9f) to = up_page + (v > 0 ? 1 : -1);
+      if (up_app->wrap) {  // (round: the same place, counted from the other end — nothing jumps on screen)
+        if (to < 0) to += n, up_pos.x += n, up_g0 += n;
+        else if (to >= n) to -= n, up_pos.x -= n, up_g0 -= n;
+      }
       up_page = constrain(to, 0, n - 1), up_pos.target = up_page;
     }
   } else {
     halo_spring_run(up_pos, K_UP, dt);
   }
-  if (!up_drag && f.tap && !f.owner && fabsf(up_pos.x - up_page) < 0.05f && up_app->tap) up_app->tap(up_page, f.x, f.y);
+  // Scrolling the page in front up and down (a page taller than the screen): under the finger, rubber past the ends,
+  // a fling carries on and settles on the spring
+  const float hmax = up_app->height ? fmaxf(0, up_app->height(up_page) - HALO_H) : 0;
+  HaloSpring &sy = up_sy[up_page];
+  if (hmax > 0 && !up_drag && f.drag_start && !f.horiz && halo_finger_claim(&up_vowner)) up_vdrag = true, up_vy0 = f.y, up_vg0 = sy.x;
+  if (up_vdrag) {
+    if (f.down && f.owner == &up_vowner) {
+      float y = up_vg0 + (up_vy0 - f.y);
+      if (y < 0) y = -halo_rubber(-y);
+      else if (y > hmax) y = hmax + halo_rubber(y - hmax);
+      sy.x = y, sy.v = -f.vy, sy.target = y;
+    } else {
+      up_vdrag = false, sy.target = constrain(sy.x - f.vy * 0.3f, 0.0f, hmax);
+    }
+  } else {
+    halo_spring_run(sy, K_UP, dt);
+  }
+  if (!up_drag && !up_vdrag && f.tap && !f.owner && fabsf(up_pos.x - up_page) < 0.05f && up_app->tap)
+    up_app->tap(up_page, f.x, f.y + sy.x);  // (in the page's own coordinates: scrolled)
   if (up_app->update) up_app->update(up_page, dt);
 }
 
@@ -252,7 +282,9 @@ static void up_layout(const HaloView &v) {
   halo_view_commit(up_track, v), halo_view_commit(up_fill, v);
   for (int p = 0; p < UP_PAGES; p++) {
     UpPage &P = up_pg[p];
-    const float dx = (p - up_pos.x) * W;
+    float d = p - up_pos.x;
+    if (up_app->wrap && n > 1) d -= n * roundf(d / n);  // (round: the nearest way)
+    const float dx = d * W;
     const bool seen = p < n && fabsf(dx) < W;
     if (!seen) {  // (gone off screen: its items and shapes hidden once)
       if (up_vis[p]) {
@@ -268,7 +300,7 @@ static void up_layout(const HaloView &v) {
     }
     up_vis[p] = true;
     HaloView pv = v;
-    pv.x += dx * v.s;
+    pv.x += dx * v.s, pv.y -= up_sy[p].x * v.s;  // (moved by the swipe, and up by its scroll)
     const int was = P.n, wasb = P.nb;
     P.n = 0, P.nb = 0;
     up_app->lay(p, P, 1, pv);
@@ -287,14 +319,17 @@ static void up_layout(const HaloView &v) {
   }
   HaloItem &c = up_clock;
   c.kind = HI_MASK, c.mask = &up_clock_mask, c.color = UP_MUTED, c.on_black = true, c.on = &halo_black, c.scale = 1;
-  c.x = CX, c.y = 38, c.alpha = up_clock_mask.bits ? 1 : 0;
+  // (a page scrolled down: the time goes up and away with its first 60 px, as Wear OS's time text — the content never
+  // runs under it)
+  const float sc = up_app && up_page < UP_PAGES ? up_sy[up_page].x : 0, gone = halo_clamp01(sc / 60);
+  c.x = CX, c.y = 38 - 50 * gone, c.alpha = up_clock_mask.bits ? 1 - gone : 0;
   halo_view_commit(c, v);
   // The page dots: the one in front r5 in the accent, the others r4 (none with one page)
   for (int p = 0; p < UP_PAGES; p++) {
     HaloItem &d = up_dot[p];
     const float on = halo_clamp01(1 - fabsf(up_pos.x - p));
     d.kind = HI_CIRCLE, d.x = CX + (p - (n - 1) / 2.0f) * 19, d.y = UP_DOTS_Y, d.r = 4 + on, d.scale = 1;
-    d.color = ui_mix(UP_DOT, acc, on), d.alpha = n > 1 && p < n ? 1 : 0, d.on_black = true, d.on = nullptr;
+    d.color = ui_mix(UP_DOT, acc, on), d.alpha = n > 1 && p < n ? 1 - gone : 0, d.on_black = true, d.on = nullptr;  // (scrolled: away)
     halo_view_commit(d, v);
   }
 }

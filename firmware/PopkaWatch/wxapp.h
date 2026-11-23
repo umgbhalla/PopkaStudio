@@ -27,7 +27,7 @@ static void wa_hhmm(char *o, int n, uint32_t t) {
   const time_t tt = t;
   struct tm m;
   localtime_r(&tt, &m);
-  snprintf(o, n, "%d:%02d", m.tm_hour, m.tm_min);
+  snprintf(o, n, "%02d:%02d", m.tm_hour, m.tm_min);  // (06:48, as 17:59: one width)
 }
 
 // ---------- The days, the details, refresh ----------
@@ -62,46 +62,84 @@ static char wa_rise_s[8], wa_set_s[8];
 static float wa_hy[12];  // the chart's points (y), x = 116 + 24 i
 static int wa_hn;
 static UiPage wa_locs;
-static int wa_count() { return 5; }
+static int wa_cities();
+static int wa_count() { return wa_cities() + 1; }
 static float wa_mid(const HaloFont &f) { return halo_text_mid(f, "0123456789"); }
 static void wa_deg(char *o, int n, int16_t t) {
   if (t == WX_NONE) strlcpy(o, "--", n);
   else snprintf(o, n, "%d\xC2\xB0", (int)t);
 }
-// The chart, per pixel in its band: the area under the line, the rules, the line (4 px, smoothed), a dot at each hour
-static void wa_chart_paint(const UpBlob &b) {
-  const float ox = b.x - 233, oy = b.y - 254;  // (where the card is now: the page's shift)
-  const int y0 = max(hb.y, (int)(b.y - b.r)), y1 = min(hb.y + hb.rows - 1, (int)(b.y + b.r));
-  if (wa_hn < 2) return;
-  const int ar = (WA_AREA >> 16 & 255) >> 3, ag = (WA_AREA >> 8 & 255) >> 2, ab = (WA_AREA & 255) >> 3;
-  const int lr = (WA_HONEY >> 16 & 255) >> 3, lg = (WA_HONEY >> 8 & 255) >> 2, lb = (WA_HONEY & 255) >> 3;
-  const int gr = (WA_GRID >> 16 & 255) >> 3, gg = (WA_GRID >> 8 & 255) >> 2, gb = (WA_GRID & 255) >> 3;
-  const int A = (int)(b.a * 256);
-  for (int y = y0; y <= y1; y++) {
-    uint16_t *row = halo_row(y);
-    const float py = y + 0.5f - oy;
-    for (int x = max(hb.x0, (int)(ox + 112)); x <= min(hb.x1, (int)(ox + 390)); x++) {
-      const float px = x + 0.5f - ox;
-      for (const float gy : {183.0f, 247.0f, 311.0f})  // the rules
-        if (fabsf(py - gy) < 0.5f && px >= 113 && px <= 388) halo_blend(row + x, gr, gg, gb, A);
-      if (px < 116 || px > 116 + 24 * (wa_hn - 1)) continue;
-      const int k = min(wa_hn - 2, (int)((px - 116) / 24));
-      const float f = (px - 116 - 24 * k) / 24, ly = wa_hy[k] + (wa_hy[k + 1] - wa_hy[k]) * f;
-      const float slope = (wa_hy[k + 1] - wa_hy[k]) / 24;
-      if (py > ly && py <= 311) halo_blend(row + x, ar, ag, ab, A);  // (the area)
-      const float d = fabsf(py - ly) / sqrtf(1 + slope * slope);
-      float cov = halo_clamp01(2.5f - d);
-      const int kn = (int)roundf((px - 116) / 24);  // (the nearest hour's dot, r 2.5 over the line)
-      if (kn >= 0 && kn < wa_hn) {
-        const float dx = px - (116 + 24 * kn), dy = py - wa_hy[kn];
-        cov = fmaxf(cov, halo_clamp01(3.5f - sqrtf(dx * dx + dy * dy)));
+// The chart as a picture (PSRAM): the plot (x 94 … 400, y 170 … 322 of its section) made once when the hours change —
+// the area under the line, the rules, the line (4 px, smoothed), a dot at each hour, over the card's colour — and only
+// copied while the page swipes or scrolls (painting it per pixel every frame made the swipe choppy)
+#define WA_PX 94
+#define WA_PY 170
+#define WA_PW 306
+#define WA_PH 152
+static uint16_t *wa_pic;
+static uint32_t wa_pic_key = 1;
+static void wa_chart_make(uint32_t key) {
+  if (key == wa_pic_key) return;
+#ifdef __EMSCRIPTEN__
+  if (!wa_pic) wa_pic = (uint16_t *)malloc(WA_PW * WA_PH * 2);
+#else
+  if (!wa_pic) wa_pic = (uint16_t *)heap_caps_malloc(WA_PW * WA_PH * 2, MALLOC_CAP_SPIRAM);
+#endif
+  if (!wa_pic) return;
+  wa_pic_key = key;
+  auto mix = [](uint32_t a, uint32_t b, float t) {
+    const int r = (a >> 16 & 255) + ((int)(b >> 16 & 255) - (int)(a >> 16 & 255)) * t;
+    const int g = (a >> 8 & 255) + ((int)(b >> 8 & 255) - (int)(a >> 8 & 255)) * t;
+    const int bl = (a & 255) + ((int)(b & 255) - (int)(a & 255)) * t;
+    return (uint32_t)(r << 16 | g << 8 | bl);
+  };
+  for (int y = 0; y < WA_PH; y++)
+    for (int x = 0; x < WA_PW; x++) {
+      const float px = WA_PX + x + 0.5f, py = WA_PY + y + 0.5f;
+      uint32_t c = WA_HCARD;
+      for (const float gy : {183.0f, 247.0f, 311.0f})
+        if (fabsf(py - gy) < 0.5f && px >= 113 && px <= 388) c = WA_GRID;
+      if (wa_hn >= 2 && px >= 116 && px <= 116 + 24 * (wa_hn - 1)) {
+        const int k = min(wa_hn - 2, (int)((px - 116) / 24));
+        const float f = (px - 116 - 24 * k) / 24, ly = wa_hy[k] + (wa_hy[k + 1] - wa_hy[k]) * f;
+        const float slope = (wa_hy[k + 1] - wa_hy[k]) / 24;
+        if (py > ly && py <= 311) c = WA_AREA;
+        const float d = fabsf(py - ly) / sqrtf(1 + slope * slope);
+        float cov = halo_clamp01(2.5f - d);
+        const int kn = (int)roundf((px - 116) / 24);
+        if (kn >= 0 && kn < wa_hn) {
+          const float dx = px - (116 + 24 * kn), dy = py - wa_hy[kn];
+          cov = fmaxf(cov, halo_clamp01(3.5f - sqrtf(dx * dx + dy * dy)));
+        }
+        if (cov > 0) c = mix(c, WA_HONEY, cov);
       }
-      if (cov > 0) halo_blend(row + x, lr, lg, lb, (int)(cov * A));
+      wa_pic[y * WA_PW + x] = HALO_PX(((c >> 8) & 0xF800) | ((c >> 5) & 0x07E0) | ((c >> 3) & 0x001F));
     }
+}
+static void wa_chart_paint(const UpBlob &b) {  // (b.x, b.y — where the plot's middle is now)
+  if (!wa_pic) return;
+  const int x0 = (int)roundf(b.x - WA_PW / 2.0f), y0 = (int)roundf(b.y - WA_PH / 2.0f);
+  const int xa = max(hb.x0, x0), xb = min(hb.x1, x0 + WA_PW - 1);
+  if (xa > xb) return;
+  for (int y = max(hb.y, y0); y < min(hb.y + hb.rows, y0 + WA_PH); y++)
+    memcpy(halo_row(y) + xa, wa_pic + (y - y0) * WA_PW + (xa - x0), (xb - xa + 1) * 2);
+}
+// ---------- A city's page: four sections one under another (scrolled), 400 px apart ----------
+#define WA_SEC 400.0f
+static int wa_cities() { return max(1, min((int)WXD_N, UP_PAGES - 1)); }
+static void wa_section(int p, const WxCity &c, UpPage &P, float a, const HaloView &v);
+static void wa_lay(int p, UpPage &P, float a, const HaloView &v) {
+  if (p >= wa_cities()) return wa_section(4, wx_city[0], P, a, v);  // (the last page: Settings)
+  for (int k = 0; k < 4; k++) {
+    HaloView vv = v;
+    vv.y += WA_SEC * k * v.s;
+    const float top = vv.y + 60 * v.s, bot = vv.y + (WA_SEC + 20) * v.s;  // (a section off screen: not laid out)
+    if (bot < -40 || top > HALO_H + 40) continue;
+    wa_section(k, wx_city[p], P, a, vv);
   }
 }
-static void wa_lay(int p, UpPage &P, float a, const HaloView &v) {
-  const WxCity &c = wx_city[0];
+static float wa_height(int p) { return p < wa_cities() ? 3 * WA_SEC + 440 : 0; }
+static void wa_section(int p, const WxCity &c, UpPage &P, float a, const HaloView &v) {
   if (p == 0) {  // Now
     up_title(P, c.name, a, v);
     HaloItem &disc = up_disc(P, CX, 144, 26, WA_HCARD, a, v);
@@ -138,7 +176,8 @@ static void wa_lay(int p, UpPage &P, float a, const HaloView &v) {
       const float l = lo - 1, h = max(hi + 1, lo + 3);
       uint32_t key = 0;
       for (int i = 0; i < wa_hn; i++) wa_hy[i] = 311 - 128 * (c.ht[first + i] - l) / (h - l), key = key * 31 + c.ht[first + i];
-      up_paint(P, 233, 254, 178, key + first, wa_chart_paint, a, v);
+      wa_chart_make(key * 131 + first + (uint32_t)lo);
+      up_paint(P, WA_PX + WA_PW / 2.0f, WA_PY + WA_PH / 2.0f, WA_PW / 2.0f + 2, key + first, wa_chart_paint, a, v);
       const int g[3] = {(int)roundf(h), (int)roundf((h + l) / 2), (int)roundf(l)};
       for (int k = 0; k < 3; k++) {
         snprintf(wa_grid[k], 6, "%d\xC2\xB0", g[k]);
@@ -245,7 +284,7 @@ static void wa_lay(int p, UpPage &P, float a, const HaloView &v) {
   }
 }
 static void wa_tap(int p, float x, float y) {
-  if (p != 4) return;
+  if (p != wa_cities()) return;
   if (up_in(x, y, 94, 185, 229, 254) && wx_fahr) sy_set_units(0);
   else if (up_in(x, y, 237, 185, 372, 254) && !wx_fahr) sy_set_units(1);
   else if (up_in(x, y, 91, 293, 375, 380)) ui_cur = 0, ui_open(&wa_locs);
@@ -254,7 +293,8 @@ static void wa_upd(int, float) {
   static uint32_t seen = 1;
   if (wx_fetched_ms != seen) seen = wx_fetched_ms, halo_damage_all();  // (fresh weather: every page again)
 }
-static const UpApp WA_APP = {wa_count, wa_lay, wa_tap, wa_upd, nullptr, WA_HONEY};
+static float wa_height(int p);
+static const UpApp WA_APP = {wa_count, wa_lay, wa_tap, wa_upd, nullptr, WA_HONEY, wa_height, true};
 static void wa_build_locs() {
   wa_locs = {"Location", {}, 0, WA_HONEY};
   UiPage &l = wa_locs;
