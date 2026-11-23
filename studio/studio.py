@@ -204,7 +204,7 @@ SC_LOOKS = {
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 # The Scene layer's pictures (scene.h; tools/scene_pack.py SCENES — the same order)
-SCENE_LOOKS = ("dunes", "lake", "coast", "night", "forest", "peaks", "confetti", "arcs")
+SCENE_LOOKS = ("dunes", "lake", "coast", "night", "forest", "peaks", "arcs")
 LOOKS = {"shade": SHADE_LOOKS, "sclock": SC_NAMES, "scene": SCENE_LOOKS}  # what a layer's look may be, by its kind
 # The weather widgets' layouts on the 7-inch board (wxwidgets.h: p3 — the index; web/mockups/weather-widgets-rect.html:
 # 1A; 2A, 2B; 3A, 3B; 4A, 4B; 5A, 5B; 6A, 6B; 7A, 7B); the round watch has one and ignores it. The digits' "band" is the
@@ -1697,9 +1697,10 @@ def write_sketch(project, folder, meta=None):
                      "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
                      "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h", "scene.h"):
             shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
-        os.makedirs(os.path.join(folder, "src"), exist_ok=True)
-        for name in ("src/scenes.cpp", "src/scenes.h"):  # (the Scene layer's pictures: tools/scene_pack.py)
-            shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
+    if any(layer["type"] == "scene" for scr in screens for layer in scr["layers"]):  # the Scene layer's pictures,
+        # built from their SVGs (tools/scene_pack.py: generated, not in git)
+        subprocess.run([sys.executable, os.path.join(ROOT, "tools", "scene_pack.py"), folder], check=True,
+                       stdout=subprocess.DEVNULL)
     fonts, icons = {}, {}  # spec -> name, (set, scale) -> name
     all_layers = [layer for scr in screens for layer in scr["layers"]]
     pomo = next((layer for layer in all_layers if layer["type"] == "pomodoro" and not layer["hidden"]), None)  # (pomodoro.h)

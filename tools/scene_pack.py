@@ -1,85 +1,112 @@
 #!/usr/bin/env python3
-"""scene_pack.py — the Scene layer's pictures (scene.h) from 466×466 PNGs: a palette and runs, into the sketch's src/.
+"""scene_pack.py — the Scene layer's pictures (scene.h), built from their SVG sources into the sketch's src/.
 
-The scenes are flat illustrations (a few fills, antialiased edges): each picture has at most 256 colours, so a pixel
-is a palette index, and a row is runs of one index — (count − 1, index) byte pairs, a run at most 256 long. A row
-table gives where each row starts, so a band decodes only its own rows. The palette is RGB565 (the panel's order is
-applied when drawing: HALO_PX). The scenes' art: assets/scenes/<name>.png (made by an SVG → 4× → linear-light
-downsample → RGB565 renderer, so the PNG holds the exact panel colours).
+The source of a scene is tools/scenes/<name>.svg (hand-drawn to tools/scenes/STYLE.md); nothing generated is kept in
+git. The build, per scene:
+  1. SVG → 4× raster (1864 px) with resvg (resvg-py: a wheel, no system libraries);
+  2. composite over black and clip to the screen's circle at 4×, average 4×4 in linear light (smooth edges);
+  3. quantize to the panel's RGB565;
+  4. pack: at most 256 colours → a palette, each row as runs of one index — (count − 1, index) byte pairs — and a row
+     table, so a band decodes only its own rows (6 … 16 KB a scene instead of 424 KB).
+Out: <sketch>/src/scenes.cpp and scenes.h (gitignored). studio.py (a project's sketch) and studio/engine/build.sh
+(the page's engine) run it; for the repo's firmware folder: tools/scene_pack.py firmware/PopkaWatch.
 
-  tools/scene_pack.py firmware/PopkaWatch  # assets/scenes/*.png (in SCENES order) → src/scenes.cpp, src/scenes.h
+  tools/scene_pack.py SKETCH [--png DIR]   # --png: also the decoded frames, to look at
 """
+import argparse
+import io
 import os
 import sys
 
 import numpy as np
 from PIL import Image
 
-# The order is the layer's look (scene.h SCENE_*; studio.py SCENE_LOOKS) — new ones go at the end
-SCENES = ["dunes", "lake", "coast", "night", "forest", "peaks", "confetti", "arcs"]
-SIZE = 466
+ROOT = os.path.dirname(os.path.abspath(__file__))
+SRC = os.path.join(ROOT, "scenes")
+# The order is the layer's look (scene.h; studio.py SCENE_LOOKS; the page's SCENE_LOOKS) — new ones go at the end
+SCENES = ["dunes", "lake", "coast", "night", "forest", "peaks", "arcs"]
+SIZE, SCALE = 466, 4
 
 
-def rgb565(img):
-    a = np.asarray(img.convert("RGB"), dtype=np.uint32)
-    return ((a[..., 0] >> 3) << 11) | ((a[..., 1] >> 2) << 5) | (a[..., 2] >> 3)
+def render(name):
+    """The scene as the panel shows it: RGB565 values, SIZE × SIZE."""
+    import resvg_py
+    png = resvg_py.svg_to_bytes(svg_path=os.path.join(SRC, name + ".svg"), width=SIZE * SCALE, height=SIZE * SCALE,
+                                skip_system_fonts=True)
+    rgba = np.asarray(Image.open(io.BytesIO(bytes(png))).convert("RGBA"), dtype=np.float32) / 255
+    n = SIZE * SCALE
+    off = np.arange(n) + 0.5 - n / 2
+    inside = off[:, None] ** 2 + off ** 2 <= (n / 2) ** 2
+    lin = np.where(rgba[..., :3] <= 0.04045, rgba[..., :3] / 12.92, ((rgba[..., :3] + 0.055) / 1.055) ** 2.4)
+    lin *= (rgba[..., 3] * inside)[..., None]  # (over black, inside the circle)
+    avg = lin.reshape(SIZE, SCALE, SIZE, SCALE, 3).mean(axis=(1, 3))
+    srgb = np.where(avg <= 0.0031308, 12.92 * avg, 1.055 * avg ** (1 / 2.4) - 0.055)
+    o1 = np.arange(SIZE) + 0.5 - SIZE / 2
+    srgb[o1[:, None] ** 2 + o1 ** 2 > (SIZE / 2) ** 2] = 0  # (a pixel whose centre is outside: true black)
+    q = np.floor(srgb * np.array([31, 63, 31]) + 0.5).astype(np.uint32)
+    return (q[..., 0] << 11) | (q[..., 1] << 5) | q[..., 2]
 
 
 def pack(px):
-    """palette (list of 565), rows (offset per row, then the end), runs (bytes)"""
+    """palette (565, the commonest first), rows (offset per row, then the end), runs"""
     colours, counts = np.unique(px, return_counts=True)
     if len(colours) > 256:
-        sys.exit(f"scene_pack: {len(colours)} colours — at most 256")
-    order = colours[np.argsort(-counts)]  # (the commonest first: black is index 0 on these)
-    index = {int(c): i for i, c in enumerate(order)}
-    idx = np.vectorize(index.get)(px).astype(np.uint8)
+        sys.exit(f"scene_pack: {len(colours)} colours — at most 256 (flat fills: see STYLE.md)")
+    order = colours[np.argsort(-counts, kind="stable")]
+    lut = {int(c): i for i, c in enumerate(order)}
+    idx = np.vectorize(lut.get)(px).astype(np.uint8)
     rows, runs = [], bytearray()
-    for y in range(px.shape[0]):
+    for row in idx:
         rows.append(len(runs))
-        row, x, w = idx[y], 0, px.shape[1]
-        while x < w:
-            v, n = row[x], 1
-            while x + n < w and row[x + n] == v and n < 256:
-                n += 1
-            runs += bytes((n - 1, int(v)))
-            x += n
+        change = np.flatnonzero(np.diff(row)) + 1
+        starts = np.concatenate(([0], change)); ends = np.concatenate((change, [len(row)]))
+        for a, b in zip(starts, ends):
+            while b - a > 0:
+                n = min(256, b - a)
+                runs += bytes((n - 1, int(row[a])))
+                a += n
     rows.append(len(runs))
     return [int(c) for c in order], rows, runs
 
 
+def decode565(px):
+    r, g, b = px >> 11, (px >> 5) & 63, px & 31
+    return np.stack(((r << 3) | (r >> 2), (g << 2) | (g >> 4), (b << 3) | (b >> 2)), -1).astype(np.uint8)
+
+
 def main():
-    sketch = sys.argv[1] if len(sys.argv) > 1 else "firmware/PopkaWatch"
-    src = os.path.join(sketch, "assets", "scenes")
-    out = [f"// Generated by tools/scene_pack.py from {os.path.relpath(src, sketch)}/*.png — do not edit by hand.",
-           '#include "scenes.h"', ""]
+    ap = argparse.ArgumentParser(description="Build the Scene layer's pictures from tools/scenes/*.svg")
+    ap.add_argument("sketch")
+    ap.add_argument("--png", help="also write the decoded frames here")
+    a = ap.parse_args()
+    out = ["// Generated by tools/scene_pack.py from tools/scenes/*.svg — not in git, do not edit.", '#include "scenes.h"', ""]
     table, total = [], 0
     for name in SCENES:
-        img = Image.open(os.path.join(src, name + ".png"))
-        if img.size != (SIZE, SIZE):
-            sys.exit(f"scene_pack: {name}.png is {img.size}, not {SIZE}×{SIZE}")
-        pal, rows, runs = pack(rgb565(img))
-        out.append(f"static const uint16_t sc_{name}_pal[{len(pal)}] = {{{', '.join(f'0x{c:04X}' for c in pal)}}};")
-        out.append(f"static const uint32_t sc_{name}_rows[{len(rows)}] = {{{', '.join(map(str, rows))}}};")
-        body = ",".join(str(b) for b in runs)
-        out.append(f"static const uint8_t sc_{name}_runs[{len(runs)}] = {{{body}}};")
+        px = render(name)
+        if a.png:
+            os.makedirs(a.png, exist_ok=True)
+            Image.fromarray(decode565(px)).save(os.path.join(a.png, name + ".png"))
+        pal, rows, runs = pack(px)
+        out += [f"static const uint16_t sc_{name}_pal[] = {{{', '.join(f'0x{c:04X}' for c in pal)}}};",
+                f"static const uint32_t sc_{name}_rows[] = {{{', '.join(map(str, rows))}}};",
+                f"static const uint8_t sc_{name}_runs[] = {{{','.join(map(str, runs))}}};"]
         table.append(f"    {{sc_{name}_pal, sc_{name}_rows, sc_{name}_runs, {len(pal)}}},  // {name}")
-        size = len(pal) * 2 + len(rows) * 4 + len(runs)
-        total += size
-        print(f"  {name:10s} {len(pal):3d} colours  {size / 1024:6.1f} KB")
-    out += ["", f"const ScenePic SCENE_PICS[SCENE_COUNT] = {{", *table, "};", ""]
-    with open(os.path.join(sketch, "src", "scenes.cpp"), "w") as f:
+        total += len(pal) * 2 + len(rows) * 4 + len(runs)
+    out += ["", "const ScenePic SCENE_PICS[SCENE_COUNT] = {", *table, "};", ""]
+    os.makedirs(os.path.join(a.sketch, "src"), exist_ok=True)
+    with open(os.path.join(a.sketch, "src", "scenes.cpp"), "w") as f:
         f.write("\n".join(out))
-    with open(os.path.join(sketch, "src", "scenes.h"), "w") as f:
-        f.write("// Generated by tools/scene_pack.py — do not edit by hand.\n#pragma once\n#include <stdint.h>\n"
+    with open(os.path.join(a.sketch, "src", "scenes.h"), "w") as f:
+        f.write("// Generated by tools/scene_pack.py — not in git, do not edit.\n#pragma once\n#include <stdint.h>\n"
                 f"#define SCENE_COUNT {len(SCENES)}\n"
                 "struct ScenePic {        // a picture of 466 x 466: palette indices in runs (scene.h draws it)\n"
                 "  const uint16_t *pal;   // RGB565 (not yet in the panel's byte order)\n"
-                "  const uint32_t *rows;  // where each row's runs start in runs; [466] — the end\n"
+                "  const uint32_t *rows;  // where each row's runs start; [466] — the end\n"
                 "  const uint8_t *runs;   // (count - 1, index) pairs\n"
                 "  int n;                 // colours\n"
                 "};\n"
                 "extern const ScenePic SCENE_PICS[SCENE_COUNT];\n")
-    print(f"in all {total / 1024:.0f} KB of flash → {sketch}/src/scenes.*")
+    print(f"scenes: {len(SCENES)}, {total / 1024:.0f} KB of flash → {a.sketch}/src/scenes.*")
 
 
 if __name__ == "__main__":

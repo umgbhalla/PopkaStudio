@@ -61,8 +61,10 @@ if ! command -v uv >/dev/null; then
 fi
 say "Python and its libraries"
 uv venv --quiet --python 3.12 --allow-existing .venv
-uv pip install --quiet --python .venv/bin/python numpy pillow pyserial
+uv pip install --quiet --python .venv/bin/python numpy pillow pyserial resvg-py
 PY="$DIR/.venv/bin/python"
+# The firmware's generated pictures (the Scene layer's, from tools/scenes/*.svg — not in git)
+"$PY" "$DIR/tools/scene_pack.py" "$DIR/firmware/PopkaWatch" >/dev/null
 
 # ---------- 3. arduino-cli and the ESP32 core (Load: build and upload the firmware) ----------
 if ! command -v arduino-cli >/dev/null; then

@@ -1471,47 +1471,6 @@
    ]
   },
   {
-   "id": "scene-confetti",
-   "name": "Confetti",
-   "layers": [
-    {
-     "id": "scene1",
-     "type": "scene",
-     "hidden": false,
-     "dx": 0,
-     "dy": 0,
-     "name": "Confetti",
-     "look": "confetti"
-    },
-    {
-     "id": "date1",
-     "type": "date",
-     "hidden": false,
-     "dx": 0,
-     "dy": 140,
-     "name": "Date",
-     "size": 24,
-     "weight": 650,
-     "width": 100,
-     "spacing": 1,
-     "color": "#E6E3DE"
-    },
-    {
-     "id": "clock1",
-     "type": "clock",
-     "hidden": false,
-     "dx": 0,
-     "dy": -72,
-     "name": "Clock",
-     "size": 104,
-     "weight": 360,
-     "width": 100,
-     "spacing": -1,
-     "color": "#FFFFFF"
-    }
-   ]
-  },
-  {
    "id": "scene-arcs",
    "name": "Arcs",
    "layers": [

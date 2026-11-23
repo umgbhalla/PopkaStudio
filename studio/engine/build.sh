@@ -31,6 +31,8 @@ command -v em++ >/dev/null || { echo "em++ not found: brew install emscripten" >
 
 HALO="$ROOT/lib/Halo/src"
 mkdir -p "$OUT" "$TMP/out"
+# The Scene layer's pictures, from their SVGs (generated into the sketch's src/, not in git)
+"$PY" "$ROOT/tools/scene_pack.py" "$SKETCH" >/dev/null
 # The .ino as a C++ file (as the Arduino build does: Arduino.h first), then the editor's calls
 WRAP="$TMP/PopkaWatch.sketch.cpp"
 # The sketch's time() is the computer's clock moved by the zone picked in the editor (studio_clock): localtime here is

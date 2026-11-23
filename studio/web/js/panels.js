@@ -193,7 +193,7 @@ const SHELVES = {
     { name: 'Saved', icon: 'saved', items: [] },  // (the project's own faces and Add: savedFaces)
   ],
   face: [
-    { name: 'Scene', icon: 'image', items: ['psDunes', 'psLake', 'psCoast', 'psNight', 'psForest', 'psPeaks', 'psConfetti', 'psArcs'] },
+    { name: 'Scene', icon: 'image', items: ['psDunes', 'psLake', 'psCoast', 'psNight', 'psForest', 'psPeaks', 'psArcs'] },
     { name: 'Clock', icon: 'clock', items: ['clock', 'pDotClock', ...CLOCK_LOOKS.map(([k]) => 'pc' + k[0].toUpperCase() + k.slice(1))] },
     { name: 'Date', icon: 'date', items: ['date', 'pDateArc', 'pWeekday', 'pDayMonth', 'pWeek', 'pDateFrame'] },
     { name: 'Weather', icon: 'weather', items: ['weather', 'pWxArc', 'pForecast', ...WXW] },

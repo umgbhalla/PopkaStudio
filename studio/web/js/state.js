@@ -151,7 +151,7 @@ export const CLOCK_LOOKS = [
   ['chrono', 'Chrono', ['#9E2B25', '#E5392F', '#F3EFE8'], ['Band', 'Accent', 'Light'], 3],
 ];
 // The Scene layer's pictures (scene.h; studio.py SCENE_LOOKS — the same order)
-export const SCENE_LOOKS = [['dunes', 'Dunes'], ['lake', 'Lake'], ['coast', 'Coast'], ['night', 'Night'], ['forest', 'Forest'], ['peaks', 'Peaks'], ['confetti', 'Confetti'], ['arcs', 'Arcs']];
+export const SCENE_LOOKS = [['dunes', 'Dunes'], ['lake', 'Lake'], ['coast', 'Coast'], ['night', 'Night'], ['forest', 'Forest'], ['peaks', 'Peaks'], ['arcs', 'Arcs']];
 export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK_LOOKS[0];
 // What a live card or a device screen shows (device.h: DV_CPU …)
 export const DEVS = [['cpu', 'Processor'], ['mem', 'Memory'], ['bat', 'Battery'], ['temp', 'Temperature'], ['snd', 'Sound'], ['mot', 'Motion']];
