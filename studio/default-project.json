@@ -1510,6 +1510,139 @@
      "color": "#FFFFFF"
     }
    ]
+  },
+  {
+   "id": "lib-pilot",
+   "name": "Pilot",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Pilot",
+     "look": "pilot",
+     "scale": 1,
+     "color": "#E3E2E6",
+     "color2": "#A8C7FA",
+     "color3": "#5A6170"
+    }
+   ]
+  },
+  {
+   "id": "lib-abold",
+   "name": "Analogue bold",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Analogue bold",
+     "look": "abold",
+     "scale": 1,
+     "color": "#B69DF8",
+     "color2": "#D0BCFF",
+     "color3": "#F1F0F4"
+    }
+   ]
+  },
+  {
+   "id": "lib-concentric",
+   "name": "Concentric",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Concentric",
+     "look": "concentric",
+     "scale": 1,
+     "color": "#FFFFFF",
+     "color2": "#A4F9B5",
+     "color3": "#8E9099"
+    }
+   ]
+  },
+  {
+   "id": "lib-modular",
+   "name": "Modular",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Modular",
+     "look": "modular",
+     "scale": 1,
+     "color": "#F1F0F4",
+     "color2": "#FFB68A",
+     "color3": "#C4C7C5"
+    }
+   ]
+  },
+  {
+   "id": "lib-weave",
+   "name": "Weave",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Weave",
+     "look": "weave",
+     "scale": 1,
+     "color": "#5F7A70",
+     "color2": "#3DDC84",
+     "color3": "#F1F0F4"
+    }
+   ]
+  },
+  {
+   "id": "lib-words",
+   "name": "Words",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Words",
+     "look": "words",
+     "scale": 1,
+     "color": "#E3E2E6",
+     "color2": "#7FCFFF",
+     "color3": "#5E5F64"
+    }
+   ]
+  },
+  {
+   "id": "lib-bigtype",
+   "name": "Big type",
+   "layers": [
+    {
+     "id": "sclock1",
+     "type": "sclock",
+     "hidden": false,
+     "dx": 0,
+     "dy": 0,
+     "name": "Big type",
+     "look": "bigtype",
+     "scale": 1,
+     "color": "#E8DEF8",
+     "color2": "#CDB4FF",
+     "color3": "#5E5F64"
+    }
+   ]
   }
  ],
  "faceSwipe": true

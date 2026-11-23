@@ -190,6 +190,8 @@ struct FaceRun {
   HaloItem *g;             // the gallery's parts: the card, its icon's circle, the icon, the title, the line under it
                            // (stars: the stars and the meteor)
   struct StarRun *stars;   // stars: where each one is, how it twinkles (stars.h)
+  float scv[4];            // a scene (scene.h): the view it was drawn through (x, y, s, a)
+  int16_t scn = -1;        // and which picture (-1 — not drawn)
   char *txt;               // the widgets: their texts (widgets.h)
 #ifndef HALO_ROUND
   uint32_t sig;            // the forecast's line: the numbers it shows (0 — none yet; widgets_rect.h)
@@ -304,7 +306,7 @@ static int nav_scr[NAV_LEVELS] = {MAIN_SCREEN, -1, -1, -1, -1};  // the screen o
 #define FACE_N 1
 static const int8_t FACE_LIST[1] = {0};
 #endif
-#define FACE_MAX 8
+#define FACE_MAX 16
 static int8_t face_ids[FACE_MAX] = {0};
 static int face_n = 1, fc_face;  // the faces (screens), the one shown (an index of face_ids)
 static HaloSpring fs_off;        // the switch now: -1..1 faces from the shown one (+ — toward the next)
@@ -869,7 +871,7 @@ static void screen_layout(int s, const HaloView &v) {
 #endif
 #if HAS_SCENE
     if (L.kind == FL_SCENE) {
-      scene_layout(S, i, L.hidden ? 0 : 1);
+      scene_layout(S, i, L.hidden ? 0 : 1, v);
       continue;
     }
 #endif

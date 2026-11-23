@@ -38,11 +38,13 @@
 #define SC_POSTER 13
 #define SC_HANDS 14
 #define SC_BEZEL 15
-#define SC_DIVE 16   // a dive bezel: 10..50 on a colored band, dot indices, a date at 3 (Apple's Count Up, our own)
-#define SC_FIELD 17  // hour bars, fine minute ticks, four live subdials (Apple's Meridian, our own)
-#define SC_SOLAR 18  // a glow and a light wedge from 12 to the minute hand (Apple's Solar Analog, our own)
-#define SC_CALIF 19  // Roman over Arabic numerals, a caret at 12, pills (Apple's California, our own)
-#define SC_CHRONO 20  // a colored bezel band with 1-12, three light subdials (Apple's Chronograph Pro, our own)
+#define SC_PILOT 16       // four big numerals, a minute track, a framed date, a hollow hour hand (Pixel Pilot's family)
+#define SC_ABOLD 17       // two giant numerals (12, 6), weather and date discs at 9 and 3, solid hands
+#define SC_CONCENTRIC 18  // a ring of minutes turning so the minute sits in a slot at 3, the hour big in the middle
+#define SC_MODULAR 19     // weekday chip, the time, three gauges: weather, sunset, battery (no fitness)
+#define SC_WEAVE 20       // a field of dashes swirling round the minute hand, made again once a minute
+#define SC_WORDS 21       // the time written out: the hour bold, the minutes light
+#define SC_BIGTYPE 22     // the hours over the minutes, heavy, two tones
 #ifdef __EMSCRIPTEN__
 #define SC_ON(n) 1
 #else
@@ -95,13 +97,6 @@ struct ScRun {
   float *wave;            // Liquid: the front and the back water line per column
   int wave_x0, wave_n;
   float last_sec;
-  // Solar: the colors its pictures were made with
-  uint32_t sol_key;
-  // Solar's light as pictures (PSRAM, the whole screen): the one shown and the one being made, a few rows a frame, when
-  // the wedge moves — no frame pays for the per-pixel work, a transition only copies (sol_*)
-  uint16_t *sol_buf[2];
-  float sol_w[2];   // the wedge each picture has (-1 — none yet)
-  int sol_front, sol_y;  // the picture shown; the next row of the one being made (-1 — none being made)
   bool vis;               // seen in the last frame (not: a screen over it, hidden — nothing worked out then)
 };
 
@@ -311,7 +306,7 @@ static float sc_mid(const HaloFont *f, const char *ref = "0123456789") {
 }
 
 
-// ---------- The dials (Dive, Field): an analog watch's parts as Apple's analog faces build them ----------
+// ---------- The dials (Pilot, Analogue bold, Concentric, Modular, Weave): an analog watch's parts ----------
 // (the research: their hands, indices, subdials, measured from Apple's own renders — 23 Nov 2026). Our designs, their
 // construction. Order back to front: the dial's items [0, d[10]) → the tick caps [0, d[11]) → the complications' items
 // [d[10], n) → the hands' caps [d[11], ncap) with their shadows, pivots and the second hand's light trail.
@@ -385,109 +380,21 @@ static int dl_hands(ScRun &c, int nc, float ax, float ay, float R, uint32_t ligh
   return nc;
 }
 
-// ---------- Solar: a glow, and a wedge of light from 12 to the minute hand (drawn per pixel, under everything) ----------
-// atan2 by a polynomial (±0.0015 rad): the wedge's edge is under the minute hand, the rest is a soft ramp
-static inline float sol_atan2(float y, float x) {
-  const float ax = fabsf(x), ay = fabsf(y), mx = fmaxf(ax, ay), mn = fminf(ax, ay), a = mn / (mx + 1e-9f), q = a * a;
-  float r = ((-0.0464964749f * q + 0.15931422f) * q - 0.327622764f) * q * a + a;
-  if (ay > ax) r = 1.57079637f - r;
-  if (x < 0) r = 3.14159274f - r;
-  return y < 0 ? -r : r;
-}
-// The band's part of the dial, exact per pixel: the glow (a smoothstep from its middle above center out to deep at the
-// edge) and the wedge (clockwise from 12 to the hand, brighter toward the hand and the rim), in float, then to 565 with a
-// noise dither (interleaved gradient noise: no 4×4 grid to see). Only the pictures are made with it — a few rows a frame
-// (sol_make_rows), so it may cost. Measured with tools/banding.py: the 256-step tables it had made spokes in the wedge
-// (~5 px of arc a step at the rim) and the 4×4 pattern a mesh in the blue (12 % of the gradient off its trend)
-static void sol_draw_bg(const ScRun &c, uint32_t light, float ax, float ay, float R, float wd, uint32_t mid, uint32_t edge) {
-  (void)c;
-  const float gy = ay - 0.3f * R, reach = 1.25f * R, inv_r = 1 / R, inv_w = wd > 0.01f ? 1 / wd : 0;
-  const float mr = mid >> 16 & 255, mg = mid >> 8 & 255, mb = mid & 255;
-  const float er = edge >> 16 & 255, eg = edge >> 8 & 255, eb = edge & 255;
-  const float lr = light >> 16 & 255, lg = light >> 8 & 255, lb = light & 255;
-  for (int y = max(hb.y, (int)(ay - R)); y < min(hb.y + hb.rows, (int)(ay + R) + 1); y++) {
-    const float dy = y + 0.5f - ay, half = R * R - dy * dy;
-    if (half <= 0) continue;
-    const float hw = sqrtf(half);
-    const int x0 = max(hb.x0, (int)ceilf(ax - hw)), x1 = min(hb.x1, (int)floorf(ax + hw));
-    uint16_t *row = halo_row(y);
-    const float gdy = y + 0.5f - gy;
-    for (int x = x0; x <= x1; x++) {
-      const float dx = x + 0.5f - ax;
-      const float u = fminf(1, sqrtf(dx * dx + gdy * gdy) / reach), e = u * u * (3 - 2 * u);
-      float r = mr + (er - mr) * e, g = mg + (eg - mg) * e, b = mb + (eb - mb) * e;
-      if (wd > 0) {
-        float an = sol_atan2(dx, -dy);
-        if (an < 0) an += 2 * HALO_PI;
-        if (an <= wd) {
-          const float rf = fminf(1, sqrtf(dx * dx + dy * dy) * inv_r), t = an * inv_w;
-          const float A = 0.843f * t * sqrtf(t) * (0.3f + 0.7f * rf);
-          r += (lr - r) * A, g += (lg - g) * A, b += (lb - b) * A;
-        }
-      }
-      // (interleaved gradient noise, Jimenez 2014: a threshold 0..1 that does not repeat in a grid)
-      const float fx = 0.06711056f * x + 0.00583715f * y, n = 52.9829189f * (fx - floorf(fx)), th = n - floorf(n);
-      const int r5 = min(31, (int)(r * (31 / 255.0f) + th)), g6 = min(63, (int)(g * (63 / 255.0f) + th)),
-                b5 = min(31, (int)(b * (31 / 255.0f) + th));
-      row[x] = HALO_PX(r5 << 11 | g6 << 5 | b5);
-    }
-  }
-}
-
-// The pictures: made in place (the layer's own middle, scale 1) a few rows at a time into the back one; shown — the
-// front one through the view (copied as it is in place, nearest pixel when scaled: in a transition)
-#define SOL_ROWS 8  // rows a frame (~1 s for a whole picture)
-static bool sol_alloc(ScRun &c) {
-  for (auto &b : c.sol_buf)
-    if (!b) {
-#ifdef __EMSCRIPTEN__
-      b = (uint16_t *)malloc(HALO_W * HALO_H * 2);
+// ---------- Weave's field: its dashes, made once a minute (one Weave on the watch at a time) ----------
+#define WV_MAX 420
+static ScCap *wv;
+static int wv_n, wv_min = -1;
+static float wv_k;
+static uint32_t wv_c;
+static bool wv_alloc() {
+  if (!wv) {
+#ifdef ESP_PLATFORM
+    wv = (ScCap *)heap_caps_calloc(WV_MAX, sizeof(ScCap), MALLOC_CAP_SPIRAM);
 #else
-      b = (uint16_t *)heap_caps_malloc(HALO_W * HALO_H * 2, MALLOC_CAP_SPIRAM);
+    wv = (ScCap *)calloc(WV_MAX, sizeof(ScCap));
 #endif
-      if (!b) return false;
-    }
-  return true;
-}
-static void sol_make_rows(ScRun &c, int back, int y0, int y1, uint32_t light, float ax, float ay, float R, float wd,
-                          uint32_t mid, uint32_t edge) {
-  const HaloBand saved = hb;
-  for (int y = y0; y < y1; y += HALO_ROWS) {
-    const int rows = min(HALO_ROWS, y1 - y);
-    hb = {c.sol_buf[back] + y * HALO_W, y, rows, 0, HALO_W - 1, 0, HALO_W};
-    memset(hb.buf, 0, rows * HALO_W * 2);
-    sol_draw_bg(c, light, ax, ay, R, wd, mid, edge);
   }
-  hb = saved;
-}
-static void sol_blit(const ScRun &c, float bax, float bay) {  // the front picture into this band, through c.d's view
-  const uint16_t *pic = c.sol_buf[c.sol_front];
-  if (!pic || c.sol_w[c.sol_front] < 0) return;
-  const float sax = c.d[0], say = c.d[1], s = c.d[2] / c.d[6], R = c.d[2];
-  const int y0 = max(hb.y, (int)(say - R)), y1 = min(hb.y + hb.rows - 1, (int)(say + R));
-  const bool same = fabsf(s - 1) < 1e-4f && fabsf(sax - bax) < 1e-3f && fabsf(say - bay) < 1e-3f;
-  const float inv = 1 / s;
-  for (int y = y0; y <= y1; y++) {
-    const int sy = same ? y : (int)((y + 0.5f - say) * inv + bay);
-    if (sy < 0 || sy >= HALO_H) continue;
-    const float dy = y + 0.5f - say, half = R * R - dy * dy;
-    if (half <= 0) continue;
-    const float hw = halo_sqrt(half);
-    const int x0 = max(hb.x0, (int)ceilf(sax - hw)), x1 = min(hb.x1, (int)floorf(sax + hw));
-    if (x0 > x1) continue;
-    const uint16_t *src = pic + sy * HALO_W;
-    uint16_t *dst = halo_row(y);
-    if (same) {
-      memcpy(dst + x0, src + x0, (x1 - x0 + 1) * 2);
-      continue;
-    }
-    int32_t sx = (int32_t)(((x0 + 0.5f - sax) * inv + bax) * 65536);
-    const int32_t step = (int32_t)(inv * 65536);
-    for (int x = x0; x <= x1; x++, sx += step) {
-      const int i = sx >> 16;
-      if ((unsigned)i < (unsigned)HALO_W) dst[x] = src[i];
-    }
-  }
+  return wv;
 }
 
 // ---------- Built once a change (face_layer_build) ----------
@@ -495,7 +402,6 @@ static void sc_layer_free(FaceRun &R) {
   ScRun *c = R.sc;
   if (!c) return;
   free(c->mir), free(c->mir_bits), free(c->wave), free(c->rowp), free(c->full), free(c->full_bits);
-  free(c->sol_buf[0]), free(c->sol_buf[1]);
   c->~ScRun();
   free(c);
   R.sc = nullptr;
@@ -511,7 +417,6 @@ static ScRun *sc_new() {
   ScRun *c = new (p) ScRun();
   for (auto &k : c->cap) k.o[4] = -1, k.a = 0;
   c->sec_shown = -1, c->last_sec = -1;
-  c->sol_w[0] = c->sol_w[1] = -1, c->sol_y = -1;
   return c;
 }
 static void sc_roll(HaloRoll &r, const HaloFont *f, int align, bool tabular) {
@@ -638,14 +543,16 @@ static void sc_layer_build(const FaceScreen &S, int i) {
       break;
     case SC_HANDS:
       break;
-    case SC_DIVE:
-    case SC_FIELD:
-    case SC_SOLAR:
-    case SC_CALIF:
-    case SC_CHRONO:
-      c->g[0] = sc_mid(L.font, look == SC_CALIF ? "XIV4578" : "0123456789"), c->g[1] = sc_mid(L.font2);
-      c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI");
-      c->g[3] = sc_mid(L.font4, "\xEF\x83\x97");
+    case SC_PILOT:
+    case SC_ABOLD:
+    case SC_CONCENTRIC:
+    case SC_MODULAR:
+    case SC_WEAVE:
+    case SC_BIGTYPE:
+      c->g[0] = sc_mid(L.font), c->g[1] = sc_mid(L.font2), c->g[2] = sc_mid(L.font3, "MONTUEWEDFRI0123");
+      break;
+    case SC_WORDS:
+      c->g[0] = sc_mid(L.font, "Twelve"), c->g[1] = sc_mid(L.font2, "oh twenty");
       break;
     default:  // Sunset, Liquid, Comet: the whole time in one line, the colon in the middle
       sc_roll(R.roll, L.font, 1, true);
@@ -687,11 +594,13 @@ static void sc_texts(const FaceLayer &L, FaceRun &R, bool animate) {
       case SC_LCD:
       case SC_FLIP:
       case SC_HANDS:
-      case SC_DIVE:
-      case SC_FIELD:
-      case SC_SOLAR:
-      case SC_CALIF:
-      case SC_CHRONO:
+      case SC_PILOT:
+      case SC_ABOLD:
+      case SC_CONCENTRIC:
+      case SC_MODULAR:
+      case SC_WEAVE:
+      case SC_WORDS:
+      case SC_BIGTYPE:
         break;
       default:
         halo_roll_set(R.roll, fc_time, animate);
@@ -764,6 +673,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
   }
   c.vis = true;
   sc_ob = !face_over_others(S, i);
+  const bool ob = sc_ob;  // (the looks that set sc_ob go back to this, never to "on black" by themselves)
   const HaloItem *on = sc_ob ? &halo_black : nullptr;
   c.s = v.s, c.a = a * v.a;
   const float sa = fc_calm ? 0 : a;  // what shows the seconds: not in Always On
@@ -1142,331 +1052,239 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       break;
     }
 #endif
-#if SC_ON(SC_DIVE)
-    case SC_DIVE: {
-      // color — the bezel band; color2 — the accent (the caret at 12, the second hand, the weekday); color3 — the light
-      // (the numerals, the indices, the hands). Dimensions: the research's cheat-sheet for 466 px, times k
+#if SC_ON(SC_PILOT)
+    case SC_PILOT: {
+      // A pilot's dial (Pixel Pilot's family, our own): four big numerals at 12 3 6 9, a minute track at the rim with
+      // the five-minute marks in the accent, a framed date between the middle and 3, a hollow hour hand and a solid
+      // minute hand. color — the numerals and hands; color2 — the accent (marks, the date's frame, the pivot); color3 —
+      // the fine ticks
       const float R = 228 * k;
-      const uint32_t light = L.color3, band = L.color, acc = L.color2;
-      HaloItem &bz = c.it[n++];
-      dl_ring(bz, ax, ay, R * 0.905f, R * 0.17f, 1, band, 0, a, v);  // the band: 0.82 R … 0.99 R (slim: a heavy band dominated)
-      for (int j = 0; j < 12; j++) {  // the dot indices: the whole ring (its rhythm unbroken)
-        float x, y;
-        dl_at(ax, ay, j * 30, R * 0.578f, x, y);
-        sc_circle(c.it[n++], x, y, R * 0.066f, light, a, v);  // (a touch smaller: air round them, as Count Up)
-      }
-      sc_ob = false;  // (from here on things lie on the band and the dots: blend)
-      const int dial = n;
-      int nc = 0;
-      for (int j = 0; j < 60; j++) {  // the inner minute track
-        const bool big = j % 5 == 0;
-        float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 6, R * (big ? 0.69f : 0.705f), x0, y0), dl_at(ax, ay, j * 6, R * 0.745f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, big ? 1.3f * k : 0.8f * k, light, a * (big ? 0.9f : 0.55f), v);
-      }
-      for (int j = 1; j < 12; j += 2) {  // the bezel's short bars between its numerals
-        float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 30, R * 0.87f, x0, y0), dl_at(ax, ay, j * 30, R * 0.94f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 1.5f * k, light, a * 0.9f, v);
-      }
-      const int ticks = nc;
-      for (int j = 2; j <= 10; j += 2) {  // 10 … 50, upright
-        snprintf(c.txt[j / 2], 8, "%d", j * 5);
-        float x, y;
-        dl_at(ax, ay, j * 30, R * 0.905f, x, y);
-        dl_text(c.it[n++], L.font, c.txt[j / 2], x, y, c.g[0], 1, light, a, v, &bz);
-      }
-      dl_text(c.it[n++], L.font4, "\xEF\x83\x97", ax, ay - R * 0.905f, c.g[3], 1, acc, a, v, &bz);  // the caret at 12
-      // The date inside, right of the middle (as Count Up: the ring of dots stays whole): the weekday, tracked, in the
-      // accent over the day
-      strlcpy(c.txt[8], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[9], 8, "%d", sc_tm.tm_mday);
-      dl_text(c.it[n++], L.font3, c.txt[8], ax + R * 0.31f, ay - R * 0.085f, c.g[2], 1, acc, a, v, &halo_black, DL_TRACK);
-      dl_text(c.it[n++], L.font2, c.txt[9], ax + R * 0.31f, ay + R * 0.065f, c.g[1], 1, light, a, v, &halo_black);
-      nc = dl_hands(c, nc, ax, ay, R, light, 0x000000, acc, R * 0.50f, R * 0.90f, a, sa, v);
-      c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
-      sc_hide_caps(c, nc);
-      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
-      break;
-    }
-#endif
-#if SC_ON(SC_FIELD)
-    case SC_FIELD: {
-      // Material 3 for Wear OS (the guide: 640 of Google's images, 23 Nov 2026): flat tonal containers on black (no
-      // borders), each complication its own pastel accent with a dim track of the same hue, rings from 12 o'clock
-      // clockwise with round ends; the hour hand thick and solid in the accent, the minute hand light and hollow.
-      // color — the light (bars, minute hand, values); color2 — the accent (hour hand, the weekday); color3 — the
-      // containers' tint (their fill is it deep in black)
-      const float R = 228 * k, sr = R * 0.235f, sd = R * 0.45f;  // (each owns its quadrant, with air round it, as Meridian)
-      const uint32_t light = L.color, acc = L.color2, disc = sc_mix(L.color3, 0x000000, 0.84f);
-      const uint32_t wx_acc = 0xFFB68A, bat_acc = 0xA4F9B5, sec_acc = 0xFF8A80;  // (peach, mint, coral: pastel accents)
-      float sx[4], sy[4];
-      HaloItem *dsc[4];
-      for (int j = 0; j < 4; j++) {
-        dl_at(ax, ay, j * 90, sd, sx[j], sy[j]);
-        dsc[j] = &c.it[n++];
-        sc_circle(*dsc[j], sx[j], sy[j], sr, disc, a, v);
-        dsc[j]->on_black = true;  // (a solid container: its texts' edges in its color)
-        halo_view_commit(*dsc[j], v);
-      }
-      sc_ob = false;
-      const int dial = n;
-      int nc = 0;
-      for (int j = 0; j < 60; j++) {  // the fine minute ticks at the edge
-        if (j % 5 == 0) continue;
-        float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 6, R * 0.94f, x0, y0), dl_at(ax, ay, j * 6, R * 0.985f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 0.75f * k, light, a * 0.4f, v);
-      }
-      for (int j = 0; j < 12; j++) {  // the hour bars: pills
-        float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 30, R * 0.76f, x0, y0), dl_at(ax, ay, j * 30, R * 0.93f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 2.6f * k, light, a, v);  // (long and slender, as Meridian's)
-      }
-      // 9: the running seconds — its own little dial, coral
-      for (int j = 0; j < 12; j++) {
-        float x0, y0, x1, y1;
-        dl_at(sx[3], sy[3], j * 30, sr * (j % 3 ? 0.76f : 0.64f), x0, y0), dl_at(sx[3], sy[3], j * 30, sr * 0.84f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, (j % 3 ? 0.8f : 1.4f) * k, light, a * (j % 3 ? 0.45f : 0.9f), v);
-      }
-      {
-        float x0, y0, x1, y1;
-        dl_at(sx[3], sy[3], sc_sec * 6, -sr * 0.16f, x0, y0), dl_at(sx[3], sy[3], sc_sec * 6, sr * 0.78f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 1.3f * k, sec_acc, sa, v);
-        sc_cap(c, nc++, sx[3], sy[3], sx[3], sy[3], 3.6f * k, sec_acc, sa, v);
-      }
-      const int ticks = nc;
-      // 12: the date — the weekday in the accent, the day big
-      strlcpy(c.txt[0], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[1], 8, "%d", sc_tm.tm_mday);
-      dl_text(c.it[n++], L.font3, c.txt[0], sx[0], sy[0] - sr * 0.36f, c.g[2], 1, acc, a, v, dsc[0], DL_TRACK);
-      dl_text(c.it[n++], L.font, c.txt[1], sx[0], sy[0] + sr * 0.16f, c.g[0], 1, light, a, v, dsc[0]);
-      // 3: the weather — a ranged gauge (low → high, open at the bottom) in peach on a dim peach track, a knob at now
-      const WxDay w = wx_day(0);
-      wx_deg(c.txt[2], 8, w.now), snprintf(c.txt[3], 8, "%d", w.lo), snprintf(c.txt[4], 8, "%d", w.hi);
-      const float g0 = -0.75f * HALO_PI, g1 = 0.75f * HALO_PI;  // (radians from 12)
-      const uint32_t wx_dim = sc_mix(wx_acc, 0x000000, 0.68f);
-      const float f = w.hi > w.lo ? halo_clamp01((float)(w.now - w.lo) / (w.hi - w.lo)) : 0.5f, ga = g0 + (g1 - g0) * f;
-      // (each arc within 0 … 2π: one across 12 o'clock is not drawn whole) — the dim track, then the filled part to now
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, g0 + 2 * HALO_PI, 2 * HALO_PI, wx_dim, a, v);
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, 0, g1, wx_dim, a, v);
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, g0 + 2 * HALO_PI, fminf(ga, 0) + 2 * HALO_PI, wx_acc, a, v);
-      dl_arc(c.it[n++], sx[1], sy[1], sr * 0.86f, 3.5f * k, 0, ga, wx_acc, ga > 0 ? a : 0, v);
-      const float kx = sx[1] + sr * 0.86f * sinf(ga), ky = sy[1] - sr * 0.86f * cosf(ga);
-      sc_circle(c.it[n++], kx, ky, 6 * k, disc, a, v);  // the knob: a gap of the container's color, then the knob
-      sc_circle(c.it[n++], kx, ky, 4 * k, light, a, v);
-      dl_text(c.it[n++], L.font2, c.txt[2], sx[1] + 3 * k, sy[1] - sr * 0.02f, c.g[1], 1, light, a, v, dsc[1]);
-      dl_text(c.it[n++], L.font3, c.txt[3], sx[1] - sr * 0.52f, sy[1] + sr * 0.64f, c.g[2], 1, wx_acc, a * 0.85f, v, dsc[1]);
-      dl_text(c.it[n++], L.font3, c.txt[4], sx[1] + sr * 0.52f, sy[1] + sr * 0.64f, c.g[2], 1, wx_acc, a * 0.85f, v, dsc[1]);
-      // 6: the battery — a ring of its charge from 12 o'clock, mint on dim mint (coral when low)
-      const HaloBattery b = halo_battery();
-      const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
-      const uint32_t bat = pct > 20 ? bat_acc : sec_acc;
-      snprintf(c.txt[5], 8, "%d", pct);
-      dl_ring(c.it[n++], sx[2], sy[2], sr * 0.86f, 3.5f * k, pct / 100.0f, bat, sc_mix(bat, 0x000000, 0.68f), a, v);
-      dl_text(c.it[n++], L.font2, c.txt[5], sx[2], sy[2] - sr * 0.05f, c.g[1], 1, light, a, v, dsc[2]);
-      dl_text(c.it[n++], L.font3, "%", sx[2], sy[2] + sr * 0.42f, c.g[2], 1, bat, a * 0.85f, v, dsc[2]);
-      nc = dl_hands(c, nc, ax, ay, R, light, 0x000000, acc, R * 0.52f, R * 0.9f, a, sa, v, acc, false);
-      c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
-      sc_hide_caps(c, nc);
-      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
-      break;
-    }
-#endif
-#if SC_ON(SC_SOLAR)
-    case SC_SOLAR: {
-      // color — the glow (its hue: bright in the middle above center, deep at the edge); color2 — the wedge's light;
-      // color3 — the lines, the numbers, the hands' core. The wedge runs from 12 to the minute hand: the hour's progress
-      const float R = 233 * k;
-      const struct tm &t = sc_tm;
-      const float q = 0.5f;  // (the wedge moves by half a degree — every 5 s; its picture is made over ~1 s meanwhile)
-      const float want = floorf((t.tm_min + sc_sec / 60) * 6 / q) * q * (HALO_PI / 180);
-      const float hq = 0.5f / (R * 0.5f) * (180 / HALO_PI);
-      const float ha = floorf(((t.tm_hour % 12) + t.tm_min / 60.0f + sc_sec / 3600) * 30 / hq) * hq;
-      // The glow and the wedge's ramp: made again when the colors change
-      const uint32_t key = L.color * 31 + L.color2;
-      if (c.sol_key != key) halo_damage_all();  // (new colors: the picture is made again below)
-      // The light's pictures: none yet — the first made at once; the wedge moved — the next made a few rows a frame,
-      // shown when whole. The minute hand goes with the picture shown, so its edge is always under the hand
-      if (sol_alloc(c)) {
-        if (c.sol_w[c.sol_front] < 0 || c.sol_key != key) {
-          sol_make_rows(c, c.sol_front, 0, HALO_H, L.color2, ax, ay, R, want, L.color, sc_mix(L.color, 0x000000, 0.93f));
-          c.sol_w[c.sol_front] = want, c.sol_y = -1, c.sol_key = key;
-        } else if (c.sol_y < 0 && c.sol_w[c.sol_front] != want) {
-          c.sol_y = 0, c.sol_w[!c.sol_front] = want;
-        }
-        if (c.sol_y >= 0) {
-          const int back = !c.sol_front, y1 = min(HALO_H, c.sol_y + SOL_ROWS);
-          sol_make_rows(c, back, c.sol_y, y1, L.color2, ax, ay, R, c.sol_w[back], L.color, sc_mix(L.color, 0x000000, 0.93f));
-          c.sol_y = y1 < HALO_H ? y1 : -1;
-          if (c.sol_y < 0) c.sol_front = back;  // (whole: shown from this frame)
-        }
-      }
-      const float wedge = c.sol_w[c.sol_front] >= 0 ? c.sol_w[c.sol_front] : want, ma = wedge * (180 / HALO_PI);
-      const float sax = halo_view_x(v, ax), say = halo_view_y(v, ay), sR = R * v.s;
-      if (c.d[3] != wedge || c.d[0] != sax || c.d[1] != say || c.d[2] != sR)  // (the picture or its place changed)
-        halo_damage_f(sax - sR, say - sR, sax + sR, say + sR);
-      c.d[0] = sax, c.d[1] = say, c.d[2] = sR, c.d[3] = wedge, c.d[6] = R, c.d[7] = ax, c.d[8] = ay;
-      sc_ob = false;  // (everything lies on the glow: blend)
-      const int dial = n;
-      int nc = 0;
-      const uint32_t light = L.color3;
-      for (int j = 0; j < 60; j++) {  // the minute ticks at the edge, the 12 long hour lines
-        float x0, y0, x1, y1;
-        if (j % 5) {
-          dl_at(ax, ay, j * 6, R * 0.935f, x0, y0), dl_at(ax, ay, j * 6, R * 0.97f, x1, y1);
-          sc_cap(c, nc++, x0, y0, x1, y1, 0.8f * k, light, a * 0.55f, v);
-        } else {
-          dl_at(ax, ay, j * 6, R * 0.5f, x0, y0), dl_at(ax, ay, j * 6, R * 0.75f, x1, y1);  // (clear of the numbers: ≥ 0.05 R)
-          sc_cap(c, nc++, x0, y0, x1, y1, 1.05f * k, light, a * 0.85f, v);  // (from further out, thinner: as Solar Analog)
-        }
-      }
-      const int ticks = nc;
-      for (int j = 1; j <= 12; j++) {  // 05 … 60 at the edge
-        snprintf(c.txt[j - 1], 8, "%02d", j * 5);
-        float x, y;
-        dl_at(ax, ay, j * 30, R * 0.86f, x, y);
-        dl_text(c.it[n++], L.font, c.txt[j - 1], x, y, c.g[0], 1, light, a * 0.9f, v, nullptr);
-      }
-      strlcpy(c.txt[12], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[13], 8, "%d", sc_tm.tm_mday);
-      {  // the weekday (tracked, dimmer) and the day as one line, centered by their measured widths
-        const float gap = 8 * k, w1 = dl_width(L.font3, c.txt[12], DL_TRACK), w2 = dl_width(L.font2, c.txt[13]);
-        const float x0 = ax - (w1 + gap + w2) / 2;
-        dl_text(c.it[n++], L.font3, c.txt[12], x0, ay - R * 0.32f, c.g[2], 0, light, a * 0.75f, v, nullptr, DL_TRACK);
-        dl_text(c.it[n++], L.font2, c.txt[13], x0 + w1 + gap, ay - R * 0.32f, c.g[1], 0, light, a, v, nullptr);
-      }
-      // The hands: lume — a light core in an outline of the glow's hue, a neck; soft shadows
-      const uint32_t rim = sc_mix(L.color, 0xFFFFFF, 0.25f);
-      nc = dl_hand(c, nc, ax, ay, ha, R * 0.12f, R * 0.5f, R * 0.07f, R * 0.016f, rim, light, true, a, v);
-      nc = dl_hand(c, nc, ax, ay, ma, R * 0.12f, R * 0.86f, R * 0.062f, R * 0.016f, rim, light, true, a, v);
-      sc_cap(c, nc++, ax, ay, ax, ay, R * 0.03f, light, a, v);
-      sc_cap(c, nc++, ax, ay, ax, ay, R * 0.013f, rim, a, v);
-      c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
-      sc_hide_caps(c, nc);
-      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
-      break;
-    }
-#endif
-#if SC_ON(SC_CALIF)
-    case SC_CALIF: {
-      // color — the numerals (the full shade); color2 — the pivot's accent; color3 — the hands. Three shades of the one
-      // color: numerals full, the 5-minute ticks mid, the minute ticks dim (as California's). Roman over the top (XI, I,
-      // X, II), a caret at 12, Arabic below (4, 5, 7, 8), pills at 3, 6, 9; the date up top, a small ring below
-      const float R = 228 * k;
-      const uint32_t full = L.color, mid = sc_mix(L.color, 0x000000, 0.35f), dim = sc_mix(L.color, 0x000000, 0.62f);
-      sc_ob = false;
+      const uint32_t light = L.color, acc = L.color2;
+      sc_ob = ob;  // (over a scene or another layer: blended)
       const int dial = n;
       int nc = 0;
       for (int j = 0; j < 60; j++) {
+        if (j % 15 == 0) continue;  // (the numerals stand there)
         const bool big = j % 5 == 0;
         float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 6, R * (big ? 0.9f : 0.935f), x0, y0), dl_at(ax, ay, j * 6, R * 0.975f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, (big ? 1.6f : 0.9f) * k, big ? mid : dim, a, v);
+        dl_at(ax, ay, j * 6, R * (big ? 0.90f : 0.935f), x0, y0), dl_at(ax, ay, j * 6, R * 0.975f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, (big ? 2.6f : 1.0f) * k, big ? acc : L.color3, a, v);
       }
-      // the pills at 3, 9 (along the radius) and 6 (across)
-      for (int h : {3, 6, 9}) {
-        float cx0, cy0;
-        dl_at(ax, ay, h * 30, R * 0.72f, cx0, cy0);
-        const float hl = R * 0.075f;
-        sc_cap(c, nc++, cx0 - hl, cy0, cx0 + hl, cy0, 5.5f * k, full, a, v);
-      }
-      // the ring below: the battery, in the numerals' hue on its dim track
       const int ticks = nc;
-      static const char *const NUM[12] = {"", "I", "II", "", "4", "5", "", "7", "8", "", "X", "XI"};
-      for (int h = 1; h < 12; h++) {
-        if (!*NUM[h]) continue;
+      static const char *const NUM[4] = {"12", "3", "6", "9"};
+      for (int q = 0; q < 4; q++) {
         float x, y;
-        dl_at(ax, ay, h * 30, R * 0.72f, x, y);
-        dl_text(c.it[n++], L.font, NUM[h], x, y, c.g[0], 1, full, a, v, &halo_black);
+        dl_at(ax, ay, q * 90, R * (q % 2 ? 0.80f : 0.78f), x, y);
+        dl_text(c.it[n++], L.font, NUM[q], x, y, c.g[0], 1, light, a, v, &halo_black);
       }
-      dl_text(c.it[n++], L.font4, "\xEF\x83\x97", ax, ay - R * 0.72f, c.g[3], 1, full, a, v, &halo_black);  // the caret
-      strlcpy(c.txt[0], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[1], 8, "%d", sc_tm.tm_mday);
-      {
-        const float gap = 8 * k, w1 = dl_width(L.font3, c.txt[0], DL_TRACK), w2 = dl_width(L.font2, c.txt[1]);
-        const float x0 = ax - (w1 + gap + w2) / 2, y = ay - R * 0.38f;
-        dl_text(c.it[n++], L.font3, c.txt[0], x0, y, c.g[2], 0, 0xFFFFFF, a * 0.75f, v, &halo_black, DL_TRACK);
-        dl_text(c.it[n++], L.font2, c.txt[1], x0 + w1 + gap, y, c.g[1], 0, 0xFFFFFF, a, v, &halo_black);
-      }
-      const HaloBattery b = halo_battery();
-      const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
-      snprintf(c.txt[2], 8, "%d", pct);
-      dl_ring(c.it[n++], ax, ay + R * 0.38f, R * 0.17f, 3.5f * k, pct / 100.0f, full, dim, a, v);
-      dl_text(c.it[n++], L.font2, c.txt[2], ax, ay + R * 0.38f, c.g[1], 1, 0xFFFFFF, a, v, &halo_black);
-      nc = dl_hands(c, nc, ax, ay, R, L.color3, 0x000000, L.color2, R * 0.5f, R * 0.88f, a, a, v);
+      snprintf(c.txt[0], 8, "%d", sc_tm.tm_mday);
+      const float dx = ax + R * 0.50f, dw = R * 0.24f, dh = R * 0.17f;
+      sc_rrect(c.it[n++], dx, ay, dw, dh, R * 0.035f, acc, a, v);
+      sc_rrect(c.it[n++], dx, ay, dw - 5 * k, dh - 5 * k, R * 0.025f, 0x000000, a, v);
+      dl_text(c.it[n++], L.font2, c.txt[0], dx, ay, c.g[1], 1, light, a, v, &c.it[n - 1]);
+      nc = dl_hands(c, nc, ax, ay, R, light, 0x000000, acc, R * 0.52f, R * 0.84f, a, sa, v);
       c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
       sc_hide_caps(c, nc);
       sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
       break;
     }
 #endif
-#if SC_ON(SC_CHRONO)
-    case SC_CHRONO: {
-      // color — the bezel band; color2 — the accent (the subdials' hands, the pivot); color3 — the light (numerals,
-      // ticks, the subdials' faces, the hands). The band from 0.62 R to the edge with 1-12 on it and sixty ticks at its
-      // rim; three light subdials (running seconds at 9, the battery at 3, the date at 6) with dark marks
-      const float R = 228 * k, sr = R * 0.245f, sd = R * 0.4f;  // (the subdials fill the inner dial, as Chronograph Pro's)
-      const uint32_t light = L.color3, acc = L.color2, ink = 0x1C1B1F;
-      HaloItem &band = c.it[n++];
-      dl_ring(band, ax, ay, R * 0.875f, R * 0.23f, 1, L.color, 0, a, v);  // (0.76 R … 0.99 R: slim)
-      float sx[3], sy[3];
-      HaloItem *dsc[3];
-      for (int j = 0; j < 3; j++) {  // 9, 3, 6
-        dl_at(ax, ay, j == 0 ? 270 : j == 1 ? 90 : 180, sd, sx[j], sy[j]);
-        dsc[j] = &c.it[n++];
-        sc_circle(*dsc[j], sx[j], sy[j], sr, light, a, v);
-        dsc[j]->on_black = true;
-        halo_view_commit(*dsc[j], v);
+#if SC_ON(SC_ABOLD)
+    case SC_ABOLD: {
+      // Analogue bold (our own): two giant numerals, 12 and 6, in the accent's light tone behind slim solid hands; a
+      // round complication either side — the weather at 9, the date at 3. color — the numerals; color2 — the hands'
+      // pivot and the labels; color3 — the hands and values
+      const float R = 228 * k, cr = R * 0.19f;
+      const uint32_t light = L.color3, acc = L.color2;
+      sc_ob = ob;  // (over a scene or another layer: blended)
+      dl_text(c.it[n++], L.font, "12", ax, ay - R * 0.56f, c.g[0], 1, L.color, a, v, &halo_black);
+      dl_text(c.it[n++], L.font, "6", ax, ay + R * 0.58f, c.g[0], 1, L.color, a, v, &halo_black);
+      HaloItem *disc[2];
+      for (int s = 0; s < 2; s++) {
+        disc[s] = &c.it[n++];
+        sc_circle(*disc[s], ax + (s ? 1 : -1) * R * 0.60f, ay, cr, 0x1E1F22, a, v);
+      }
+      const WxCity &w = wx_city[0];
+      if (w.now == WX_NONE) strlcpy(c.txt[0], "--", 8);
+      else snprintf(c.txt[0], 8, "%d\xC2\xB0", (int)w.now);
+      strlcpy(c.txt[1], MONTH[sc_tm.tm_mon % 12], 8), snprintf(c.txt[2], 8, "%d", sc_tm.tm_mday);
+      const float lx = ax - R * 0.60f, rx = ax + R * 0.60f;
+      dl_text(c.it[n++], L.font2, c.txt[0], lx, ay - cr * 0.12f, c.g[1], 1, light, a, v, disc[0]);
+      dl_text(c.it[n++], L.font3, "NOW", lx, ay + cr * 0.48f, c.g[2], 1, acc, a, v, disc[0], DL_TRACK);
+      dl_text(c.it[n++], L.font3, c.txt[1], rx, ay - cr * 0.42f, c.g[2], 1, acc, a, v, disc[1], DL_TRACK);
+      dl_text(c.it[n++], L.font2, c.txt[2], rx, ay + cr * 0.18f, c.g[1], 1, light, a, v, disc[1]);
+      sc_ob = false;
+      const int dial = n;
+      int nc = dl_hands(c, 0, ax, ay, R, light, 0x000000, acc, R * 0.50f, R * 0.86f, a, sa, v, 0, false);
+      c.ncap = nc, c.d[10] = dial, c.d[11] = 0;
+      sc_hide_caps(c, nc);
+      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      break;
+    }
+#endif
+#if SC_ON(SC_CONCENTRIC)
+    case SC_CONCENTRIC: {
+      // Concentric (our own): a ring of minutes that turns so the minute now sits at 3 o'clock, in a framed slot; the
+      // hour big in the middle. It moves once a minute (each number its own place: the ring is redrawn then, never in
+      // between). color — the hour and the slot's minutes; color2 — the slot's frame; color3 — the ring
+      const float R = 228 * k;
+      const int mnow = sc_tm.tm_min;
+      sc_ob = ob;  // (over a scene or another layer: blended)
+      const float sw = R * 0.40f, sh = R * 0.27f, sx = ax + R * 0.74f;
+      sc_rrect(c.it[n++], sx, ay, sw, sh, sh / 2, L.color2, a, v);
+      sc_rrect(c.it[n++], sx, ay, sw - 6 * k, sh - 6 * k, sh / 2 - 3 * k, 0x000000, a, v);
+      snprintf(c.txt[0], 8, "%02d", mnow);
+      dl_text(c.it[n++], L.font3, c.txt[0], sx, ay, c.g[2], 1, L.color, a, v, &c.it[1]);
+      snprintf(c.txt[1], 8, "%02d", fc_h24 ? sc_tm.tm_hour : (sc_tm.tm_hour + 11) % 12 + 1);
+      dl_text(c.it[n++], L.font, c.txt[1], ax - R * 0.17f, ay, c.g[0], 1, L.color, a, v, &halo_black);
+      int t = 2;
+      for (int m = 0; m < 60; m += 5) {  // the numbers, upright, every five minutes — none in the slot
+        const float d = 90 + (m - mnow) * 6;
+        float off = fmodf(d - 90 + 540, 360) - 180;
+        if (fabsf(off) < 16) continue;
+        snprintf(c.txt[t], 8, "%02d", m);
+        float x, y;
+        dl_at(ax, ay, d, R * 0.84f, x, y);
+        dl_text(c.it[n++], L.font2, c.txt[t++], x, y, c.g[1], 1, L.color3, a, v, &halo_black);
       }
       sc_ob = false;
       const int dial = n;
       int nc = 0;
-      for (int j = 0; j < 60; j++) {  // the band's rim ticks
-        const bool big = j % 5 == 0;
+      for (int m = 0; m < 60; m++) {  // the minute ticks between them at the rim
+        if (m % 5 == 0) continue;
+        const float d = 90 + (m - mnow) * 6;
+        if (fabsf(fmodf(d - 90 + 540, 360) - 180) < 16) continue;
         float x0, y0, x1, y1;
-        dl_at(ax, ay, j * 6, R * (big ? 0.955f : 0.965f), x0, y0), dl_at(ax, ay, j * 6, R * 0.985f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, (big ? 1.2f : 0.7f) * k, light, a * (big ? 0.9f : 0.6f), v);
+        dl_at(ax, ay, d, R * 0.95f, x0, y0), dl_at(ax, ay, d, R * 0.985f, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, 1.1f * k, L.color3, a * 0.6f, v);
       }
-      for (int j = 0; j < 12; j++) {  // the running seconds' ticks (9)
-        float x0, y0, x1, y1;
-        dl_at(sx[0], sy[0], j * 30, sr * (j % 3 ? 0.74f : 0.62f), x0, y0), dl_at(sx[0], sy[0], j * 30, sr * 0.86f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, (j % 3 ? 0.7f : 1.2f) * k, ink, a, v);
-      }
-      {
-        float x0, y0, x1, y1;
-        dl_at(sx[0], sy[0], sc_sec * 6, -sr * 0.15f, x0, y0), dl_at(sx[0], sy[0], sc_sec * 6, sr * 0.8f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 1.2f * k, acc, a, v);
-        sc_cap(c, nc++, sx[0], sy[0], sx[0], sy[0], 3 * k, acc, a, v);
-      }
-      // the battery (3): a hand from empty to full over a scale of 0-100 at the top, as a chronograph's register
-      const HaloBattery b = halo_battery();
-      const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
-      for (int j = 0; j <= 10; j++) {
-        float x0, y0, x1, y1;
-        const float an = -120 + j * 24;
-        dl_at(sx[1], sy[1], an, sr * (j % 5 ? 0.74f : 0.64f), x0, y0), dl_at(sx[1], sy[1], an, sr * 0.86f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, (j % 5 ? 0.7f : 1.2f) * k, ink, a, v);
-      }
-      {
-        float x0, y0, x1, y1;
-        const float an = -120 + 240 * pct / 100.0f;
-        dl_at(sx[1], sy[1], an, -sr * 0.15f, x0, y0), dl_at(sx[1], sy[1], an, sr * 0.78f, x1, y1);
-        sc_cap(c, nc++, x0, y0, x1, y1, 1.2f * k, acc, a, v);
-        sc_cap(c, nc++, sx[1], sy[1], sx[1], sy[1], 3 * k, acc, a, v);
-      }
-      const int ticks = nc;
-      for (int h = 1; h <= 12; h++) {  // 1-12 on the band
-        snprintf(c.txt[h - 1], 8, "%d", h);
-        float x, y;
-        dl_at(ax, ay, h * 30, R * 0.855f, x, y);
-        dl_text(c.it[n++], L.font, c.txt[h - 1], x, y, c.g[0], 1, light, a, v, &band);
-      }
-      snprintf(c.txt[12], 8, "%d", pct);
-      dl_text(c.it[n++], L.font2, c.txt[12], sx[1], sy[1] + sr * 0.46f, c.g[1], 1, ink, a, v, dsc[1]);
-      strlcpy(c.txt[13], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[14], 8, "%d", sc_tm.tm_mday);
-      dl_text(c.it[n++], L.font3, c.txt[13], sx[2], sy[2] - sr * 0.42f, c.g[2], 1, acc, a, v, dsc[2], DL_TRACK);
-      dl_text(c.it[n++], L.font2, c.txt[14], sx[2], sy[2] + sr * 0.14f, c.g[1], 1, ink, a, v, dsc[2]);
-      nc = dl_hands(c, nc, ax, ay, R, light, 0x000000, acc, R * 0.5f, R * 0.86f, a, a, v);
-      c.ncap = nc, c.d[10] = dial, c.d[11] = ticks;
+      c.ncap = nc, c.d[10] = dial, c.d[11] = nc;
       sc_hide_caps(c, nc);
       sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      break;
+    }
+#endif
+#if SC_ON(SC_MODULAR)
+    case SC_MODULAR: {
+      // Modular (our own, no fitness): the weekday with the day in a chip, the time big, three round gauges — the
+      // weather now (of −10 … 40°), the sunset (the day gone), the battery. color — the time; color2 — the gauges'
+      // accent (each has its own hue: warm, gold, green — from color2 as the first); color3 — the labels
+      const float R = 228 * k, gr = R * 0.19f;
+      sc_ob = ob;  // (over a scene or another layer: blended)
+      strlcpy(c.txt[0], WEEKDAY[sc_tm.tm_wday % 7], 8), snprintf(c.txt[1], 8, "%d", sc_tm.tm_mday);
+      const float cy0 = ay - R * 0.60f, w1 = dl_width(L.font3, c.txt[0], DL_TRACK), cw = R * 0.20f, gap = 8 * k;
+      const float x0 = ax - (w1 + gap + cw) / 2;
+      dl_text(c.it[n++], L.font3, c.txt[0], x0, cy0, c.g[2], 0, L.color3, a, v, &halo_black, DL_TRACK);
+      HaloItem &chip = c.it[n++];
+      sc_rrect(chip, x0 + w1 + gap + cw / 2, cy0, cw, R * 0.14f, R * 0.04f, 0x2E3036, a, v);
+      dl_text(c.it[n++], L.font3, c.txt[1], x0 + w1 + gap + cw / 2, cy0, c.g[2], 1, L.color, a, v, &chip);
+      dl_text(c.it[n++], L.font, fc_time, ax, ay - R * 0.20f, c.g[0], 1, L.color, a, v, &halo_black);
+      const WxCity &w = wx_city[0];
+      const HaloBattery b = halo_battery();
+      const int pct = b.ok && b.percent >= 0 ? b.percent : 100;
+      float fr[3] = {w.now == WX_NONE ? 0 : halo_clamp01((w.now + 10) / 50.0f), 0, pct / 100.0f};
+      if (w.now == WX_NONE) strlcpy(c.txt[2], "--", 8);
+      else snprintf(c.txt[2], 8, "%d\xC2\xB0", (int)w.now);
+      strlcpy(c.txt[3], "--:--", 8);
+#if WX_APP
+      if (w.set) {
+        struct tm st;
+        const time_t ts = w.set;
+        localtime_r(&ts, &st);
+        snprintf(c.txt[3], 8, fc_h24 ? "%02d:%02d" : "%d:%02d", fc_h24 ? st.tm_hour : (st.tm_hour + 11) % 12 + 1, st.tm_min);
+        const float now_m = sc_tm.tm_hour * 60 + sc_tm.tm_min, set_m = st.tm_hour * 60 + st.tm_min;
+        fr[1] = halo_clamp01((now_m - 360) / fmaxf(1, set_m - 360));  // (from 6 a.m. to the sunset)
+      }
+#endif
+      snprintf(c.txt[4], 8, "%d", pct);  // (the label says what it is: no % — 100 fits the disc)
+      static const char *const LAB[3] = {"NOW", "SUNSET", "BATTERY"};
+      const uint32_t hue[3] = {L.color2, sc_mix(L.color2, 0xFFD580, 0.7f), 0xA4F9B5};
+      const float gx[3] = {ax - R * 0.50f, ax, ax + R * 0.50f}, gy[3] = {ay + R * 0.30f, ay + R * 0.60f, ay + R * 0.30f};
+      for (int g = 0; g < 3; g++) {
+        HaloItem &disc = c.it[n++];
+        sc_circle(disc, gx[g], gy[g], gr, 0x1B1C1F, a, v);
+        dl_ring(c.it[n++], gx[g], gy[g], gr - 4 * k, 6 * k, fr[g], hue[g], 0x303238, a, v);
+        dl_text(c.it[n++], L.font2, c.txt[2 + g], gx[g], gy[g] - gr * 0.10f, c.g[1], 1, L.color, a, v, &disc);
+        dl_text(c.it[n++], L.font3, LAB[g], gx[g], gy[g] + gr * 0.42f, c.g[2], 1, hue[g], a, v, &disc, 1);
+      }
+      c.ncap = 0, c.d[10] = n, c.d[11] = 0;
+      sc_hide_caps(c, 0);
+      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      break;
+    }
+#endif
+#if SC_ON(SC_WEAVE)
+    case SC_WEAVE: {
+      // Weave (our own): a field of short dashes over the whole dial, each turned round the minute hand's tip — a
+      // current flowing about the hand — and fainter near it, so the hand reads; the field is made again once a minute
+      // (the hands move only then), so it costs nothing in between. color — the dashes; color2 — the pivot; color3 —
+      // the hands
+      const float R = 228 * k;
+      if (wv_alloc() && (wv_min != sc_tm.tm_min + sc_tm.tm_hour * 60 || wv_k != k || wv_c != L.color)) {
+        wv_min = sc_tm.tm_min + sc_tm.tm_hour * 60, wv_k = k, wv_c = L.color;
+        float tx, ty;
+        dl_at(ax, ay, sc_tm.tm_min * 6, R * 0.55f, tx, ty);
+        wv_n = 0;
+        const float step = 21 * k, len = 7 * k;
+        for (float y = ay - R + step / 2; y < ay + R; y += step)
+          for (float x = ax - R + step / 2; x < ax + R; x += step) {
+            const float dx = x - ax, dy = y - ay;
+            if (dx * dx + dy * dy > (R - 10 * k) * (R - 10 * k) || wv_n >= WV_MAX) continue;
+            const float qx = x - tx, qy = y - ty, d = sqrtf(qx * qx + qy * qy) + 1;
+            const float an = atan2f(qy, qx) + HALO_PI / 2 + 0.6f * expf(-d / (R * 0.5f));  // (round the tip, a swirl)
+            const float ux = cosf(an) * len, uy = sinf(an) * len;
+            ScCap &s = wv[wv_n++];
+            s.x0 = x - ux, s.y0 = y - uy, s.x1 = x + ux, s.y1 = y + uy, s.hw = 2.2f * k, s.c = L.color;
+            s.a = 0.35f + 0.65f * halo_clamp01((d - R * 0.12f) / (R * 0.5f));
+          }
+        halo_damage_f(ax - R, ay - R, ax + R, ay + R);
+      }
+      c.d[12] = a;
+      sc_ob = false;
+      const int dial = n;
+      int nc = dl_hands(c, 0, ax, ay, R, L.color3, 0x000000, L.color2, R * 0.48f, R * 0.80f, a, sa, v, 0, false);
+      c.ncap = nc, c.d[10] = dial, c.d[11] = 0;
+      sc_hide_caps(c, nc);
+      sc_box_add(box, halo_view_x(v, ax - R), halo_view_y(v, ay - R), halo_view_x(v, ax + R), halo_view_y(v, ay + R));
+      break;
+    }
+#endif
+#if SC_ON(SC_WORDS)
+    case SC_WORDS: {
+      // Words (our own): the time written out, left-aligned — the hour bold in the accent, the minutes in a light weight
+      // under it ("Ten / oh / nine", "Four / forty / two", "Six / o'clock"). color — the minutes; color2 — the hour
+      static const char *const ONES[20] = {"", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                                           "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+                                           "seventeen", "eighteen", "nineteen"};
+      static const char *const TENS[6] = {"", "", "twenty", "thirty", "forty", "fifty"};
+      static const char *const HOURS[12] = {"Twelve", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
+                                            "Nine", "Ten", "Eleven"};
+      const int h = sc_tm.tm_hour % 12, m = sc_tm.tm_min;
+      const char *l2 = "o'clock", *l3 = nullptr;
+      if (m > 0 && m < 10) l2 = "oh", l3 = ONES[m];
+      else if (m >= 10 && m < 20) l2 = ONES[m];
+      else if (m >= 20) l2 = TENS[m / 10], l3 = m % 10 ? ONES[m % 10] : nullptr;
+      const float lh = 80 * k, x = ax - 170 * k, y0 = ay - (l3 ? lh : lh / 2);
+      sc_ob = ob;  // (over a scene or another layer: blended)
+      dl_text(c.it[n++], L.font, HOURS[h], x, y0, c.g[0], 0, L.color2, a, v, &halo_black);
+      dl_text(c.it[n++], L.font2, l2, x, y0 + lh, c.g[1], 0, L.color, a, v, &halo_black);
+      dl_text(c.it[n++], L.font2, l3 ? l3 : "", x, y0 + 2 * lh, c.g[1], 0, L.color, l3 ? a : 0, v, &halo_black);
+      c.ncap = 0, c.d[10] = n, c.d[11] = 0;
+      sc_hide_caps(c, 0);
+      break;
+    }
+#endif
+#if SC_ON(SC_BIGTYPE)
+    case SC_BIGTYPE: {
+      // Big type (our own): the hours over the minutes, heavy and round, filling the dial — two tones of one hue.
+      // color — the hours; color2 — the minutes
+      snprintf(c.txt[0], 8, "%02d", fc_h24 ? sc_tm.tm_hour : (sc_tm.tm_hour + 11) % 12 + 1);
+      snprintf(c.txt[1], 8, "%02d", sc_tm.tm_min);
+      sc_ob = ob;  // (over a scene or another layer: blended)
+      dl_text(c.it[n++], L.font, c.txt[0], ax, ay - 94 * k, c.g[0], 1, L.color, a, v, &halo_black);
+      dl_text(c.it[n++], L.font, c.txt[1], ax, ay + 96 * k, c.g[0], 1, L.color2, a, v, &halo_black);
+      c.ncap = 0, c.d[10] = n, c.d[11] = 0;
+      sc_hide_caps(c, 0);
       break;
     }
 #endif
@@ -1798,13 +1616,21 @@ static void sc_draw(const FaceScreen &S, int i) {
       sc_draw_flip(L, c);
       break;
 #endif
-#if SC_ON(SC_DIVE) || SC_ON(SC_FIELD) || SC_ON(SC_SOLAR) || SC_ON(SC_CALIF) || SC_ON(SC_CHRONO)
-    case SC_DIVE:
-    case SC_FIELD:
-    case SC_SOLAR:
-    case SC_CALIF:
-    case SC_CHRONO: {  // the dial, its ticks, the complications, the hands (dl_*: the order); Solar — its light under all
-      if ((int)L.p2 == SC_SOLAR && c.a > 0.004f) sol_blit(c, c.d[7], c.d[8]);
+    case SC_PILOT:
+    case SC_ABOLD:
+    case SC_CONCENTRIC:
+    case SC_MODULAR:
+    case SC_WEAVE:
+    case SC_WORDS:
+    case SC_BIGTYPE: {  // the dial's items, its ticks, the complications, the hands (dl_*: the order); Weave — its field first
+#if SC_ON(SC_WEAVE)
+      if ((int)L.p2 == SC_WEAVE && wv && c.d[12] > 0.004f)
+        for (int j = 0; j < wv_n; j++) {
+          ScCap d = wv[j];
+          d.a *= c.d[12];
+          sc_cap_draw(d);
+        }
+#endif
       const int dial = (int)c.d[10], ticks = (int)c.d[11];
       sc_draw_items(c, 0, dial);
       for (int j = 0; j < ticks && j < c.ncap; j++) sc_cap_draw(c.cap[j]);
@@ -1812,7 +1638,6 @@ static void sc_draw(const FaceScreen &S, int i) {
       for (int j = ticks; j < c.ncap; j++) sc_cap_draw(c.cap[j]);
       break;
     }
-#endif
 #if SC_ON(SC_HANDS) || SC_ON(SC_BEZEL)
     case SC_HANDS:
       sc_draw_items(c, 0, 48);

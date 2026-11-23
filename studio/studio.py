@@ -179,28 +179,30 @@ SC_LOOKS = {
     "bezel": [("GoogleSansFlex.ttf", 176, 280, "digits", "wght=700,ROND=100", None),
               ("GoogleSansFlex.ttf", 24, 30, "digits", "wght=660,ROND=100", None),
               ("GoogleSansFlex.ttf", 40, 48, "digits", "wght=660,ROND=100", None)],
-    # The dials (sclock.h dl_*): Dive — the bezel's numerals, the date's day, the weekday, the caret at 12 (Font Awesome);
-    # Field — the subdials' big values, (none), their small words and numbers
-    "dive": [("GoogleSansFlex.ttf", 21, 28, "digits", "wght=600,ROND=100", None),
-             ("GoogleSansFlex.ttf", 30, 40, "digits", "wght=640,ROND=100", None),
-             ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA"', "wght=800,ROND=100", None),
-             ("fa-solid-900.ttf", 38, 50, "0xf0d7", "", None)],
-    "field": [("GoogleSansFlex.ttf", 29, 40, 'digits "°%-"', "wght=640,ROND=100", None),
-              ("GoogleSansFlex.ttf", 23, 32, 'digits "°%-"', "wght=600,ROND=100", None),
-              ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA%" digits "-"', "wght=760,ROND=100", None)],
-    # Solar: the numbers at the edge, the day, the weekday
-    "solar": [("GoogleSansFlex.ttf", 17, 24, "digits", "wght=520,ROND=100", None),
-              ("GoogleSansFlex.ttf", 26, 34, "digits", "wght=700,ROND=100", None),
-              ("GoogleSansFlex.ttf", 18, 24, '"SUNMOTEWDHFRIA"', "wght=700,ROND=100", None)],
-    # California: the numerals (Roman and Arabic, one rounded bold), the day, the weekday, the caret at 12
-    "california": [("GoogleSansFlex.ttf", 50, 66, '"XIV4578"', "wght=780,ROND=100", None),
-                   ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=700,ROND=100", None),
-                   ("GoogleSansFlex.ttf", 16, 22, '"SUNMOTEWDHFRIA" digits', "wght=760,ROND=100", None),
-                   ("fa-solid-900.ttf", 92, 120, "0xf0d7", "", None)],  # (the caret: the heaviest mark, as California's)
-    # Chrono: the band's 1-12, the date's day, the small words and numbers on the subdials
-    "chrono": [("GoogleSansFlex.ttf", 22, 30, "digits", "wght=620,ROND=100", None),
-               ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=680,ROND=100", None),
-               ("GoogleSansFlex.ttf", 15, 20, '"SUNMOTEWDHFRIA" digits', "wght=760,ROND=100", None)],
+    # The dials and type faces of the face library (sclock.h, 23 Nov 2026 — the Pixel Watch study: our own designs). Sizes
+    # from one scale by the dial's diameter D = 466: hero ≈ 0.33 D, display ≈ 0.22 D, title ≈ 0.075 D, label ≈ 0.033 D
+    # Pilot: the four numerals, the date's day
+    "pilot": [("GoogleSansFlex.ttf", 64, 84, '"12369"', "wght=600,ROND=100", None),
+              ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=650,ROND=100", None)],
+    # Analogue bold: the giant 12 and 6, the values, the labels
+    "abold": [("GoogleSansFlex.ttf", 150, 200, '"126"', "wght=820,ROND=100", None),
+              ("GoogleSansFlex.ttf", 32, 42, 'digits "°-"', "wght=650,ROND=100", None),
+              ("GoogleSansFlex.ttf", 15, 20, '"NOWJAFEBMRPYULGSCTVD"', "wght=760,ROND=100", None)],
+    # Concentric: the hour, the ring's numbers, the slot's minutes
+    "concentric": [("GoogleSansFlex.ttf", 150, 200, "digits", "wght=700,ROND=100", None),
+                   ("GoogleSansFlex.ttf", 24, 32, "digits", "wght=560,ROND=100", None),
+                   ("GoogleSansFlex.ttf", 42, 56, "digits", "wght=700,ROND=100", None)],
+    # Modular: the time, the gauges' values, the labels and the chip
+    "modular": [("GoogleSansFlex.ttf", 104, 140, GSF_DIGITS, "wght=560,ROND=100", None),
+                ("GoogleSansFlex.ttf", 27, 36, 'digits "°%:-"', "wght=650,ROND=100", None),
+                ("GoogleSansFlex.ttf", 15, 20, '"NOWSUETBAYMDHFRI" digits', "wght=760,ROND=100", None)],
+    # Weave: no text — the field, the hands
+    "weave": [],
+    # Words: the hour (bold) and the minutes (light), written out
+    "words": [("GoogleSansFlex.ttf", 66, 88, '"TOFSEN" "abcdefghijklmnopqrstuvwxyz"', "wght=720,ROND=100", None),
+              ("GoogleSansFlex.ttf", 66, 88, '"abcdefghijklmnopqrstuvwxyz\'"', "wght=340,ROND=100", None)],
+    # Big type: the hours over the minutes
+    "bigtype": [("GoogleSansFlex.ttf", 176, 240, "digits", "wght=860,ROND=100", None)],
 }
 SC_NAMES = tuple(SC_LOOKS)  # (their order: SC_* in sclock.h)
 # The Scene layer's pictures (scene.h; tools/scene_pack.py SCENES — the same order)
@@ -236,7 +238,7 @@ def uses_steps(layer, rect=False):
     return not rect and (kind in ("steps", "stepring", "infoline") or kind in STEPS_SCREEN
             or (kind == "curve" and layer.get("what") in ("steps", "datesteps")))
 FX = {"zoom": "HALO_FX_ZOOM", "fade": "HALO_FX_FADE", "slide": "HALO_FX_SLIDE"}  # lib/Halo: halo_nav_face_open
-MAX_SCREENS, MAX_LAYERS = 32, 32  # what the page's engine has room for (engine/studio_api.h)
+MAX_SCREENS, MAX_LAYERS = 48, 32  # what the page's engine has room for (engine/studio_api.h)
 # The watch's Functions (firmware/PopkaWatch/power.h; the page: state.js FUNCTIONS — the same): Always On when idle
 # (after idle s, the panel at bright of 255), what BOOT and PWR do (on: False — nothing) — act: "off" (the screen off),
 # "aod" (Always On at once; the button again — back) or "lock" (Always On, locked; a long press of that button unlocks)
@@ -822,7 +824,7 @@ def clean_screens(project):
     return out or [{"id": "face", "name": "Watch face", "layers": []}]
 
 
-FACE_MAX = 8  # face.h: the watch faces a firmware switches between (the home and the saved ones)
+FACE_MAX = 16  # face.h: the watch faces a firmware switches between (the home and the saved ones)
 
 
 WX_APP_PARTS = ("wxapp", "city", "wxicon", "wxtemp", "wxhilo", "hourly", "feels")  # the Weather app's, the Weather screen's

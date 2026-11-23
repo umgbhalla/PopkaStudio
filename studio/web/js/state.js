@@ -144,14 +144,14 @@ export const CLOCK_LOOKS = [
   ['poster', 'Poster', ['#FFF8EE', '#FF8A80', '#5E5F64'], ['Hours', 'Minutes', null], 1],
   ['hands', 'Hands', ['#FFF8EE', '#FF8A80', '#4A4B50'], ['Hands', 'Second hand', 'Dots'], 0],
   ['bezel', 'Bezel', ['#FFF8EE', '#FF8A80', '#9E9E9E'], ['Hour', 'Marker', 'Scale'], 3],
-  ['dive', 'Dive', ['#3F1116', '#FF453A', '#F2EEE6'], ['Bezel', 'Accent', 'Light'], 4],
-  ['field', 'Field', ['#F2F2F2', '#A8C7FA', '#FAFAFA'], ['Light', 'Accent', 'Containers'], 3],
-  ['solar', 'Solar', ['#1E3BE0', '#6F8CFF', '#FFFFFF'], ['Glow', 'Light', 'Lines and hands'], 3],
-  ['california', 'California', ['#FF5A4E', '#FF5A4E', '#F5F5F5'], ['Numerals', 'Accent', 'Hands'], 4],
-  ['chrono', 'Chrono', ['#9E2B25', '#E5392F', '#F3EFE8'], ['Band', 'Accent', 'Light'], 3],
+  ['pilot', 'Pilot', ['#E3E2E6', '#A8C7FA', '#5A6170'], ['Numerals & hands', 'Accent', 'Ticks'], 2],
+  ['abold', 'Analogue bold', ['#B69DF8', '#D0BCFF', '#F1F0F4'], ['Numerals', 'Accent', 'Hands & values'], 3],
+  ['concentric', 'Concentric', ['#FFFFFF', '#A4F9B5', '#8E9099'], ['Hour & minutes', 'Slot', 'Ring'], 3],
+  ['modular', 'Modular', ['#F1F0F4', '#FFB68A', '#C4C7C5'], ['Time', 'Accent', 'Labels'], 3],
+  ['weave', 'Weave', ['#5F7A70', '#3DDC84', '#F1F0F4'], ['Field', 'Pivot', 'Hands'], 0],
+  ['words', 'Words', ['#E3E2E6', '#7FCFFF', '#5E5F64'], ['Minutes', 'Hour', null], 2],
+  ['bigtype', 'Big type', ['#E8DEF8', '#CDB4FF', '#5E5F64'], ['Hours', 'Minutes', null], 1],
 ];
-// The Scene layer's pictures (scene.h; studio.py SCENE_LOOKS — the same order)
-export const SCENE_LOOKS = [['dunes', 'Dunes'], ['lake', 'Lake'], ['coast', 'Coast'], ['night', 'Night'], ['forest', 'Forest'], ['peaks', 'Peaks'], ['arcs', 'Arcs']];
 export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK_LOOKS[0];
 // What a live card or a device screen shows (device.h: DV_CPU …)
 export const DEVS = [['cpu', 'Processor'], ['mem', 'Memory'], ['bat', 'Battery'], ['temp', 'Temperature'], ['snd', 'Sound'], ['mot', 'Motion']];
@@ -360,7 +360,7 @@ export const GAP = 260;   // between screens on the map
 export let PAGES = 1;                 // the pages of a screen with the Weather screen's parts: one a city (emit keeps it)
 export const PAGE_STEP = TW + GAP;  // on the map its pages stand in a row, as far apart as screens
 export const STEP_PAGES = ['Today', 'This week'];  // the Steps screen's pages (stepscreen.h)
-export const MAX_SCREENS = 32;        // what the engine has room for (studio.py: MAX_SCREENS)
+export const MAX_SCREENS = 48;        // what the engine has room for (studio.py: MAX_SCREENS)
 // A screen that pages sideways: the Weather screen (a city a page) or the Steps screen (today, the week)
 export const weatherPaged = (s) => !!s && s.layers.some((l) => PAGED.has(l.type));
 export const STEPS_PARTS = new Set(['stnum', 'stcap', 'stfoot', 'stchart']);  // the Steps screen's (stepscreen.h)
