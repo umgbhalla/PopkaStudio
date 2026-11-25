@@ -24,6 +24,7 @@
 
 #include <driver/gpio.h>
 #include <driver/i2c_master.h>
+#include "../esp32_common/halo_i2c.h"
 #include <esp_cache.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
@@ -58,11 +59,7 @@ i2c_master_bus_t *hx_bus() {
 }
 
 i2c_master_dev_t *hx_device(uint8_t addr) {
-  if (!bus || i2c_master_probe(bus, addr, 50) != ESP_OK) return nullptr;
-  i2c_device_config_t dc = {};
-  dc.dev_addr_length = I2C_ADDR_BIT_LEN_7, dc.device_address = addr, dc.scl_speed_hz = 400000;
-  i2c_master_dev_handle_t h = nullptr;
-  return i2c_master_bus_add_device(bus, &dc, &h) == ESP_OK ? h : nullptr;
+  return halo_i2c_device(bus, addr);
 }
 
 static bool xw(uint8_t reg, uint8_t v) {
@@ -224,13 +221,13 @@ static bool m2m_init(M2M &m, int pieces, int prio, gdma_event_callback_t eof) {
 // ---------- Passes: the bounce fills read the frame buffer ----------
 static esp_lcd_panel_handle_t panel;
 static uint16_t *fb;
-static DRAM_ATTR volatile uint32_t pass_n, pass_t, pass_period, read_rows, fill_rows, fill_pass, fills, late_fills;
-static DRAM_ATTR volatile uint32_t te_blank = 1480, vs_count;
+// "TE" is a pass's start: te_count — the pass's number, te_rise — its time
+#define HALO_TE_BLANK_US 1480
+#include "../esp32_common/halo_te.h"  // the count, its waiter and hd_te_*: on_bounce_empty feeds them
+static DRAM_ATTR volatile uint32_t read_rows, fill_rows, fill_pass, fills, late_fills, vs_count;
 static DRAM_ATTR uint32_t read_at[CHUNKS];  // µs from a pass's start to its fill of chunk k being done (the last pass's)
-static DRAM_ATTR volatile TaskHandle_t te_waiter;
 static void *volatile pend_buf;  // a fill asked for while the last one still runs: started from its interrupt
 static volatile int pend_pos;
-static portMUX_TYPE te_mux = portMUX_INITIALIZER_UNLOCKED;  // the pass's number and its time — as a pair
 
 static void IRAM_ATTR fill_start(void *buf, int pos_px) {
   const int k = 4, part = HALO_W * BB_ROWS * 2 / k;  // 3840 bytes: four rows, a multiple of HD_BURST
@@ -240,16 +237,16 @@ static void IRAM_ATTR fill_start(void *buf, int pos_px) {
     desc_set(&bm.rd[i], (uint8_t *)buf + i * part, part, i == k - 1, true);
   }
   fill_rows = pos_px / HALO_W + BB_ROWS;
-  fill_pass = pass_n;
+  fill_pass = te_count;
   bm.bytes = bm.bytes + HALO_W * BB_ROWS * 2;
   m2m_go(bm);
 }
 
 static bool IRAM_ATTR bm_eof(gdma_channel_handle_t, gdma_event_data_t *, void *) {
   m2m_done(bm);
-  if (fill_pass == pass_n) {  // (a late fill of the last pass's end does not count for this one)
+  if (fill_pass == te_count) {  // (a late fill of the last pass's end does not count for this one)
     read_rows = fill_rows;
-    read_at[fill_rows / BB_ROWS - 1] = (uint32_t)esp_timer_get_time() - pass_t;
+    read_at[fill_rows / BB_ROWS - 1] = (uint32_t)esp_timer_get_time() - te_rise;
   }
   if (pend_buf) {
     void *b = pend_buf;
@@ -286,9 +283,9 @@ static bool IRAM_ATTR on_bounce_empty(esp_lcd_panel_handle_t, void *buf, int pos
   if (pos_px == 0) {  // a new pass over the frame buffer: "TE"
     const uint32_t now = (uint32_t)esp_timer_get_time();
     portENTER_CRITICAL_ISR(&te_mux);
-    if (pass_t && now - pass_t < 40000) pass_period = now - pass_t;
-    pass_t = now;
-    pass_n = pass_n + 1;
+    if (te_rise && now - te_rise < 40000) te_period = now - te_rise;
+    te_rise = now;
+    te_count = te_count + 1;
     read_rows = 0;
     portEXIT_CRITICAL_ISR(&te_mux);
     if (halo_trace_on) halo_trace_put(TR_TE, now, 0, 0);
@@ -321,49 +318,21 @@ static bool IRAM_ATTR on_vsync(esp_lcd_panel_handle_t, const esp_lcd_rgb_panel_e
     if (i < 4) vs_dscr[i] = d, vs_dscr_n[i] = vs_dscr_n[i] + 1;
     else vs_dscr_other = vs_dscr_other + 1;
   }
-  const uint32_t d = (uint32_t)esp_timer_get_time() - pass_t;
+  const uint32_t d = (uint32_t)esp_timer_get_time() - te_rise;
   if (d < 5000) te_blank = d + ACTIVE_LEAD_US;  // the pass's start → the LCD's first row
   vs_count = vs_count + 1;
   if (halo_trace_on) halo_trace_put(TR_SCAN, (uint32_t)esp_timer_get_time(), 0, 0);
   return false;
 }
 
-bool hd_wait_te(uint32_t count, uint32_t timeout_ms) {
-  te_waiter = xTaskGetCurrentTaskHandle();
-  ulTaskNotifyTake(pdTRUE, 0);  // old notifications do not count — the counter does
-  bool ok = true;
-  while (ok && (int32_t)(pass_n - count) < 0) ok = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(timeout_ms)) > 0;
-  te_waiter = nullptr;
-  return ok;
-}
-
-void hd_te_snapshot(uint32_t *count, uint32_t *rise) {
-  portENTER_CRITICAL(&te_mux);
-  *count = pass_n, *rise = pass_t;
-  portEXIT_CRITICAL(&te_mux);
-}
-
-uint32_t hd_te_count() {
-  return pass_n;
-}
-uint32_t hd_te_period() {
-  return (uint32_t)esp_timer_get_time() - pass_t < 100000 ? pass_period : 0;
-}
-uint32_t hd_te_rise() {
-  return pass_t;
-}
-uint32_t hd_te_blank() {
-  return te_blank;
-}
-
 bool hd_read(uint32_t pass, int rows) {
-  return pass_n != pass || read_rows >= (uint32_t)rows;
+  return te_count != pass || read_rows >= (uint32_t)rows;
 }
 
 uint32_t hd_read_eta(int rows) {
   const int k = constrain((rows + BB_ROWS - 1) / BB_ROWS - 1, 0, CHUNKS - 1);
   const uint32_t at = read_at[k] ? read_at[k] : 2100 + k * 520;
-  return pass_t + at;
+  return te_rise + at;
 }
 
 const uint16_t *hd_fb() {
@@ -473,7 +442,7 @@ void hd_state(int *f, int *queued, int *free_bufs) {
 }
 
 void hd_regs(char *out, int n) {
-  snprintf(out, n, "RGB 16 MHz, passes %lu, fills %lu (late %lu, max %lu us), writes %lu (max %lu us)", (unsigned long)pass_n,
+  snprintf(out, n, "RGB 16 MHz, passes %lu, fills %lu (late %lu, max %lu us), writes %lu (max %lu us)", (unsigned long)te_count,
            (unsigned long)fills, (unsigned long)late_fills, (unsigned long)bm.max_us, (unsigned long)wm.n,
            (unsigned long)wm.max_us);
 }
@@ -608,7 +577,7 @@ bool hd_begin(uint32_t, int buffers, uint8_t brightness) {
         "%.1f MB/s overall (max %lu us, busy %.0f%%); pass %lu us, blank %lu us, rows read at +%lu +%lu +%lu ... +%lu us\n",
         (unsigned long)dt, (unsigned long)bn, bs ? bb / (float)bs : 0, (unsigned long)bm.max_us,
         (unsigned long)(late_fills - late0), (unsigned long)wn, ws ? wb / (float)ws : 0, wb / (dt * 1000.0f),
-        (unsigned long)wm.max_us, ws / (dt * 10.0f), (unsigned long)pass_period, (unsigned long)te_blank,
+        (unsigned long)wm.max_us, ws / (dt * 10.0f), (unsigned long)te_period, (unsigned long)te_blank,
         (unsigned long)read_at[0], (unsigned long)read_at[1], (unsigned long)read_at[2], (unsigned long)read_at[CHUNKS - 1]);
     LOG("lcd: fill calls (core %lu): longest gap %lu us, %lu too soon after the last one, %lu from the restart at VSYNC\n",
         (unsigned long)isr_core, (unsigned long)gap_max, (unsigned long)gap_early, (unsigned long)from_vsync);

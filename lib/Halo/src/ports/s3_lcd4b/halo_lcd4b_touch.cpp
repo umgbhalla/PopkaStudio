@@ -14,24 +14,10 @@
 #include "halo_lcd4b.h"
 
 #include <driver/i2c_master.h>
-
-#define REPORT_AFTER_US 8000  // nothing to ask for this long after a report
-#define RELEASE_US 100000     // no reports for this long: the finger is gone even without a "no fingers" report
+#include "../esp32_common/halo_touch_ring.h"
+#include "../esp32_common/halo_gt911.h"
 
 static i2c_master_dev_handle_t tp, pmu;
-
-#define HIST 8
-static HaloTouchSample hist[HIST];
-static int hist_n, hist_head;
-static portMUX_TYPE hist_mux = portMUX_INITIALIZER_UNLOCKED;
-
-int halo_touch_samples(HaloTouchSample *out, int max) {
-  portENTER_CRITICAL(&hist_mux);
-  const int n = min(max, hist_n);
-  for (int i = 0; i < n; i++) out[i] = hist[(hist_head - i + HIST) % HIST];
-  portEXIT_CRITICAL(&hist_mux);
-  return n;
-}
 
 // ---------- The power chip: the PWR button and the battery ----------
 static volatile uint8_t pwr_ev;  // HALO_PWR_* since the last halo_pwr_event()
@@ -94,104 +80,13 @@ uint8_t halo_pwr_event() {
 }
 
 // ---------- Touch ----------
-static bool gt_read(uint16_t reg, uint8_t *out, size_t n) {
-  const uint8_t r[2] = {(uint8_t)(reg >> 8), (uint8_t)reg};
-  return i2c_master_transmit_receive(tp, r, 2, out, n, 20) == ESP_OK;
-}
-
-static bool gt_take() {  // the report is read: the chip may write the next one
-  const uint8_t w[3] = {0x81, 0x4E, 0};
-  return i2c_master_transmit(tp, w, 3, 20) == ESP_OK;
-}
-
-static int16_t down_x, down_y, last_x, last_y;
-static uint16_t reports;
-
-static void release(const char *why) {
-  portENTER_CRITICAL(&hist_mux);
-  hist_n = 0;
-  portEXIT_CRITICAL(&hist_mux);
-  if (reports) LOG("touch up %d,%d: moved %+d,%+d, %u reports (%s)\n", last_x, last_y, last_x - down_x, last_y - down_y, reports, why);
-  reports = 0;
-}
-
 static void touch_task(void *) {
-  int track = -1;      // the finger we follow: with two on the glass their order in the report changes
-  uint32_t last = 0;   // when the latest report came
-  uint32_t asked = 0;  // questions in a row without an answer
-  for (;;) {
-    if (hist_n) {
-      const int32_t left = (int32_t)(REPORT_AFTER_US - (trace_now() - last));
-      if (left >= 1000) vTaskDelay(left / 1000);
-      if (asked >= 200) vTaskDelay(1);  // (40 ms of asking: a finger that stopped reporting, stay polite on the bus)
-    } else {
-      vTaskDelay(3);
-    }
-    pmu_poll();
-    battery_poll();
-    if (!tp) {
-      vTaskDelay(50);
-      continue;
-    }
-    uint8_t st = 0;
-    const uint32_t t = trace_now();
-    if (!gt_read(0x814E, &st, 1)) {
-      vTaskDelay(5);
-      continue;
-    }
-    if (!(st & 0x80)) {
-      asked++;
-      if (hist_n && t - last > RELEASE_US) track = -1, release("timeout");
-      continue;
-    }
-    asked = 0;
-    const int n = st & 0x0F;
-    if (n < 1 || n > 5) {
-      gt_take();
-      track = -1;
-      release("lift");
-      continue;
-    }
-    uint8_t p[40];
-    const bool ok = gt_read(0x814F, p, n * 8);
-    gt_take();
-    if (!ok) continue;
-    int i = -1;
-    if (track < 0) i = 0, track = p[0];
-    else
-      for (int k = 0; k < n; k++)
-        if (p[k * 8] == track) i = k;
-    if (i < 0) {  // the finger we followed is gone and another one stays: a new touch, not a jump to where that one is
-      track = -1;
-      release("finger changed");
-      continue;
-    }
-    const int x = p[i * 8 + 1] | (p[i * 8 + 2] << 8), y = p[i * 8 + 3] | (p[i * 8 + 4] << 8);
-    const HaloTouchSample s = {(int16_t)constrain(x, 0, HALO_W - 1), (int16_t)constrain(y, 0, HALO_H - 1), t};
-    portENTER_CRITICAL(&hist_mux);
-    hist_head = (hist_head + 1) % HIST;
-    hist[hist_head] = s;
-    if (hist_n < HIST) hist_n++;
-    portEXIT_CRITICAL(&hist_mux);
-    last = t;
-    trace_mark(TR_TOUCH_READ, s.x, s.y);
-    if (!reports++) down_x = s.x, down_y = s.y, LOG("touch down %d,%d\n", s.x, s.y);
-    last_x = s.x, last_y = s.y;
-  }
+  gt911_task(tp, [] { pmu_poll(), battery_poll(); }, [](int *, int *) {});  // (the panel's own axes)
 }
 
-// ---------- I2C for the sketch (the same bus: the driver takes turns between tasks by itself) ----------
+// ---------- I2C for the sketch (the same bus: the driver takes turns between tasks by itself; halo_i2c.cpp) ----------
 HaloI2c halo_i2c(uint8_t addr) {
   return hx_device(addr);
-}
-
-bool halo_i2c_write(HaloI2c d, uint8_t reg, uint8_t val) {
-  const uint8_t w[2] = {reg, val};
-  return d && i2c_master_transmit(d, w, 2, 20) == ESP_OK;
-}
-
-bool halo_i2c_read(HaloI2c d, uint8_t reg, uint8_t *buf, int n) {
-  return d && i2c_master_transmit_receive(d, &reg, 1, buf, n, 20) == ESP_OK;
 }
 
 bool ht_begin() {

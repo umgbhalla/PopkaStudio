@@ -124,11 +124,10 @@ void hd_state(int *f, int *queued, int *free_bufs) {
 }
 
 // ---------- TE ----------
-static DRAM_ATTR volatile uint32_t te_rise, te_period, te_count, te_blank = 500;
-static DRAM_ATTR volatile TaskHandle_t te_waiter;
-static portMUX_TYPE te_mux = portMUX_INITIALIZER_UNLOCKED;  // the signal's number and its time — as a pair
-static DRAM_ATTR volatile uint32_t te_real;                 // edges of the real line
-static esp_timer_handle_t te_timer;                         // stands in when the line is silent
+#define HALO_TE_BLANK_US 500
+#include "../esp32_common/halo_te.h"  // the count, its waiter and hd_te_*: the interrupt below feeds them
+static DRAM_ATTR volatile uint32_t te_real;  // edges of the real line
+static esp_timer_handle_t te_timer;          // stands in when the line is silent
 
 static void IRAM_ATTR te_isr(void *) {
   const uint32_t now = (uint32_t)esp_timer_get_time();
@@ -161,34 +160,6 @@ static void te_stand_in(void *) {  // the timer's task, 60 times a second
   portEXIT_CRITICAL(&te_mux);
   TaskHandle_t w = te_waiter;
   if (w) xTaskNotifyGive(w);
-}
-
-bool hd_wait_te(uint32_t count, uint32_t timeout_ms) {
-  te_waiter = xTaskGetCurrentTaskHandle();
-  ulTaskNotifyTake(pdTRUE, 0);  // old notifications do not count — the counter does
-  bool ok = true;
-  while (ok && (int32_t)(te_count - count) < 0) ok = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(timeout_ms)) > 0;
-  te_waiter = nullptr;
-  return ok;
-}
-
-void hd_te_snapshot(uint32_t *count, uint32_t *rise) {
-  portENTER_CRITICAL(&te_mux);
-  *count = te_count, *rise = te_rise;
-  portEXIT_CRITICAL(&te_mux);
-}
-
-uint32_t hd_te_count() {
-  return te_count;
-}
-uint32_t hd_te_period() {
-  return (uint32_t)esp_timer_get_time() - te_rise < 100000 ? te_period : 0;
-}
-uint32_t hd_te_rise() {
-  return te_rise;
-}
-uint32_t hd_te_blank() {
-  return te_blank;
 }
 
 void hd_regs(char *out, int n) {
