@@ -432,7 +432,7 @@ static void ck_fill(int p) {
   gmtime_r(&now, &u);
   const int i = ck_idx[p];
   ck_tz_local(i < 0 ? TZ : CK_CITIES[i].tz, now, t);
-  snprintf(ck_time[p], 8, fc_h24 ? "%02d:%02d" : "%d:%02d", fc_h24 ? t.tm_hour : (t.tm_hour + 11) % 12 + 1, t.tm_min);
+  fc_hm(ck_time[p], 8, t.tm_hour, t.tm_min, false);
   int off = (t.tm_yday * 1440 + t.tm_hour * 60 + t.tm_min) - (u.tm_yday * 1440 + u.tm_hour * 60 + u.tm_min);
   if (off > 1440) off -= 365 * 1440;
   if (off < -1440) off += 365 * 1440;
