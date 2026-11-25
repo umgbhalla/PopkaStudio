@@ -121,13 +121,12 @@ static void up_text(UpPage &P, const HaloFont &f, const char *s, float mid, floa
 }
 static void up_rrect(UpPage &P, float x0, float y0, float x1, float y1, float r, uint32_t c, float a, const HaloView &v) {
   HaloItem &b = up_item(P);
-  b.kind = HI_RRECT, b.x = (x0 + x1) / 2, b.y = (y0 + y1) / 2, b.w = x1 - x0, b.h = y1 - y0, b.r = r, b.scale = 1;
-  b.color = c, b.alpha = a, b.on_black = true, b.on = nullptr;
+  ui_rrect(b, (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0, r, 1, c, a);
   up_commit(b, v);
 }
 static HaloItem &up_disc(UpPage &P, float x, float y, float r, uint32_t c, float a, const HaloView &v) {
   HaloItem &b = up_item(P);
-  b.kind = HI_CIRCLE, b.x = x, b.y = y, b.r = r, b.scale = 1, b.color = c, b.alpha = a, b.on_black = true, b.on = nullptr;
+  ui_circle(b, x, y, r, 1, c, a);
   up_commit(b, v);
   return b;
 }
@@ -235,8 +234,8 @@ static void up_update(float dt) {
     } else {
       up_drag = false;
       const float d = up_pos.x - up_page, v = up_pos.v;
-      int to = up_page + (fabsf(d) > 0.33f ? (d > 0 ? 1 : -1) : 0);
-      if (fabsf(v) > 0.9f) to = up_page + (v > 0 ? 1 : -1);
+      // a third of the way or a fling faster than 0.9 page/s, either way (a fling wins over the way)
+      int to = up_page + (halo_land(d, v, 0.33f, 0.9f, true) ? 1 : halo_land(-d, -v, 0.33f, 0.9f, true) ? -1 : 0);
       if (up_app->wrap) {  // (round: the same place, counted from the other end — nothing jumps on screen)
         if (to < 0) to += n, up_pos.x += n, up_g0 += n;
         else if (to >= n) to -= n, up_pos.x -= n, up_g0 -= n;
@@ -372,6 +371,10 @@ static void up_swap(UpState &s) {
   std::swap(s.drag, up_drag), std::swap(s.x0, up_x0), std::swap(s.g0, up_g0);
   for (int p = 0; p < UP_PAGES; p++) std::swap(s.vis[p], up_vis[p]), std::swap(s.dot[p], up_dot[p]);
   std::swap(s.track, up_track), std::swap(s.fill, up_fill), std::swap(s.clock, up_clock);
+}
+// fn with s as the pager's state (up_open, up_update, up_layout, up_audit of a pager kept aside)
+template <class F> static inline void up_with(UpState &s, F fn) {
+  up_swap(s), fn(), up_swap(s);
 }
 static void up_draw_of(const UpState &s) {  // (up_draw of a state kept aside)
   if (!s.app || !s.pg) return;

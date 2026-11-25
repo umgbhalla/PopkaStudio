@@ -280,8 +280,8 @@ static void gal_update(FaceScreen &S, float dt, int depth) {
 // Text by the middle of its letters; align: 0 — x is its left end, 2 — its right end
 static void rg_text(HaloItem &it, const HaloFont &f, const char *s, float mid, int align, float x, float y, uint32_t color,
                     float alpha, const HaloItem *on, int sp = 0) {
-  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = align, it.color = color, it.on = on, it.on_black = false;
-  it.x = x, it.y = y + (f.line / 2.0f - mid), it.scale = 1, it.alpha = alpha, it.spacing = sp;
+  halo_item_text(it, f, s, mid, x, y, 1, align, color, alpha, on);
+  it.spacing = sp;
 }
 
 static void rg_card(const FaceScreen &S, int i, const GalRun &g, int c, float a, const HaloView &v) {

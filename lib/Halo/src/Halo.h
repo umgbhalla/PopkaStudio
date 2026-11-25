@@ -747,4 +747,34 @@ static inline float halo_clamp01(float v) {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
+// ---------- Жест отпустили: дальше или обратно ----------
+// pos — пройденная доля пути, speed — скорость в ту же сторону (у каждого места свои единицы). true — дальше: бросок
+// быстрее fast или пройдено больше cut; back — и бросок назад быстрее fast возвращает, сколько бы ни прошли. Числа — у
+// каждого места свои (halo_nav.cpp: треть пути и 700 px/с; страницы upager.h — треть и 0,9 страницы/с)
+static inline bool halo_land(float pos, float speed, float cut, float fast, bool back = false) {
+  if (speed > fast) return true;
+  if (back && speed < -fast) return false;
+  return pos > cut;
+}
+
+// ---------- Элементы одним вызовом: текст, плашка, круг ----------
+// Текст по середине его букв mid (halo_text_mid) в (x, y), x — по align; on — на чём лежит (on_black — false: кому
+// надо, ставит сам). spacing и fit не трогает
+static inline void halo_item_text(HaloItem &it, const HaloFont &f, const char *s, float mid, float x, float y, float sc,
+                                  int align, uint32_t color, float a, const HaloItem *on) {
+  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = align, it.color = color, it.scale = sc, it.alpha = a;
+  it.on_black = false, it.on = on;
+  it.x = x, it.y = y + (f.line / 2.0f - mid) * sc;
+}
+// Плашка w×h с углами r и круг радиуса r — центр (x, y), на чёрном (on_black — true, on — нет)
+static inline void halo_item_rrect(HaloItem &it, float x, float y, float w, float h, float r, float sc, uint32_t c,
+                                   float a) {
+  it.kind = HI_RRECT, it.x = x, it.y = y, it.w = w, it.h = h, it.r = r, it.scale = sc, it.color = c, it.alpha = a;
+  it.on_black = true, it.on = nullptr;
+}
+static inline void halo_item_circle(HaloItem &it, float x, float y, float r, float sc, uint32_t c, float a) {
+  it.kind = HI_CIRCLE, it.x = x, it.y = y, it.r = r, it.scale = sc, it.color = c, it.alpha = a, it.on_black = true;
+  it.on = nullptr;
+}
+
 #pragma GCC pop_options

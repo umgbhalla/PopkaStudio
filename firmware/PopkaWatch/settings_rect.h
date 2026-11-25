@@ -3,6 +3,15 @@
 // bar is a slider. The second row opens About when the project has it (the layer's link; none — no row).
 // Included from settings.h in place of its round layout.
 
+static const char *dp_hint_text() {  // what BOOT does (the editor's Buttons): 1 — screen off, 2 — lock, 3 — Always On
+  switch (pw_boot_fn()) {
+    case 1: return "BOOT turns the screen off";
+    case 2: return "BOOT locks the screen";
+    case 3: return "BOOT turns on Always On";
+  }
+  return "";
+}
+
 #if defined(HALO_SQUARE)
 // The square, 480 × 480 (variant 5C of web/mockups/square-screens.html): the two rows side by side at the top, the percent
 // and "Brightness" in the middle, then the round board's control — big "−" and "+" at the ends of a pill and the eight
@@ -38,15 +47,6 @@ static HaloItem dq_seg[DP_STEPS];
 static Press dr_press;
 static char dr_pct_s[8];
 static float dr_mid_title, dr_mid_row, dr_mid_label, dr_mid_pct, dr_mid_hint, dr_mid_ic;
-
-static const char *dp_hint_text() {  // what BOOT does (the editor's Buttons): 1 — screen off, 2 — lock, 3 — Always On
-  switch (pw_boot_fn()) {
-    case 1: return "BOOT turns the screen off";
-    case 2: return "BOOT locks the screen";
-    case 3: return "BOOT turns on Always On";
-  }
-  return "";
-}
 
 static void display_build() {
   dr_mid_title = halo_text_mid(gl_r_title, "Settings"), dr_mid_row = halo_text_mid(gl_r_t32, "Display");
@@ -199,15 +199,6 @@ static HaloItem dr_title, dr_row[2], dr_row_ic[2], dr_row_t[2], dr_label, dr_pct
 static Press dr_press;
 static char dr_pct_s[8];
 static float dr_mid_title, dr_mid_row, dr_mid_label, dr_mid_pct, dr_mid_hint, dr_mid_ic;
-
-static const char *dp_hint_text() {  // what BOOT does (the editor's Buttons): 1 — screen off, 2 — lock, 3 — Always On
-  switch (pw_boot_fn()) {
-    case 1: return "BOOT turns the screen off";
-    case 2: return "BOOT locks the screen";
-    case 3: return "BOOT turns on Always On";
-  }
-  return "";
-}
 
 static void display_build() {
   dr_mid_title = halo_text_mid(gl_r_title, "Settings"), dr_mid_row = halo_text_mid(gl_r_t32, "Display");
