@@ -42,3 +42,9 @@ static void snd_begin(int rate) {
   (void)rate;
 #endif
 }
+
+// A time as m:ss (mm — mm:ss, two digits of minutes), whole seconds, cut down (round: pass sec + 0.5f)
+static void mmss(char *o, int n, float sec, bool mm = false) {
+  const int s = max(0, (int)sec);
+  snprintf(o, n, mm ? "%02d:%02d" : "%d:%02d", s / 60, s % 60);
+}

@@ -127,7 +127,6 @@ static bool vh_ended() { return vh_t >= vh_len; }
 static float vh_length() { return vh_len; }
 static float vh_position() { return vh_t; }
 static void vh_seek(float frac, bool) { vh_t = frac * vh_len; }
-static void vh_volume(float) {}
 static void vh_tick(float dt) {
   if (vh_play && vh_t < vh_len) vh_t = fminf(vh_t + dt, vh_len);
 }
@@ -805,12 +804,6 @@ static void vh_seek_run() {
   vh_end = false;
   vh_seeking = true, vh_want = n, vh_go_final = final;
   vh_go(n, final);
-}
-
-static void vh_volume(float v) {
-  if (v <= 0.001f) return halo_audio_volume(0);
-  const float db = -40 + v * 46, reg = 0xBF + 2 * db;
-  halo_audio_volume((int)lroundf((reg + 1) * 100 / 256));
 }
 
 // Every frame: which frame the next boundary shows. The picture keeps to the screen's boundaries, so the cadence is even

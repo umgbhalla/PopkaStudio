@@ -5,7 +5,9 @@
 // for 2.5 s after a change. 0..10, 6 at start (not saved).
 // The owner screen: vol_enter() when it opens, vol_update(dt) first in its update (true — the volume screen took the
 // finger), f = vol_layout(v) — how much of its own screen is seen, vol_draw() last; vol_open() — its volume button.
-// vol_tick(dt) — once a frame (settings_tick). Included from settings.h before player.h and recorder.h.
+// vol_tick(dt) — once a frame (settings_tick). Included from settings.h before player.h and recorder.h, and from
+// video.h (the Video app's button sets the same level: a firmware with Video alone has it from there).
+#pragma once
 
 #define VOL_PRIMARY 0xE9DDFF     // "+" and "−"
 #define VOL_ON_SURFACE 0xF6EDFF  // the speaker

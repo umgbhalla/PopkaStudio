@@ -45,10 +45,6 @@ static float ra_mid_mic, ra_mid_stop, ra_mid_list, ra_mid_back, ra_mid_pm, ra_mi
 static Preferences ra_prefs;
 static int ra_owner;  // (the horizontal drag held while recording)
 
-static void ra_mmss(char *o, int n, float sec) {
-  const int s = max(0, (int)sec);
-  snprintf(o, n, "%02d:%02d", s / 60, s % 60);
-}
 static inline float ra_bar_h(int lv) { return 2 + 22 * constrain(lv, 0, 255) / 255.0f; }  // level 0..255 → 2..24 px
 static void ra_bar(UpPage &P, int i, float h, uint32_t c, float a, const HaloView &v) {
   const float x = 123 + 10 * i;  // (a round 4 px stroke, caps r 2: the box is h + 4 tall)
@@ -136,7 +132,7 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
   const bool rec = rc_state == RC_REC;
   if (p == 0) {  // Capture: ready or recording
     up_title(P, "Recorder", a, v);
-    ra_mmss(ra_time, sizeof(ra_time), rec ? rc_t : 0);
+    mmss(ra_time, sizeof(ra_time), rec ? rc_t : 0, true);
     up_text(P, gl_up_hero, ra_time, up_mid_hero, CX, 181, 1, UP_WHITE, a, v);
     HaloItem &card = ra_wave_card(P, rec ? RA_HOT : RA_PANEL, a, v);
     for (int i = 0; i < RA_BARS; i++) {  // the last 23 slices, the newest (in progress) at the right
@@ -149,7 +145,7 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
       ra_bar(P, i, h, rec ? RA_ACC : RA_QUIET, a, v);
     }
     char lim[8];
-    ra_mmss(lim, sizeof(lim), rc_limit_s);
+    mmss(lim, sizeof(lim), rc_limit_s, true);
     snprintf(ra_cap, sizeof(ra_cap), rec ? "RECORDING" : "UP TO %s", lim);
     up_text(P, gl_up_lab, ra_cap, up_mid_lab, CX, 282, 1, rec ? RA_ACC : UP_MUTED, a, v, &card);
     ra_secondary(P, rec ? RA_PANEL : RA_CTRL, RA_IC_LIST, ra_mid_list, rec ? RA_QUIET : RA_ACC, a, v);
@@ -165,8 +161,7 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_rrect(P, 80, y - 36, 386, y + 36, 24, RA_PANEL, a, v);
     HaloItem &row = P.it[P.n - 1];
     ra_when(ra_stamp, sizeof(ra_stamp));
-    const int s = (int)((float)rc_len / rc_rate + 0.5f);
-    snprintf(ra_dur, sizeof(ra_dur), "%d:%02d", s / 60, s % 60);
+    mmss(ra_dur, sizeof(ra_dur), (float)rc_len / rc_rate + 0.5f);
     up_text(P, gl_up_title, ra_name(), up_mid_title, 107, y - 9, 0, UP_WHITE, a, v, &row);
     up_text(P, gl_up_lab, ra_stamp, up_mid_lab, 107, y + 17, 0, UP_MUTED, a, v, &row);
     up_text(P, gl_ra_dur, ra_dur, ra_mid_dur, 306, y, 2, UP_WHITE, a, v, &row);
@@ -230,20 +225,20 @@ static int rp_count() { return 1; }
 static void rp_lay(int, UpPage &P, float a, const HaloView &v) {
   const bool play = rc_state == RC_PLAY;
   up_title(P, ra_name(), a, v);
-  ra_mmss(ra_time, sizeof(ra_time), (float)rc_pos / rc_rate);
+  mmss(ra_time, sizeof(ra_time), (float)rc_pos / rc_rate, true);
   up_text(P, gl_up_hero, ra_time, up_mid_hero, CX, 181, 1, UP_WHITE, a, v);
   HaloItem &card = ra_wave_card(P, RA_PANEL, a, v);
   const int played = rc_len ? (int)lroundf(RA_BARS * (float)rc_pos / rc_len) : 0;
   for (int i = 0; i < RA_BARS; i++) ra_bar(P, i, ra_ov[i], i < played ? RA_ACC : RA_QUIET, a, v);
   char tot[8];
-  ra_mmss(tot, sizeof(tot), (float)rc_len / rc_rate);
+  mmss(tot, sizeof(tot), (float)rc_len / rc_rate, true);
   snprintf(ra_cap, sizeof(ra_cap), "OF %s", tot);
   up_text(P, gl_up_lab, ra_cap, up_mid_lab, CX, 282, 1, UP_MUTED, a, v, &card);
   ra_secondary(P, RA_CTRL, RA_IC_BACK, ra_mid_back, RA_ACC, a, v);
   up_primary(P, RA_PRI_X, RA_ROW_Y, 55, ra_pmorph.x, play ? UP_IC_PAUSE : UP_IC_PLAY, RA_ACC, RA_INK, a, v);
 }
 static void rp_tap(int, float x, float y) {
-  if (ra_in_pri(x, y)) rc_state == RC_PLAY ? (void)(rc_playing = false, rc_state = RC_DONE) : rc_play();
+  if (ra_in_pri(x, y)) rc_toggle();
   else if (ra_in_sec(x, y)) ra_close_clip();
 }
 static float rp_ring() { return rc_len ? (float)rc_pos / rc_len : 0; }

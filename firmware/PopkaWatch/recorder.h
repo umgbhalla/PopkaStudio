@@ -313,9 +313,10 @@ static void rc_play() {
 #endif
   rc_gate = 1, rc_playing = true, rc_state = RC_PLAY;
 }
+static void rc_toggle() { rc_state == RC_PLAY ? (void)(rc_playing = false, rc_state = RC_DONE) : rc_play(); }  // Play / Stop
 static void rc_action(int i, float held) {  // held — s since the finger touched the button
   if (i == 0) rc_state == RC_REC ? rc_stop(held + 0.04f) : rc_record();  // (Record again — a new one in its place)
-  else if (i == 1) rc_state == RC_PLAY ? (void)(rc_playing = false, rc_state = RC_DONE) : rc_play();
+  else if (i == 1) rc_toggle();
   else vol_open();
 }
 static bool rc_busy() { return rc_state == RC_REC || rc_state == RC_PLAY; }
@@ -416,8 +417,7 @@ static void recorder_tick(float dt) {  // every frame, whatever is on screen
   rc_clock += dt;
   const float sec = rc_state == RC_REC ? rc_t : rc_state == RC_PLAY ? (float)rc_pos / rc_rate
                     : rc_state == RC_DONE ? (float)(rc_pos > 0 ? rc_pos : rc_len) / rc_rate : 0;
-  const int s = (int)sec;
-  snprintf(rc_time_s, sizeof rc_time_s, "%d:%02d", s / 60, s % 60);
+  mmss(rc_time_s, sizeof rc_time_s, sec);
 }
 
 #ifdef HALO_ROUND

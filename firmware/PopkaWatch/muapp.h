@@ -25,7 +25,7 @@ extern const HaloFont gl_mu_track, gl_mu_queue, gl_mu_opt, gl_mu_lab, gl_mu_vol,
 #define MU_IC_SPEAKER "\xEF\x80\xA8"  // U+F028
 #define MU_IC_DRIVE "\xEF\x82\xA0"    // U+F0A0
 #define MU_DEG (HALO_PI / 180)
-#define MU_PIECE (12 * MU_DEG)  // the progress arc's pieces: 308° in 26
+#define MU_ARC_PIECE (12 * MU_DEG)  // the progress arc's pieces: 308° in 26
 #define MU_PIECES 26
 // The rows of Queue and Music settings: 66 px cards 16 px apart, centred on y 165, 247, 329 (the design's frames; its
 // SPEC_music.md text says 74 px queue cards on 165, 250, 335 — the frames win: one rhythm for both pages). A two-line
@@ -62,10 +62,6 @@ static HaloItem &mu_text(UpPage &P, const HaloFont &f, const char *s, float x, f
   t.on_black = on == &halo_black;
   up_commit(t, v);
   return t;
-}
-static void mu_mmss(char *o, int n, float s) {
-  const int t = max(0, (int)s);
-  snprintf(o, n, "%d:%02d", t / 60, t % 60);
 }
 static const char *mu_source() {
 #if defined(HALO_SD_CS) && !defined(__EMSCRIPTEN__)
@@ -105,15 +101,15 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
     // drawn again, and each piece's box keeps to the rim (one arc's box would cover the dial)
     const float end = UP_A0 + UP_SWEEP * fr;
     for (int k = 0; k < MU_PIECES; k++) {
-      const float a0 = UP_A0 + k * MU_PIECE, a1 = fminf(a0 + MU_PIECE, end);
+      const float a0 = UP_A0 + k * MU_ARC_PIECE, a1 = fminf(a0 + MU_ARC_PIECE, end);
       up_arc(P, UP_RING_R, UP_RING_W, a0, fmaxf(a0, a1), MU_ACC, have ? a : 0, v);
     }
     if (have) {
       const MuTrack &t = mu_tracks[pl_cur];
-      mu_mmss(mu_el, sizeof(mu_el), pl_elapsed);
+      mmss(mu_el, sizeof(mu_el), pl_elapsed);
       mu_text(P, gl_up_disp, mu_el, CX, 178, 1, UP_WHITE, a, v);
       char len[8];
-      mu_mmss(len, sizeof(len), pl_len[pl_cur]);
+      mmss(len, sizeof(len), pl_len[pl_cur]);
       snprintf(mu_of, sizeof(mu_of), "OF %s", len);
       mu_text(P, gl_up_lab, mu_of, CX, 231, 1, MU_ACC, a, v);
       mu_text(P, gl_mu_track, t.title, CX, 265, 1, UP_WHITE, a, v, &halo_black, 300);
@@ -167,7 +163,7 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
       mu_text(P, gl_up_lab, mu_q[k][0], 106, y, 1, k ? MU_ACC : MU_INK, a, v, &badge);
       mu_text(P, gl_mu_queue, mu_tracks[i].title, 137, y - 11, 0, UP_WHITE, a, v, &card, 227);
       mu_text(P, gl_mu_lab, mu_tracks[i].artist, 137, y + 15.5f, 0, UP_MUTED, a, v, &card, 177);
-      mu_mmss(mu_q[k][1], 8, pl_len[i]);
+      mmss(mu_q[k][1], 8, pl_len[i]);
       mu_text(P, gl_up_lab, mu_q[k][1], 364, y + 15.5f, 2, MU_ACC, a, v, &card);
     }
     if (!mu_qn) mu_text(P, gl_mu_opt, "No upcoming tracks", CX, 233, 1, UP_MUTED, a, v);
