@@ -8,13 +8,9 @@
 // The transitions are the interface's ordinary 60 Hz frames. While the video plays the frame engine decodes it into the
 // frame buffer (halo_under) and only what lies over the picture goes through the usual drawing: nothing at all once the
 // controls hide. The hardware half: video_hw.h. Included from settings.h.
-// The volume is the speaker's one level (volume.h, 0..10, the Music's and the Recorder's too): the button's ring and
-// number show it, held and moved it is set — 26 px a step, the whole range in 260 (before, the app had a level of its own,
-// 0.62 at start, and opening it put that on the speaker over the Music's)
 
 extern const HaloFont gl_r_title, gl_r_t28, gl_r_t32, gl_r_v24, gl_r_n21, gl_r_n24, gl_r_n26, gl_r_n40, gl_r_ic64;
 #include "video_hw.h"
-#include "volume.h"  // (settings.h has it already with the Music, the Recorder, the shade or the Radio)
 
 #define VT_X0 32          // the tiles
 #define VT_Y0 92
@@ -56,8 +52,7 @@ static HaloSpring vd_open_s, vd_ctl, vd_pp, vd_vr, vd_press;
 static HaloSpringK K_VD_OPEN, K_VD_FAST;
 static HaloList vd_list;
 static int vd_list_n = -1;
-static float vd_scroll, vd_hide_in, vd_vol_y0, vd_seek_at = -1;
-static int vd_vol_from;  // the level when the finger began to set it
+static float vd_scroll, vd_hide_in, vd_vol = 0.62f, vd_vol_from, vd_vol_y0, vd_seek_at = -1;
 static float vd_mid_title, vd_mid_t, vd_mid_n24, vd_mid_n26, vd_mid_n21, vd_mid_n40, vd_mid_ic, vd_mid_v, vd_mid_e;
 static bool vd_on_top, vd_vol_on, vd_btn, vd_line, vd_free;
 static bool vd_away;  // the player on its way into Always On or dark, or there (vd_away_check)
@@ -221,7 +216,6 @@ static void video_build() {
   vd_mid_n21 = halo_text_mid(gl_r_n21, "0123456789"), vd_mid_n40 = halo_text_mid(gl_r_n40, "0123456789");
   vd_mid_ic = halo_text_mid(gl_r_ic64, VP_ICON_VOL), vd_mid_v = halo_text_mid(gl_r_v24, "Video"), vd_mid_e = halo_text_mid(gl_r_t32, "No videos");
   vh_commands();
-  vol_build();  // the speaker's volume (volume.h)
   vh_on_picture = vd_ctl_repaint;
 #ifdef __EMSCRIPTEN__
   vh_begin();  // (the editor's page: its made-up clips at once, for the screen's picture)
@@ -250,6 +244,7 @@ static void vd_open_clip(int i) {
 #endif
   vd_sel = i, vd_mode = VM_OPEN, vd_open_s.target = 1, vd_vr.target = 0, vd_vol_on = false;
   halo_spring_set(vd_ctl, 0), halo_spring_set(vd_pp, 1);
+  vh_volume(vd_vol);
   if (vd_ready_i != i) vh_open(i);
   vd_ready_i = -1;
 }
@@ -376,11 +371,11 @@ static void vd_player_update(float) {
   }
   if (vd_btn && f.down) {  // held, or moved up and down: the volume
     if (!vd_vol_on && (halo_ms() - f.t0 > 320 || fabsf(f.y - f.y0) > 14)) {
-      vd_vol_on = true, vd_vol_from = vol_level, vd_vol_y0 = f.y, vd_vr.target = 1;
+      vd_vol_on = true, vd_vol_from = vd_vol, vd_vol_y0 = f.y, vd_vr.target = 1;
     }
     if (vd_vol_on) {
-      const int lv = constrain(vd_vol_from + (int)lroundf((vd_vol_y0 - f.y) / 26), 0, 10);
-      if (lv != vol_level) vol_set(lv, false);
+      vd_vol = halo_clamp01(vd_vol_from + (vd_vol_y0 - f.y) / 260);
+      vh_volume(vd_vol);
       vd_hide_in = VP_HIDE_S;
     }
   }
@@ -550,8 +545,8 @@ static void vd_ctl_layout(const HaloView &v) {
   if (on && vd_sel >= 0) {
     const float len = vh_length(), now = vd_seek_at >= 0 ? vd_seek_at * len : vh_position(), f = len > 0 ? halo_clamp01(now / len) : 0, fx = VP_LINE_W * f;
     mmss(vd_t0, sizeof vd_t0, now), mmss(vd_t1, sizeof vd_t1, len + 0.5f);
-    const float vol = vol_level / 10.0f;
-    snprintf(vd_num, sizeof vd_num, "%d", vol_level * 10);
+    const int pct = (int)lroundf(vd_vol * 100);
+    snprintf(vd_num, sizeof vd_num, "%d", pct);
     const char *title = vh_files[vd_sel].title;
 #if VH_UNDER && FN_WIFI
     if (vh_files[vd_sel].net) {  // a clip from a computer (the streaming bench): how the stream goes, beside its name
@@ -579,7 +574,7 @@ static void vd_ctl_layout(const HaloView &v) {
     for (int i = 0; i < 3; i++) gl_text_mid(vu->ic[i], gl_r_ic64, G[i], vd_mid_ic, VP_BTN_X + (i == 1 ? 4 : 0), VP_BTN_Y, 1, VP_TEXT, ka * A[i], nullptr), vu->ic[i].on_black = false, halo_view_commit(vu->ic[i], v);
     HaloItem &ri = vu->ring, &ar = vu->arc;
     ri.kind = HI_RING, ri.x = VP_BTN_X, ri.y = VP_BTN_Y, ri.r = VP_RING_R, ri.w = VP_RING_W, ri.v = 1, ri.scale = 1, ri.color = 0xFFFFFF, ri.color2 = 0xFFFFFF, ri.alpha = 0.22f * ka * vr, ri.on_black = false, ri.on = nullptr;
-    ar.kind = HI_ARC, ar.x = VP_BTN_X, ar.y = VP_BTN_Y, ar.r = VP_RING_R, ar.w = VP_RING_W, ar.a0 = 0, ar.a1 = 2 * HALO_PI * vol, ar.scale = 1, ar.color = VP_TEXT, ar.alpha = (vol_level > 0 ? ka * vr : 0), ar.on_black = false, ar.on = nullptr;
+    ar.kind = HI_ARC, ar.x = VP_BTN_X, ar.y = VP_BTN_Y, ar.r = VP_RING_R, ar.w = VP_RING_W, ar.a0 = 0, ar.a1 = 2 * HALO_PI * vd_vol, ar.scale = 1, ar.color = VP_TEXT, ar.alpha = (vd_vol > 0.004f ? ka * vr : 0), ar.on_black = false, ar.on = nullptr;
     halo_view_commit(ri, v), halo_view_commit(ar, v);
     vd_text(vu->num, gl_r_n40, vd_num, vd_mid_n40, 1, VP_BTN_X, VP_NUM_Y, VP_TEXT, ka * vr, v);
   } else {
@@ -588,7 +583,7 @@ static void vd_ctl_layout(const HaloView &v) {
   // Anything of theirs changed: a frame is drawn, and with it the picture under them is decoded again (halo_under, and
   // vd_ctl_repaint marks all of them over it). Hidden just now: the picture alone, once more
   uint32_t h = 2166136261u;
-  for (float q : {k * 256, vr * 256, halo_clamp01(vd_pp.x) * 256, vol_level * 100.0f, vd_seek_at * 4000, vh_position() * 10, (float)vd_sel, v.a * 256})
+  for (float q : {k * 256, vr * 256, halo_clamp01(vd_pp.x) * 256, vd_vol * 1000, vd_seek_at * 4000, vh_position() * 10, (float)vd_sel, v.a * 256})
     h = (h ^ (uint32_t)(int32_t)q) * 16777619u;
   const bool vis = on && ka > 0.004f;  // (closing they are not drawn at all: marking them made the close redraw the whole screen)
   if (vis && h != vd_ctl_h) vd_ctl_mark();
