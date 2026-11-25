@@ -1,5 +1,5 @@
 // HaloClock — точное время из интернета для скетчей на Halo: Wi-Fi включается, узнаёт время по NTP и выключается;
-// через 6 часов — снова (сети нет — через 10 минут). Как net_time_only() в AmoledNet, но без LVGL и AmoledBoard.
+// через 6 часов — снова (сети нет — через 10 минут).
 //
 // Отдельный заголовок, а не часть Halo.h: Wi-Fi попадает в прошивку только тем скетчам, что его подключили
 // (~0,4 МБ прошивки и ~65 КБ внутренней памяти на время подключения — у Halo её с запасом). Сеть и пароль — общие
@@ -18,6 +18,7 @@
 #include <Halo.h>
 #include <WiFi.h>
 #include <esp_sntp.h>
+#include "HaloWifiList.h"
 #if __has_include("wifi_secrets.h")  // the shared network (if there is one); else — only the one passed to begin
 #include "wifi_secrets.h"
 #endif
@@ -63,10 +64,7 @@ static void hclk_scan() {
   WiFi.mode(WIFI_STA);
   const int n = WiFi.scanNetworks();
   hclk_status();
-  for (int i = 0; i < n; i++)
-    if (WiFi.SSID(i).length())  // (скрытые сети — без имени)
-      LOG("wifi: net %d %d %s\n", (int)WiFi.RSSI(i), WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? 0 : 1, WiFi.SSID(i).c_str());
-  WiFi.scanDelete();
+  halo_wifi_list(n);
 #ifndef HALO_WIFI_KEEP
   if (!hclk_hold) WiFi.mode(WIFI_OFF);
 #endif
@@ -74,6 +72,15 @@ static void hclk_scan() {
   hclk_busy = false;
   LOG("wifi: scan done %d\n", n < 0 ? 0 : n);
 }
+
+// После WiFi.begin: ждать подключения не дольше ms, проверяя раз в 250 мс; stop() — бросить ждать. true — подключена
+// (и сверка времени здесь, и Радио: radio_net.h)
+static bool hclk_wait_joined(uint32_t ms, bool (*stop)()) {
+  const uint32_t t1 = millis();
+  while (WiFi.status() != WL_CONNECTED && !stop() && millis() - t1 < ms) vTaskDelay(pdMS_TO_TICKS(250));
+  return WiFi.status() == WL_CONNECTED;
+}
+static bool hclk_scan_asked() { return hclk_scan_req; }
 
 // Подключиться и узнать время (не дольше минуты; просьба поискать сети прерывает попытку — она повторится)
 static void hclk_sync() {
@@ -87,10 +94,7 @@ static void hclk_sync() {
       const int i = (hclk_good + k) % hclk_nets;
       if (k) WiFi.disconnect(false), vTaskDelay(pdMS_TO_TICKS(100));
       WiFi.begin(hclk_net_ssid[i], hclk_net_pass[i]);
-      const uint32_t t1 = millis();
-      while (WiFi.status() != WL_CONNECTED && !hclk_scan_req && millis() - t1 < (hclk_nets > 1 ? 15000u : 60000u))
-        vTaskDelay(pdMS_TO_TICKS(250));
-      if (WiFi.status() == WL_CONNECTED) {
+      if (hclk_wait_joined(hclk_nets > 1 ? 15000u : 60000u, hclk_scan_asked)) {
         hclk_good = i, hclk_ssid = hclk_net_ssid[i], hclk_pass = hclk_net_pass[i];
         break;
       }

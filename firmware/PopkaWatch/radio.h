@@ -978,18 +978,59 @@ static const HaloScreen *rs_screen();
 // The Stations screen's own layer (FL_RBROWSE) while it is the project's screen: its link opens the Folder screen
 // (nullptr — the built-in Browse of a project from before 13 Nov 2026: the built-in stations screen)
 static const FaceLayer *rb_link;
-static void rs_open(int folder) {
+// ---------- A folder's stations (ru->s_*): the Folder screen's below and the paged Radio's (radioapp.h) ----------
+static void rd_rows_favs() {  // the favourites as the folder's rows
+  RdUi &u = *ru;
+  u.s_n = min(rd_fav_n, RD_RES);
+  memcpy(u.s_rows, rd_fav, u.s_n * sizeof(RdSt));
+}
+// A folder opened: the favourites at once, else the catalog asked (its answer: rd_rows_take)
+static void rd_rows_open(int folder) {
   RdUi &u = *ru;
   u.s_folder = folder, u.s_n = 0, u.s_state = 0;
   const RdFolder &f = RD_FOLDER[folder];
   if (f.kind == RF_FAV) {
-    u.s_n = min(rd_fav_n, RD_RES), u.s_state = 1;
-    memcpy(u.s_rows, rd_fav, u.s_n * sizeof(RdSt));
+    rd_rows_favs(), u.s_state = 1;
   } else {
     rd_folder_path(f, u.s_path, sizeof(u.s_path));
     u.s_gen = rn_fetch_gen;
     rn_fetch(u.s_path, folder);
   }
+}
+static bool rd_rows_take() {  // the catalog answered: its stations into the rows; true — they changed
+  RdUi &u = *ru;
+  if (u.s_state != 0 || rn_fetch_gen == u.s_gen || rn_fetch_st == 1) return false;
+  u.s_gen = rn_fetch_gen;
+  if (rn_fetch_st == 2) {
+    u.s_n = min((int)rn_res_n, RD_RES);
+    memcpy(u.s_rows, rn_res, u.s_n * sizeof(RdSt));
+    u.s_state = 1;
+  } else {
+    u.s_state = 2;
+  }
+  return true;
+}
+static void rd_rows_retry() {  // Retry: ask the catalog once more
+  RdUi &u = *ru;
+  u.s_state = 0, u.s_gen = rn_fetch_gen;
+  rn_fetch(u.s_path, u.s_folder);
+}
+// Row i played: the folder onto the dial, it plays
+static void rd_rows_play(int i) {
+  RdUi &u = *ru;
+  rd_folder = u.s_folder;
+  if (RD_FOLDER[rd_folder].kind == RF_FAV) {
+    rd_list_favs();
+    for (int k = 0; k < rd_list_n; k++)
+      if (!strcmp(rd_list[k].url, u.s_rows[i].url)) return rd_tune(k);
+  } else {
+    rd_list_n = u.s_n;
+    memcpy(rd_list, u.s_rows, u.s_n * sizeof(RdSt));
+    rd_tune(i);
+  }
+}
+static void rs_open(int folder) {
+  rd_rows_open(folder);
   if (rb_link && rb_link->tap > 0 && rb_link->tap < face_scr_n) gl_req = rb_link, gl_req_depth = halo_nav_depth();
   else halo_nav_open(*rs_screen());
 }
@@ -1097,46 +1138,20 @@ static void rs_enter() {
   rs_armed = rs_heart = -1, rs_btn_armed = false;
   rs_rows_init();
 }
-static void rs_take_fetch() {  // the catalog answered: its stations into the rows
-  RdUi &u = *ru;
-  if (u.s_state != 0 || rn_fetch_gen == u.s_gen || rn_fetch_st == 1) return;
-  u.s_gen = rn_fetch_gen;
-  if (rn_fetch_st == 2) {
-    u.s_n = min((int)rn_res_n, RD_RES);
-    memcpy(u.s_rows, rn_res, u.s_n * sizeof(RdSt));
-    u.s_state = 1;
-  } else {
-    u.s_state = 2;
-  }
-  rs_rows_init();
-}
 // A station of the folder tapped: the folder onto the dial, it plays — the list stays (its circle shows it loading, then
 // playing); the one already playing tapped again — the main screen (13 Nov 2026, the user's wish; before: always back)
 static void rs_pick(int i) {
-  RdUi &u = *ru;
-  if (rd_has_cur && rd_on && !strcmp(rd_cur.url, u.s_rows[i].url)) {
+  if (rd_has_cur && rd_on && !strcmp(rd_cur.url, ru->s_rows[i].url)) {
     if (rn_playing) halo_nav_back_to(rd_main_depth);  // (still loading: nothing)
     return;
   }
-  rd_folder = u.s_folder;
-  if (RD_FOLDER[rd_folder].kind == RF_FAV) {
-    rd_list_favs();
-    for (int k = 0; k < rd_list_n; k++)
-      if (!strcmp(rd_list[k].url, u.s_rows[i].url)) {
-        rd_tune(k);
-        break;
-      }
-  } else {
-    rd_list_n = u.s_n;
-    memcpy(rd_list, u.s_rows, u.s_n * sizeof(RdSt));
-    rd_tune(i);
-  }
+  rd_rows_play(i);
 }
 static void rs_update(float dt) {
   RdUi &u = *ru;
   HaloFinger &f = halo_finger;
   HaloList &l = u.s_list;
-  rs_take_fetch();
+  if (rd_rows_take()) rs_rows_init();
   halo_list_update(l, dt);
   RdEdge &e = u.s_edge;
   rd_edge_update(e, l, dt);
@@ -1158,8 +1173,7 @@ static void rs_update(float dt) {
   if (f.tap) {
     if (e.armed) halo_nav_back_to(rd_main_depth);
     else if (rs_btn_armed) {  // Retry: ask the catalog once more
-      u.s_state = 0, u.s_gen = rn_fetch_gen;
-      rn_fetch(u.s_path, u.s_folder);
+      rd_rows_retry();
       rs_rows_init();
     } else if (rs_heart >= 0 && rs_heart < u.s_n) rd_fav_toggle(u.s_rows[rs_heart]);
     else if (rs_armed > 0 && rs_armed - 1 < u.s_n) rs_pick(rs_armed - 1);
@@ -1275,9 +1289,8 @@ static void rb_layout_on(const HaloView &v) {
 static void rs_layout_on(const HaloView &v) {
   if (!ru) return;
   if (!ru->s_list.n) {  // (not opened from a folder: the favourites)
-    RdUi &u = *ru;
-    u.s_folder = 0, u.s_n = min(rd_fav_n, RD_RES), u.s_state = 1;
-    memcpy(u.s_rows, rd_fav, u.s_n * sizeof(RdSt));
+    ru->s_folder = 0, ru->s_state = 1;
+    rd_rows_favs();
     rs_rows_init();
   }
   rs_layout(v);

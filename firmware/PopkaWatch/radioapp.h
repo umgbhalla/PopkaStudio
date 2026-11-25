@@ -173,53 +173,22 @@ static int &rpg_slice() {
 static int rpg_slices() { return max(1, (rpg_n() + 2) / 3); }
 static inline bool rpg_is_cur(const RdSt &s) { return rd_has_cur && !strcmp(rd_cur.url, s.url); }
 
-// A folder opened (the folders' view): the favourites at once, else the catalog asked (its answer: rpg_take)
+// A folder opened (the folders' view): radio.h's rows — the favourites at once, else the catalog asked (rd_rows_take)
 static void rpg_open_folder(int i) {
-  RdUi &u = *ru;
-  u.s_folder = i, u.s_n = 0, u.s_state = 0;
-  const RdFolder &f = RD_FOLDER[i];
-  if (f.kind == RF_FAV) {
-    u.s_n = min(rd_fav_n, RD_RES), u.s_state = 1;
-    memcpy(u.s_rows, rd_fav, u.s_n * sizeof(RdSt));
-  } else {
-    rd_folder_path(f, u.s_path, sizeof(u.s_path));
-    u.s_gen = rn_fetch_gen;
-    rn_fetch(u.s_path, i);
-  }
+  rd_rows_open(i);
   rpg_route = RPG_FOLDER;
   rpg_sl[i] = constrain(rpg_sl[i], 0, rpg_slices() - 1);
 }
-static void rpg_take() {  // the catalog answered: its stations into the folder's rows
-  RdUi &u = *ru;
-  if (u.s_state != 0 || rn_fetch_gen == u.s_gen || rn_fetch_st == 1) return;
-  u.s_gen = rn_fetch_gen;
-  if (rn_fetch_st == 2) u.s_n = min((int)rn_res_n, RD_RES), memcpy(u.s_rows, rn_res, u.s_n * sizeof(RdSt)), u.s_state = 1;
-  else u.s_state = 2;
-}
 // A station of a folder picked: the folder onto the dial, it plays (the view stays, the row highlighted)
 static void rpg_pick_folder(int i) {
-  RdUi &u = *ru;
-  if (i >= u.s_n) return;
-  rd_folder = u.s_folder;
-  if (RD_FOLDER[rd_folder].kind == RF_FAV) {
-    rd_list_favs();
-    for (int k = 0; k < rd_list_n; k++)
-      if (!strcmp(rd_list[k].url, u.s_rows[i].url)) return rd_tune(k);
-  } else {
-    rd_list_n = u.s_n;
-    memcpy(rd_list, u.s_rows, u.s_n * sizeof(RdSt));
-    rd_tune(i);
-  }
+  if (i < ru->s_n) rd_rows_play(i);
 }
 static void rpg_heart(int i) {  // a long press on a station's row: in the favourites or out (radio.h)
   const RdSt *s = rpg_st(i);
   if (!s) return;
   const RdSt keep = *s;  // (the list may shift under it)
   rd_fav_toggle(keep);
-  if (rpg_route == RPG_FOLDER && RD_FOLDER[ru->s_folder].kind == RF_FAV) {
-    ru->s_n = min(rd_fav_n, RD_RES);
-    memcpy(ru->s_rows, rd_fav, ru->s_n * sizeof(RdSt));
-  }
+  if (rpg_route == RPG_FOLDER && RD_FOLDER[ru->s_folder].kind == RF_FAV) rd_rows_favs();
   rpg_slice() = constrain(rpg_slice(), 0, rpg_slices() - 1);
 }
 
@@ -355,10 +324,7 @@ static void rpg_tap_stations(float x, float y) {
     if (rpg_route == RPG_FOLDERS && rpg_sl_folders * 3 > rd_folder + 2) rpg_sl_folders = rd_folder / 3;
     return;
   }
-  if (rpg_route == RPG_FOLDER && ru->s_state == 2 && up_in(x, y, 66, 193, 400, 269)) {  // Retry: ask the catalog again
-    ru->s_state = 0, ru->s_gen = rn_fetch_gen;
-    return rn_fetch(ru->s_path, ru->s_folder);
-  }
+  if (rpg_route == RPG_FOLDER && ru->s_state == 2 && up_in(x, y, 66, 193, 400, 269)) return rd_rows_retry();  // Retry
   const int i = rpg_row_at(x, y);
   if (i < 0) return;
   if (rpg_route == RPG_FOLDERS) rpg_open_folder(i);
@@ -429,7 +395,7 @@ static void rpg_tap(int p, float x, float y) {
 }
 static void rpg_update(int p, float dt) {
   if (!ru) return;
-  rpg_take();
+  rd_rows_take();
   // Play ↔ Pause: the primary's shape over 180 ms, ease-out cubic
   if (rpg_m_to != rd_on) rpg_m_to = rd_on, rpg_m_from = rpg_morph, rpg_m_at = halo_ms();
   const float u = halo_clamp01((halo_ms() - rpg_m_at) / 180.0f), e = 1 - (1 - u) * (1 - u) * (1 - u);

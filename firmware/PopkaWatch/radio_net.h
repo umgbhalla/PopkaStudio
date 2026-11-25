@@ -107,18 +107,16 @@ static void rn_title_copy(char *out, size_t n) {
 }
 
 // ---------- Wi-Fi: held while the radio needs it ----------
+static bool rn_wifi_unwanted() { return !(rn_on || rn_fetch_want || rn_fetching); }
 static bool rn_wifi_join() {
   if (!rn_wifi_held) rn_wifi_held = true, hclk_hold = true, halo_stay_awake(true);
   if (WiFi.status() == WL_CONNECTED) return true;
   rn_net = RN_JOINING;
-  for (int attempt = 0; attempt < 3 && (rn_on || rn_fetch_want || rn_fetching); attempt++) {
+  for (int attempt = 0; attempt < 3 && !rn_wifi_unwanted(); attempt++) {
     if (attempt) WiFi.disconnect(), vTaskDelay(pdMS_TO_TICKS(500));  // (a refused rejoin needs a fresh begin)
     WiFi.mode(WIFI_STA);
     WiFi.begin(hclk_ssid, hclk_pass);
-    for (int i = 0; i < 40 && (rn_on || rn_fetch_want || rn_fetching); i++) {  // 10 s
-      if (WiFi.status() == WL_CONNECTED) return LOG("radio: wifi joined, %d dBm\n", (int)WiFi.RSSI()), true;
-      vTaskDelay(pdMS_TO_TICKS(250));
-    }
+    if (hclk_wait_joined(10000, rn_wifi_unwanted)) return LOG("radio: wifi joined, %d dBm\n", (int)WiFi.RSSI()), true;
   }
   return WiFi.status() == WL_CONNECTED;
 }
@@ -192,11 +190,8 @@ static void rn_close() {
 static int rn_open(const char *url, int depth, uint32_t gen) {
   RnUrl u;
   if (!rn_parse(url, u)) return LOG("radio: not an http(s) address\n"), 0;
-  struct addrinfo hints = {}, *res = nullptr;
-  hints.ai_family = AF_INET, hints.ai_socktype = SOCK_STREAM;
-  if (lwip_getaddrinfo(u.host, nullptr, &hints, &res) != 0 || !res) return LOG("radio: %s not found\n", u.host), 0;
-  const IPAddress ip(((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr);
-  lwip_freeaddrinfo(res);
+  IPAddress ip;
+  if (!halo_http_lookup(u.host, ip)) return LOG("radio: %s not found\n", u.host), 0;
   if (u.tls) {
     if (rn_free_int() < RN_TLS_MIN) return LOG("radio: https needs memory (%u KB free)\n", (unsigned)(rn_free_int() / 1024)), -1;
     if (!rn_tls) rn_tls = new NetworkClientSecure;
