@@ -101,24 +101,11 @@ static void sp_before(Snake &S) {
 }
 
 static void sp_make_glow() {  // a radial glow: (1 − r/R)² in 16 steps
-  const int D = SP_GLOW, bpr = (D + 1) / 2;
-  uint8_t *bits = (uint8_t *)heap_caps_calloc(D * bpr + D * 2, 1, MALLOC_CAP_SPIRAM);
-  if (!bits) return;
-  uint8_t *ext = bits + D * bpr;
-  const float R = D / 2.0f;
-  for (int y = 0; y < D; y++) {
-    int first = D, last = -1;
-    for (int x = 0; x < D; x++) {
-      const float dx = x + 0.5f - R, dy = y + 0.5f - R, d = sqrtf(dx * dx + dy * dy) / R;
-      if (d >= 1) continue;
-      const int v = (int)(15 * (1 - d) * (1 - d) + 0.5f);
-      if (!v) continue;
-      bits[y * bpr + x / 2] |= x & 1 ? v : v << 4;
-      first = min(first, x), last = max(last, x);
-    }
-    ext[2 * y] = first > last ? 1 : first, ext[2 * y + 1] = first > last ? 0 : last;
-  }
-  sp_glow = {(int16_t)D, (int16_t)D, 0, 0, 0, bits, ext};
+  const float R = SP_GLOW / 2.0f;
+  gm_make_mask(sp_glow, SP_GLOW, [&](int x, int y) {
+    const float dx = x + 0.5f - R, dy = y + 0.5f - R, d = sqrtf(dx * dx + dy * dy) / R;
+    return d >= 1 ? 0 : (int)(15 * (1 - d) * (1 - d) + 0.5f);
+  });
 }
 
 static void space_build() {
@@ -126,10 +113,10 @@ static void space_build() {
   sp_star = (SpStar *)heap_caps_calloc(SP_STARS, sizeof(SpStar), MALLOC_CAP_SPIRAM);
   sp_orb = (GmBox *)heap_caps_calloc(SN_MAXL, sizeof(GmBox), MALLOC_CAP_SPIRAM);
   if (!sp_s || !sp_star || !sp_orb) return void(sp_s = nullptr);
-  sn_init_polar(*sp_s, SP_A, SP_R, 0.11f, 40, 23);
+  sn_init_open(*sp_s, SP_A, SP_R, true, 0.11f, 40, 23);  // (polar: the angles wrap)
   sp_s->before_step = sp_before;
   uint32_t r = 31;
-  auto rnd = [&]() { r ^= r << 13, r ^= r >> 17, r ^= r << 5; return (r >> 8) * (1.0f / 16777216); };
+  auto rnd = [&]() { return sn_xorshiftf(r); };
   for (int i = 0; i < SP_STARS; i++) {  // even over the area from the disc out (r 46…236); ω ∝ r^−1.6
     const float rr = sqrtf(46 * 46 + rnd() * (SP_SKY * SP_SKY - 46 * 46));
     sp_star[i] = {rr, rnd() * 2 * HALO_PI, sp_omega(rr), (uint8_t)(1 + (int)(rnd() * 3)), -9, -9};
@@ -187,7 +174,7 @@ static void space_tick(float dt) {
   if (S.food_n != sp_food_n) sp_food_orbit(S);  // a new star: its orbit at once (not at the next step)
   if (sp_col_n != S.food_n) {  // … and a colour of its own (not the last one's)
     uint32_t c = sp_food_col;
-    while (c == sp_food_col) sp_food_rnd ^= sp_food_rnd << 13, sp_food_rnd ^= sp_food_rnd >> 17, sp_food_rnd ^= sp_food_rnd << 5, c = SP_FOOD[sp_food_rnd % 7];
+    while (c == sp_food_col) c = SP_FOOD[sn_xorshift(sp_food_rnd) % 7];
     sp_food_col = c, sp_col_n = S.food_n;
   }
   // The comet's sparks: two a frame, thrown back from the head

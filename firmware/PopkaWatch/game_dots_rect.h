@@ -26,7 +26,7 @@ static void dot_make(DotGame &g, int cols, int rows, float pitch, float w, float
   g.look = g.drawn + cols * rows;
   g.cols = cols, g.rows = rows, g.pitch = pitch, g.w = w, g.h = h;
   g.ox = (w - (cols - 1) * pitch) / 2, g.oy = (h - (rows - 1) * pitch) / 2;
-  sn_init_rect(*g.s, cols, rows, tick, cap, seed);
+  sn_init_open(*g.s, cols, rows, false, tick, cap, seed);
   gm_make_rrect(g.dot[0], mw0, pitch * 0.62f, pitch * 0.62f * 0.3f), gm_make_rrect(g.dot[1], mw1, pitch * 0.74f, pitch * 0.74f * 0.3f);
 }
 
