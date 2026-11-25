@@ -22,6 +22,8 @@ import numpy as np
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+import halo_assets as ha  # noqa: E402 — RGB565 as the board's images have it
 SRC = os.path.join(ROOT, "scenes")
 # The order is the layer's look (scene.h; studio.py SCENE_LOOKS; the page's SCENE_LOOKS) — new ones go at the end
 SCENES = ["dunes", "lake", "coast", "night", "forest", "peaks", "arcs"]
@@ -44,7 +46,7 @@ def render(name):
     o1 = np.arange(SIZE) + 0.5 - SIZE / 2
     srgb[o1[:, None] ** 2 + o1 ** 2 > (SIZE / 2) ** 2] = 0  # (a pixel whose centre is outside: true black)
     q = np.floor(srgb * np.array([31, 63, 31]) + 0.5).astype(np.uint32)
-    return (q[..., 0] << 11) | (q[..., 1] << 5) | q[..., 2]
+    return ha.pack565(q[..., 0], q[..., 1], q[..., 2])
 
 
 def pack(px):
@@ -69,11 +71,6 @@ def pack(px):
     return [int(c) for c in order], rows, runs
 
 
-def decode565(px):
-    r, g, b = px >> 11, (px >> 5) & 63, px & 31
-    return np.stack(((r << 3) | (r >> 2), (g << 2) | (g >> 4), (b << 3) | (b >> 2)), -1).astype(np.uint8)
-
-
 def main():
     ap = argparse.ArgumentParser(description="Build the Scene layer's pictures from tools/scenes/*.svg")
     ap.add_argument("sketch")
@@ -85,7 +82,7 @@ def main():
         px = render(name)
         if a.png:
             os.makedirs(a.png, exist_ok=True)
-            Image.fromarray(decode565(px)).save(os.path.join(a.png, name + ".png"))
+            Image.fromarray(ha.unpack565(px)).save(os.path.join(a.png, name + ".png"))
         pal, rows, runs = pack(px)
         out += [f"static const uint16_t sc_{name}_pal[] = {{{', '.join(f'0x{c:04X}' for c in pal)}}};",
                 f"static const uint32_t sc_{name}_rows[] = {{{', '.join(map(str, rows))}}};",

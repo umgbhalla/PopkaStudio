@@ -49,12 +49,17 @@ def q4(a):
     return np.clip((a.astype(np.int32) * 15 + 127) // 255, 0, 15).astype(np.uint8)
 
 
-def pack4(a4):
-    """Строки по (w+1)/2 байт, левый пиксель — старшие 4 бита; и ext: первый/последний непустой столбец строки."""
+def nibbles(a4):
+    """Строки 0..15 → по (w+1)/2 байт, левый пиксель — старшие 4 бита (маски Halo; клетки HaloPixels — halo_pixels.py)."""
     h, w = a4.shape
     pad = np.zeros((h, w + (w & 1)), np.uint8)
     pad[:, :w] = a4
-    bits = (pad[:, 0::2] << 4) | pad[:, 1::2]
+    return (pad[:, 0::2] << 4) | pad[:, 1::2]
+
+
+def pack4(a4):
+    """nibbles() списком; и ext: первый/последний непустой столбец строки."""
+    bits = nibbles(a4)
     ext = []
     for row in a4:
         nz = np.nonzero(row)[0]
@@ -307,6 +312,22 @@ def load_png(path, width):
     return np.array(im)
 
 
+def pack565(r, g, b):
+    """Каналы 0..31, 0..63, 0..31 → RGB565 (порядок памяти; тип — как у каналов). Им же — scene_pack.py."""
+    return (r << 11) | (g << 5) | b
+
+
+def swap565(px):
+    """RGB565 ↔ порядок дисплея (старший байт первым): переставить байты (studio.py — обратно, для страницы)."""
+    return ((px & 0xFF) << 8) | (px >> 8)
+
+
+def unpack565(px):
+    """RGB565 → RGB 0..255 (uint8, ещё одна ось в конце): старшие биты канала повторены в младших."""
+    r, g, b = px >> 11, (px >> 5) & 63, px & 31
+    return np.stack(((r << 3) | (r >> 2), (g << 2) | (g >> 4), (b << 3) | (b >> 2)), -1).astype(np.uint8)
+
+
 def do_image(out, name, path, width, preview):
     rgba = load_png(path, width)
     a = rgba[:, :, 3]
@@ -317,9 +338,9 @@ def do_image(out, name, path, width, preview):
     r = np.clip(np.round(rgb[:, :, 0] * 31 / 255), 0, 31).astype(np.uint16)
     g = np.clip(np.round(rgb[:, :, 1] * 63 / 255), 0, 63).astype(np.uint16)
     b = np.clip(np.round(rgb[:, :, 2] * 31 / 255), 0, 31).astype(np.uint16)
-    px = (r << 11) | (g << 5) | b
+    px = pack565(r, g, b)
     if not os.environ.get("HALO_PX_LE"):  # (плата, у которой кадр читается как есть, — HALO_PX_LE=1: порядок памяти)
-        px = ((px & 0xFF) << 8) | (px >> 8)  # порядок дисплея: старший байт первым
+        px = swap565(px)  # порядок дисплея: старший байт первым
     a4 = q4(rgba[:, :, 3])
     px[a4 == 0] = 0
     bits, ext = pack4(a4)

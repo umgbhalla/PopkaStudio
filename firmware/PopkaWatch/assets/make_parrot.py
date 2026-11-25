@@ -138,11 +138,18 @@ def frame(f):
     return g
 
 
-def to_image(g):
-    rgb = np.zeros((H, W, 3), np.uint8)
+def paint(g, skip=""):
+    """A frame's cells in their colors, one px a cell (RGBA; the letters of skip — and nothing — left transparent).
+    studio/app/make_icon.py paints the app icon's parrot with it."""
+    a = np.zeros((H, W, 4), np.uint8)
     for ch, c in COLORS.items():
-        rgb[g == ch] = ((c >> 16) & 255, (c >> 8) & 255, c & 255)
-    return Image.fromarray(rgb).resize((W * CELL, H * CELL), Image.NEAREST)
+        if ch not in skip:
+            a[g == ch] = ((c >> 16) & 255, (c >> 8) & 255, c & 255, 255)
+    return a
+
+
+def to_image(g):
+    return Image.fromarray(paint(g)[..., :3]).resize((W * CELL, H * CELL), Image.NEAREST)
 
 
 def main():

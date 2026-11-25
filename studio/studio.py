@@ -22,7 +22,6 @@ Other runs:
 import contextlib
 import glob
 import http.server
-import importlib.util
 import io
 import json
 import os
@@ -77,19 +76,11 @@ def bring_old_data():
 VERSION = "2.6"  # PopkaStudio's version (the About window; the release notes)
 
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+import gen_icons as gi  # noqa: E402 — the weather icons
 import halo_assets as ha  # noqa: E402 — the board's font and image code
 import p4v  # noqa: E402 — a video into a clip for the P4's Video app
 import stream  # noqa: E402 — the Video app's clips over Wi-Fi from here (the Stream switch)
 
-
-def _load(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-gi = _load("gen_icons", os.path.join(ROOT, "tools/gen_icons.py"))  # the weather icons
 assets_lock = threading.Lock()  # gen_icons keeps its scale in a module global; halo_assets writes previews
 
 # ---------- The project: what is on the screen ----------
@@ -1642,7 +1633,7 @@ def image_entry(path, native=False):
     w, h = map(int, re.search(r"const HaloImage i = \{(\d+), (\d+),", text).groups())
     px, alpha, ext = out.arrays["i_px"], out.arrays["i_alpha"], out.arrays["i_ext"]
     if native:  # (halo_assets.py writes the round board's byte order, high byte first)
-        px = [((p & 0xFF) << 8) | (p >> 8) for p in px]
+        px = [ha.swap565(p) for p in px]
     b = struct.pack("<hhIII", w, h, len(px), len(alpha), len(ext))
     b += struct.pack(f"<{len(px)}H", *px) + bytes(alpha) + bytes(ext)
     return b + bytes(-len(b) % 4)
@@ -2783,19 +2774,9 @@ VIDEOS = os.path.join(HERE, "videos")
 PUT_CHUNK = 8192  # (as the board's VH_PUT_CHUNK, video_hw.h)
 
 
-def clip_info(path):
-    with open(path, "rb") as f:
-        head = f.read(64)
-    if head[:4] != b"P4V2":
-        return None
-    h = struct.unpack("<11I", head[4:48])
-    return {"name": os.path.basename(path), "title": os.path.basename(path)[:-4].replace("_", " "), "size": os.path.getsize(path),
-            "seconds": h[5] * h[4] / h[3] if h[3] else 0, "poster": h[8], "poster_size": h[9]}
-
-
 def clips():
     os.makedirs(VIDEOS, exist_ok=True)
-    return [c for c in map(clip_info, sorted(glob.glob(os.path.join(VIDEOS, "*.p4v")), key=str.lower)) if c]
+    return [c for c in map(p4v.clip_info, sorted(glob.glob(os.path.join(VIDEOS, "*.p4v")), key=str.lower)) if c]
 
 
 def clip_path(name, folder=VIDEOS):
@@ -3197,7 +3178,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if url.path == "/api/video/poster":
             try:
                 folder = STREAM if q.get("stream") else VIDEOS
-                c = clip_info(clip_path(q.get("name", [""])[0], folder))
+                c = p4v.clip_info(clip_path(q.get("name", [""])[0], folder))
                 with open(os.path.join(folder, c["name"]), "rb") as f:
                     f.seek(c["poster"])
                     return self.send(200, f.read(c["poster_size"]), "image/jpeg")

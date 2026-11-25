@@ -64,6 +64,33 @@ def cloud(size, ox, oy, s, grow):
     return m
 
 
+def fill(img, color, mask):
+    """Paint color where mask is."""
+    img.paste(Image.new("RGBA", img.size, rgb(color) + (255,)), (0, 0), mask)
+
+
+def cut(img, mask):
+    """Make transparent where mask is (the gap where one shape overlaps another)."""
+    img.paste(Image.new("RGBA", img.size, (0, 0, 0, 0)), (0, 0), mask)
+
+
+def drop(d, x0, y0, x1, y1, wd, color):
+    """A slanted rain drop from (x0, y0) to (x1, y1), canvas px, wd wide, with round caps."""
+    d.line(((x0 * SS, y0 * SS), (x1 * SS, y1 * SS)), fill=rgb(color) + (255,), width=int(wd * SS))
+    for x, y in ((x0, y0), (x1, y1)):  # round caps
+        d.ellipse(((x - wd / 2) * SS, (y - wd / 2) * SS, (x + wd / 2) * SS, (y + wd / 2) * SS), fill=rgb(color) + (255,))
+
+
+def wx_canvas(scale):
+    """The Weather screen's icon canvas: around "sun behind a cloud" with a margin, in board pixels relative to its
+    top-left corner -> (img 8x, its draw, (left, top, right, bottom), (w, h) of the icon)."""
+    left, top = SUN_C[0] - SUN_R - 2, SUN_C[1] - SUN_R - 2
+    right, bottom = BIG_C[0] + BIG_R + 2, BASE_Y1 + 2
+    w, h = int((right - left) * scale + 1), int((bottom - top) * scale + 1)
+    img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
+    return img, ImageDraw.Draw(img), (left, top, right, bottom), (w, h)
+
+
 def icon(scale, path):
     save(icon_img(scale), path)
 
@@ -123,17 +150,11 @@ def fit_height(make, target, scale):
 
 
 def icon_img(scale):
-    # Canvas around the icon with a margin, in board pixels relative to its top-left corner
-    left, top = SUN_C[0] - SUN_R - 2, SUN_C[1] - SUN_R - 2
-    right, bottom = BIG_C[0] + BIG_R + 2, BASE_Y1 + 2
-    w, h = int((right - left) * scale + 1), int((bottom - top) * scale + 1)
-    img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+    img, d, (left, top, _, _), (w, h) = wx_canvas(scale)
     x, y, r = (SUN_C[0] - left) * scale * SS, (SUN_C[1] - top) * scale * SS, SUN_R * scale * SS
     d.ellipse((x - r, y - r, x + r, y + r), fill=rgb(SUN) + (255,))
-    clear = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    img.paste(clear, (0, 0), cloud(img.size, left, top, scale, GAP))  # cut the gap out of the sun
-    img.paste(Image.new("RGBA", img.size, rgb(CLOUD) + (255,)), (0, 0), cloud(img.size, left, top, scale, 0))
+    cut(img, cloud(img.size, left, top, scale, GAP))  # cut the gap out of the sun
+    fill(img, CLOUD, cloud(img.size, left, top, scale, 0))
     return img.resize((w, h), Image.LANCZOS)
 
 
@@ -143,11 +164,7 @@ def weather_icon(kind, scale, path):
 
 def weather_icon_img(kind, scale):
     """Sunny, cloudy and rain for the Weather screen: the canvas and the cloud of its "sun behind a cloud" (icon())."""
-    left, top = SUN_C[0] - SUN_R - 2, SUN_C[1] - SUN_R - 2
-    right, bottom = BIG_C[0] + BIG_R + 2, BASE_Y1 + 2
-    w, h = int((right - left) * scale + 1), int((bottom - top) * scale + 1)
-    img = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+    img, d, (left, top, right, bottom), (w, h) = wx_canvas(scale)
     mx, my = (left + right) / 2, (top + bottom) / 2  # canvas center, mockup px
     ccx = (SMALL_C[0] - SMALL_R + BIG_C[0] + BIG_R) / 2  # cloud bbox center, mockup px
     ccy = (BASE_Y1 - 2 * BIG_R + BASE_Y1) / 2
@@ -157,34 +174,23 @@ def weather_icon_img(kind, scale):
         ox, oy = ccx - (mx + dx - left) / k, ccy - (my + dy - top) / k
         return cloud(img.size, ox, oy, scale * k, grow)
 
-    def fill(color, mask):
-        img.paste(Image.new("RGBA", img.size, rgb(color) + (255,)), (0, 0), mask)
-
-    def cut(mask):
-        img.paste(Image.new("RGBA", img.size, (0, 0, 0, 0)), (0, 0), mask)
-
     if kind == "sun":
         x, y, r = (mx - left) * scale * SS, (my - top) * scale * SS, 24 * scale * SS
         d.ellipse((x - r, y - r, x + r, y + r), fill=rgb(SUN) + (255,))
     elif kind == "cloud":  # a gray cloud behind a white one
-        fill(FACE_CLOUD_BACK, cloud_mask(-7, -8, 0.82, 0))
-        cut(cloud_mask(3, 5, 1, GAP))
-        fill(CLOUD, cloud_mask(3, 5, 1, 0))
+        fill(img, FACE_CLOUD_BACK, cloud_mask(-7, -8, 0.82, 0))
+        cut(img, cloud_mask(3, 5, 1, GAP))
+        fill(img, CLOUD, cloud_mask(3, 5, 1, 0))
     elif kind == "snow":  # the weather widgets' fifth sky (wxwidgets.h): the rain's cloud, three flakes under it
-        fill(CLOUD, cloud_mask(0, -7, 1, 0))
+        fill(img, CLOUD, cloud_mask(0, -7, 1, 0))
         for x, y in ((-10, 15), (0, 21), (10, 15)):
             xx, yy, rr = (mx + x - left) * scale * SS, (my + y - top) * scale * SS, 2.9 * scale * SS
             d.ellipse((xx - rr, yy - rr, xx + rr, yy + rr), fill=rgb(CLOUD) + (255,))
     elif kind == "rain":  # the cloud higher up, three slanted drops under it
-        fill(CLOUD, cloud_mask(0, -7, 1, 0))
+        fill(img, CLOUD, cloud_mask(0, -7, 1, 0))
         for x in (-10, 0, 10):
-            x0, y0 = (mx + x + 2.4 - left) * scale, (my + 13 - top) * scale
-            x1, y1 = (mx + x - 1.8 - left) * scale, (my + 22 - top) * scale
-            wd = 4.6 * scale
-            d.line(((x0 * SS, y0 * SS), (x1 * SS, y1 * SS)), fill=rgb(FACE_RAIN) + (255,), width=int(wd * SS))
-            for xx, yy in ((x0, y0), (x1, y1)):  # round caps
-                d.ellipse(((xx - wd / 2) * SS, (yy - wd / 2) * SS, (xx + wd / 2) * SS, (yy + wd / 2) * SS),
-                          fill=rgb(FACE_RAIN) + (255,))
+            drop(d, (mx + x + 2.4 - left) * scale, (my + 13 - top) * scale,
+                 (mx + x - 1.8 - left) * scale, (my + 22 - top) * scale, 4.6 * scale, FACE_RAIN)
     return img.resize((w, h), Image.LANCZOS)
 
 
@@ -230,32 +236,23 @@ def face_icon(kind, path):
     d = ImageDraw.Draw(img)
     c = FACE_BOX / 2
 
-    def fill(color, mask):
-        img.paste(Image.new("RGBA", img.size, rgb(color) + (255,)), (0, 0), mask)
-
-    def cut(mask):
-        img.paste(Image.new("RGBA", img.size, (0, 0, 0, 0)), (0, 0), mask)
-
     def sun(x, y, r):
         d.ellipse(((c + x - r) * SS, (c + y - r) * SS, (c + x + r) * SS, (c + y + r) * SS), fill=rgb(FACE_SUN) + (255,))
 
     if kind == "partly":  # the mockup: the sun upper left, the cloud in front of it lower right
         sun(-3.45, -3.68, 20.41)
-        cut(face_cloud(img.size, c + 2.04, c + 8.95, 1, FACE_GAP))
-        fill(FACE_CLOUD, face_cloud(img.size, c + 2.04, c + 8.95, 1, 0))
+        cut(img, face_cloud(img.size, c + 2.04, c + 8.95, 1, FACE_GAP))
+        fill(img, FACE_CLOUD, face_cloud(img.size, c + 2.04, c + 8.95, 1, 0))
     elif kind == "sun":
         sun(0, 0, 21.5)
     elif kind == "cloud":  # a gray cloud behind a white one
-        fill(FACE_CLOUD_BACK, face_cloud(img.size, c - 5.5, c - 9, 0.85, 0))
-        cut(face_cloud(img.size, c + 2.2, c + 8.5, 1, FACE_GAP))
-        fill(FACE_CLOUD, face_cloud(img.size, c + 2.2, c + 8.5, 1, 0))
+        fill(img, FACE_CLOUD_BACK, face_cloud(img.size, c - 5.5, c - 9, 0.85, 0))
+        cut(img, face_cloud(img.size, c + 2.2, c + 8.5, 1, FACE_GAP))
+        fill(img, FACE_CLOUD, face_cloud(img.size, c + 2.2, c + 8.5, 1, 0))
     elif kind == "rain":  # the cloud higher up, three slanted drops under it
-        fill(FACE_CLOUD, face_cloud(img.size, c, c - 6, 1, 0))
+        fill(img, FACE_CLOUD, face_cloud(img.size, c, c - 6, 1, 0))
         for x in (-10, 0, 10):
-            x0, y0, x1, y1 = c + x + 2.2, c + 13.5, c + x - 1.8, c + 21.5
-            d.line(((x0 * SS, y0 * SS), (x1 * SS, y1 * SS)), fill=rgb(FACE_RAIN) + (255,), width=int(4.4 * SS))
-            for x_, y_ in ((x0, y0), (x1, y1)):  # round caps
-                d.ellipse(((x_ - 2.2) * SS, (y_ - 2.2) * SS, (x_ + 2.2) * SS, (y_ + 2.2) * SS), fill=rgb(FACE_RAIN) + (255,))
+            drop(d, c + x + 2.2, c + 13.5, c + x - 1.8, c + 21.5, 4.4, FACE_RAIN)
     out = round(FACE_BOX * FACE_SCALE)
     img = img.resize((out, out), Image.LANCZOS)
     img.save(path)

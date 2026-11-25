@@ -24,11 +24,15 @@ What it does:
 Out: a header with the palette, the cells (4 bits, rows of (w+1)/2 bytes, the left cell in the high bits), the frames
 one after another and how long a frame lasts. It all stays in flash: a 69 × 68 GIF of 12 frames — 28 KB.
 """
+import os
 import sys
 from collections import Counter, deque
 
 import numpy as np
 from PIL import Image, ImageSequence
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import halo_assets as ha  # noqa: E402 — 4 bits a pixel, as the masks are packed
 
 
 def frames_of(path):
@@ -245,13 +249,8 @@ def main():
                     sparks.append(i | j << 10 | k << 20)
         spark_at.append(len(sparks))
 
-    # 4 bits a cell, the left cell in the high bits
-    rb = (nx + 1) // 2
-    packed = bytearray()
-    for f in range(len(I)):
-        for j in range(ny):
-            row = list(I[f, j]) + [0]
-            packed += bytes((row[2 * b] << 4) | row[2 * b + 1] for b in range(rb))
+    # 4 bits a cell, the left cell in the high bits (rows of (nx + 1) / 2 bytes, frame after frame)
+    packed = bytearray(ha.nibbles(I.reshape(-1, nx)).tobytes())
     frame_ms = int(round(float(np.median(ms))))
     changed = [int((I[f] != I[(f + 1) % len(I)]).sum()) for f in range(len(I))]
     print(f"  colors: background #{bg:06X} → nothing; {len(body_colors)} of the subject, {len(apart_colors)} apart "
