@@ -4,7 +4,7 @@
 // row — the update's state (update.js) with its button: Check / What's new / Try again, a bar while an update runs —
 // the contact, and a support card: subscribe on YouTube (?sub_confirmation=1 — YouTube asks "Subscribe?" at once).
 // A newer version out: the heart opens "What's new" instead (About is a link there).
-import { updatesPending, openUpdates, updateInfo, checkNow, onUpdates } from './update.js';
+import { updatesPending, openUpdates, updateInfo, checkNow, onUpdates, updateStatus } from './update.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -37,7 +37,7 @@ export function initAbout() {
   };
   const follow = async () => {  // (an update going on: its percent here while About is open)
     clearTimeout(timer);
-    try { run = await (await fetch('/api/update?status=1')).json(); } catch (e) { run = null; }
+    try { run = await updateStatus(); } catch (e) { run = null; }
     row();
     if (shown() && run?.state === 'running') timer = setTimeout(follow, 500);
   };

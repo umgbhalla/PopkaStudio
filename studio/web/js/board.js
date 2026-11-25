@@ -18,6 +18,7 @@
 // first (a box in its question). A Load that couldn't reach the board's loader — the BOOT help: hold BOOT, plug in.
 import { BOARD, screenIcon } from './screen.js';
 import { state, emit } from './state.js';
+import { day } from './day.js';
 
 const $ = (id) => document.getElementById(id);
 let ports = [], boards = [];
@@ -71,7 +72,7 @@ export function boardState() {
 // "2026-11-06T12:03" → "6 Nov 12:03"
 function when(t) {
   const d = t && new Date(t);
-  return d && !isNaN(d) ? `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.toTimeString().slice(0, 5)}` : '';
+  return d && !isNaN(d) ? `${day(t)} ${d.toTimeString().slice(0, 5)}` : '';
 }
 
 // The tips, the dot; Load — enabled when there is a board and nothing runs

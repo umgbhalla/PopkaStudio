@@ -10,15 +10,11 @@
 // that runs goes on, and the window shows it again when opened.
 import { sync as saved } from './state.js';
 import { openAbout } from './about.js';
+import { day } from './day.js';  // (GitHub's time, UTC → this computer's day: "6 Nov", "6 Nov 2026")
 
 const $ = (id) => document.getElementById(id);
 const X = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg>';
 const COPY = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.6"/><path d="M10.5 3.5v-.3A1.2 1.2 0 0 0 9.3 2H3.2A1.2 1.2 0 0 0 2 3.2v6.1a1.2 1.2 0 0 0 1.2 1.2h.3"/></svg>';
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const day = (d, year = false) => {  // (GitHub's time, UTC → this computer's day: "6 Nov", "6 Nov 2026")
-  const t = new Date(d || '');
-  return isNaN(t) ? '' : `${t.getDate()} ${MON[t.getMonth()]}${year ? ' ' + t.getFullYear() : ''}`;
-};
 let info = null, open = null;
 // Just restarted by an update (restart() below left a mark): the start window is skipped — the same project opens
 // (start.js), and a note says to Load. Read once, as the page loads.
@@ -30,6 +26,8 @@ const WAS = (() => {
   } catch (e) { return null; }
 })();
 export const justUpdated = () => !!WAS;
+// How an update goes now (studio.py update_job: state, pct, step…) — this window and About's version row ask it
+export const updateStatus = async () => (await fetch('/api/update?status=1')).json();
 
 // ---------- The release notes (markdown, as written for GitHub) → the window's HTML ----------
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -195,7 +193,7 @@ export function openUpdates(i = info) {
     clearInterval(timer);
     timer = setInterval(async () => {
       try {
-        const s = await (await fetch('/api/update?status=1')).json();
+        const s = await updateStatus();
         show(s);
         if (s.state !== 'running') clearInterval(timer);
         if (s.state === 'done') go.dataset.to = s.to || newer[0].v;
@@ -230,7 +228,7 @@ export function openUpdates(i = info) {
   if (!i.installed) go.hidden = true, q('.upd-later').textContent = 'Close';
   show({ state: 'idle' });
   // an update already going (the window was closed while it ran) or done: show it
-  fetch('/api/update?status=1').then((r) => r.json()).then((s) => {
+  updateStatus().then((s) => {
     if (s.state === 'running') show(s), follow();
     else if (s.state === 'done') show(s), go.dataset.to = s.to || newer[0].v;
   }).catch(() => {});
