@@ -16,8 +16,8 @@
 #define WA_IC_CLOCK "\xEF\x80\x97"
 #define WA_IC_MOON "\xEF\x86\x86"
 
-static const char *wa_icon(uint8_t kind, bool snow = false) {
-  return snow ? WA_IC_SNOW : kind == WX_SUN ? WA_IC_SUN : kind == WX_PARTLY ? WA_IC_PARTLY : kind == WX_RAIN ? WA_IC_RAIN : WA_IC_CLOUD;
+static const char *wa_icon(uint8_t sky) {  // (WX_PARTLY … WX_SNOW: weather.h wx_sky_of)
+  return sky == WX_SNOW ? WA_IC_SNOW : sky == WX_SUN ? WA_IC_SUN : sky == WX_PARTLY ? WA_IC_PARTLY : sky == WX_RAIN ? WA_IC_RAIN : WA_IC_CLOUD;
 }
 static const char *wa_sky(uint8_t kind) {
   return kind == WX_SUN ? "Clear" : kind == WX_PARTLY ? "Partly cloudy" : kind == WX_RAIN ? "Rain" : "Cloudy";
@@ -65,10 +65,6 @@ static UiPage wa_locs;
 static int wa_cities();
 static int wa_count() { return wa_cities() + 1; }
 static float wa_mid(const HaloFont &f) { return halo_text_mid(f, "0123456789"); }
-static void wa_deg(char *o, int n, int16_t t) {
-  if (t == WX_NONE) strlcpy(o, "--", n);
-  else snprintf(o, n, "%d\xC2\xB0", (int)t);
-}
 // The chart as a picture (PSRAM): the plot (x 94 … 400, y 170 … 322 of its section) made once when the hours change —
 // the area under the line, the rules, the line (4 px, smoothed), a dot at each hour, over the card's colour — and only
 // copied while the page swipes or scrolls (painting it per pixel every frame made the swipe choppy)
@@ -144,13 +140,13 @@ static void wa_section(int p, const WxCity &c, UpPage &P, float a, const HaloVie
     up_title(P, c.name, a, v);
     HaloItem &disc = up_disc(P, CX, 144, 26, WA_HCARD, a, v);
     up_text(P, gl_wx_ic38, wa_icon(c.kind), halo_text_mid(gl_wx_ic38, WA_IC_SUN), CX, 144, 1, WA_HONEY, a, v, &disc);
-    wa_deg(wa_now, sizeof(wa_now), c.now);
+    wx_deg(wa_now, sizeof(wa_now), c.now, "--");
     up_text(P, gl_wx_hero, wa_now, wa_mid(gl_wx_hero), CX, 231, 1, UP_WHITE, a, v);
     char f[8];
-    wa_deg(f, sizeof(f), c.feels);
+    wx_deg(f, sizeof(f), c.feels, "--");
     snprintf(wa_line, sizeof(wa_line), "%s \xC2\xB7 feels %s", wa_sky(c.kind), f);
     up_text(P, gl_wx_line, wa_line, halo_text_mid(gl_wx_line, "Sfx"), CX, 311, 1, UP_MUTED, a, v);
-    wa_deg(wa_hi, sizeof(wa_hi), c.hi), wa_deg(wa_lo, sizeof(wa_lo), c.lo);
+    wx_deg(wa_hi, sizeof(wa_hi), c.hi, "--"), wx_deg(wa_lo, sizeof(wa_lo), c.lo, "--");
     for (int k = 0; k < 2; k++) {
       const float x = k ? 295 : 171;
       up_rrect(P, x - 55, 335, x + 55, 395, 24, k ? WA_ICE : WA_HCARD, a, v);
@@ -180,7 +176,7 @@ static void wa_section(int p, const WxCity &c, UpPage &P, float a, const HaloVie
       up_paint(P, WA_PX + WA_PW / 2.0f, WA_PY + WA_PH / 2.0f, WA_PW / 2.0f + 2, key + first, wa_chart_paint, a, v);
       const int g[3] = {(int)roundf(h), (int)roundf((h + l) / 2), (int)roundf(l)};
       for (int k = 0; k < 3; k++) {
-        snprintf(wa_grid[k], 6, "%d\xC2\xB0", g[k]);
+        wx_deg(wa_grid[k], 6, g[k]);
         up_text(P, gl_up_lab, wa_grid[k], up_mid_lab, 94, 183 + 64 * k, 2, UP_MUTED, a, v);
       }
       static const int IX[4] = {0, 4, 8, 11};
@@ -213,10 +209,10 @@ static void wa_section(int p, const WxCity &c, UpPage &P, float a, const HaloVie
       up_text(P, gl_up_lab, WD[m.tm_wday], up_mid_lab, 95, y, 0, d ? UP_MUTED : UP_WHITE, a, v);
       const bool rain = c.dk[d] == WX_RAIN;
       HaloItem &ic = up_item(P);
-      ui_text(ic, gl_ic24, wa_icon(c.dk[d], c.dsnow >> d & 1), halo_text_mid(gl_ic24, WA_IC_SUN), 152, y, 0.875f, 1,
+      ui_text(ic, gl_ic24, wa_icon(wx_sky_of(c.dk[d], c.dsnow >> d & 1)), halo_text_mid(gl_ic24, WA_IC_SUN), 152, y, 0.875f, 1,
               rain ? WA_COOL : WA_HONEY, a, &halo_black);
       ic.on_black = true, up_commit(ic, v);
-      wa_deg(wa_day[d][0], 8, c.dlo[d]), wa_deg(wa_day[d][1], 8, c.dhi[d]);
+      wx_deg(wa_day[d][0], 8, c.dlo[d], "--"), wx_deg(wa_day[d][1], 8, c.dhi[d], "--");
       up_text(P, gl_wx_week, wa_day[d][0], wa_mid(gl_wx_week), 218, y, 2, WA_COOL, a, v);
       up_text(P, gl_wx_week, wa_day[d][1], wa_mid(gl_wx_week), 369, y, 2, UP_WHITE, a, v);
       up_rrect(P, 239, y - 3, 308, y + 3, 3, WA_WTRACK, a, v);

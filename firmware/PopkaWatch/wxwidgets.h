@@ -22,7 +22,6 @@
 // config.h: a bit a widget, from FL_WXDIGITS); the editor's page has them all.
 // Included from face.h after widgets.h.
 
-#define WX_SNOW 4
 // A widget's bit in FN_WXW (studio.py WXW: from wxdigits). Numbers, not FL_*: #if can't see an enum — FL_WXWEAR there
 // is 0, and a project with one widget had all of them cut out but the first (15 Nov 2026)
 #define WW_DIGITS 0
@@ -169,11 +168,6 @@ static uint32_t ww_tcol(float T) {
     if (T <= tt[i]) return ww_mix(cc[i - 1], cc[i], (T - tt[i - 1]) / (tt[i] - tt[i - 1]));
   return cc[5];
 }
-static void ww_hour_name(char *o, int n, int h) {  // an hour as the clock shows it: 13 or 1PM
-  h = ((h % 24) + 24) % 24;
-  if (fc_h24) snprintf(o, n, "%02d", h);
-  else snprintf(o, n, "%d%s", h % 12 ? h % 12 : 12, h < 12 ? "AM" : "PM");
-}
 
 // ---------- The weather the widgets show: the first city's ----------
 struct WwSky {
@@ -187,16 +181,15 @@ static WwSky ww_sky() {
   const WxDay d = wx_day(0);
   w.c = &wx_city[0], w.real = wx_demo < 0;
   w.now = d.now, w.feels = d.feels, w.hi = d.hi, w.lo = d.lo;
-  w.sky = d.kind & 3;
-  if (w.real && w.c->snow && w.sky == WX_CLOUD) w.sky = WX_SNOW;
+  w.sky = wx_sky_of(d.kind, w.real && w.c->snow);
   if (w.real && w.c->t0 && time(nullptr) > (time_t)w.c->t0)
     w.k0 = min(WX_AHEAD - 1, (int)((time(nullptr) - (time_t)w.c->t0) / 3600));
   return w;
 }
 static int ww_hour_sky(const WwSky &w, int j) {  // the sky j hours from now
   if (!w.real || !w.c->t0) return w.sky;
-  const int k = min(w.k0 + j, WX_AHEAD - 1), kind = w.c->hk[k] & 3;
-  return (w.c->hsnow >> k & 1) && kind == WX_CLOUD ? WX_SNOW : kind;
+  const int k = min(w.k0 + j, WX_AHEAD - 1);
+  return wx_sky_of(w.c->hk[k], w.c->hsnow >> k & 1);
 }
 static float ww_hour_t(const WwSky &w, int j) {  // the degrees j hours from now
   if (w.real && w.c->t0) {
@@ -1163,7 +1156,7 @@ static void ww_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
           const float y = Y0 + j * st;
           ww_image(c, n++, L.icons ? L.icons[ww_hour_sky(w, j)] : nullptr, ax + G[3], y, a, v);
           if (!j) snprintf(c.txt[m], 40, "NOW");
-          else if (ok) ww_hour_name(c.txt[m], 40, tm.tm_hour + j);
+          else if (ok) wx_hour_name(c.txt[m], 40, tm.tm_hour + j);
           else snprintf(c.txt[m], 40, "--");
           ww_text(c, n++, L.font2, c.mid2, c.txt[m], ax + G[4], y, 0, j ? L.color2 : L.color, a, 1, v, c.ob, hs);
         }
@@ -1222,7 +1215,7 @@ static void ww_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
         const float x = X0 + j * st;
         ww_image(c, n++, L.icons ? L.icons[ww_hour_sky(w, j)] : nullptr, x, ay + G[3], a, v);
         if (!j) snprintf(c.txt[m], 40, "NOW");
-        else if (ok) ww_hour_name(c.txt[m], 40, tm.tm_hour + j);
+        else if (ok) wx_hour_name(c.txt[m], 40, tm.tm_hour + j);
         else snprintf(c.txt[m], 40, "--");
 #ifdef HALO_P4_TALL  // (tall: the small font is the line over the curve's, 24 px — the hours at 16)
         ww_text(c, n++, L.font2, c.mid2, c.txt[m], x, ay + G[4], 1, j ? L.color2 : L.color, a, 1, v, c.ob, 0.67f);
@@ -1801,7 +1794,7 @@ static void ww_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       for (int j = 0; j < nd; j++) {
         const bool has = w.real && w.c->dhi[j] != WX_NONE && w.c->dlo[j] != WX_NONE;
         hi[j] = has ? w.c->dhi[j] : (w.hi == WX_NONE ? 0 : w.hi), lo[j] = has ? w.c->dlo[j] : (w.lo == WX_NONE ? 0 : w.lo);
-        sk[j] = !has ? w.sky : (w.c->dsnow >> j & 1) && (w.c->dk[j] & 3) == WX_CLOUD ? WX_SNOW : w.c->dk[j] & 3;
+        sk[j] = !has ? w.sky : wx_sky_of(w.c->dk[j], w.c->dsnow >> j & 1);
         mn = fminf(mn, lo[j]), mx = fmaxf(mx, hi[j]);
       }
       const float yk = G[4] / fmaxf(1, mx - mn);
