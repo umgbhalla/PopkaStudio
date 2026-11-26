@@ -29,15 +29,7 @@ struct StDays { int32_t d[7]; uint32_t n[7]; };   // (NVS "days")
 
 static void steps_show(uint32_t n) {  // into every Steps layer: 6,233
   fc_steps = n;
-  char s[16];
-  snprintf(s, sizeof(s), "%lu", (unsigned long)n);
-  const int len = strlen(s);
-  char *o = fc_steps_s;
-  for (int i = 0; i < len; i++) {
-    *o++ = s[i];
-    if ((len - 1 - i) % 3 == 0 && i < len - 1) *o++ = ',';
-  }
-  *o = 0;
+  ss_commas(fc_steps_s, n);
   face_set_all(FL_STEPS, fc_steps_s, !fc_still);
 }
 
@@ -47,10 +39,10 @@ static void steps_tick() {
   if (halo_ms() - checked < 1000 && !halo_woke()) return;
   checked = halo_ms();
   const uint32_t total = halo_steps();
+  const time_t now = time(nullptr);  // (the clock read once: the day, and the hour the new steps go to)
+  struct tm t;
+  localtime_r(&now, &t);
   if (halo_clock_valid()) {
-    const time_t now = time(nullptr);
-    struct tm t;
-    localtime_r(&now, &t);
     const int day = (t.tm_year + 1900) * 400 + t.tm_yday;
 #if HAS_STEPSCR
     const int32_t dnum = ss_daynum(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
@@ -72,9 +64,6 @@ static void steps_tick() {
   const uint32_t today = st_saved + (total - st_base);
 #if HAS_STEPSCR
   if (ss_today >= 0 && today > st_hours_have) {  // the new steps — to this hour
-    const time_t now = time(nullptr);
-    struct tm t;
-    localtime_r(&now, &t);
     ss_hour[t.tm_hour] = (uint16_t)min<uint32_t>(65535, ss_hour[t.tm_hour] + (today - st_hours_have));
     st_hours_have = today;
   }

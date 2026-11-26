@@ -9,7 +9,7 @@
 // renderer shows comes from here; it reads the events (eat / molt / die) each frame and clears them.
 // Food that moves (Comet: a star on an orbit): the game's before_step puts the food's cell for this step and, aim on,
 // a target — where to meet it (the food is eaten when the head enters its cell, as always).
-// The board is cols × rows cells: square (G × G inside the circle) or polar (sn_init_polar: angles round × rings out,
+// The board is cols × rows cells: square (G × G inside the circle) or open (sn_init_open; polar — angles round × rings out,
 // the angle wrapping round — Comet: the snake goes round orbits and along rays).
 // One Snake per game, in PSRAM (~10 KB: the board and the search's scratch). Only in a firmware with a game.
 
@@ -44,12 +44,14 @@ struct Snake {
   int16_t occ[SN_MAXC], dist[SN_MAXC], from[SN_MAXC], q[SN_MAXC], path[SN_MAXC], vb[SN_MAXL + SN_MAXC];
 };
 
-static uint32_t sn_rand(Snake &S) {  // xorshift32
-  uint32_t x = S.rnd;
+// xorshift32: the next of x (x moves on), and as 0..1 — the games' one random (the snakes', the sparks', the stars')
+static inline uint32_t sn_xorshift(uint32_t &x) {
   x ^= x << 13, x ^= x >> 17, x ^= x << 5;
-  return S.rnd = x;
+  return x;
 }
-static inline float sn_randf(Snake &S) { return (sn_rand(S) >> 8) * (1.0f / 16777216); }
+static inline float sn_xorshiftf(uint32_t &x) { return (sn_xorshift(x) >> 8) * (1.0f / 16777216); }
+static inline uint32_t sn_rand(Snake &S) { return sn_xorshift(S.rnd); }
+static inline float sn_randf(Snake &S) { return sn_xorshiftf(S.rnd); }
 static inline int sn_wx(const Snake &S, int x) { return S.wrap ? (x + S.cols) % S.cols : x; }
 static inline bool sn_free(const Snake &S, int x, int y) {
   x = sn_wx(S, x);
@@ -145,12 +147,28 @@ static void sn_place_food(Snake &S) {
   }
 }
 
+// What every board shares: its size, the pace, the seed (set) — and a game from the start: the snake, its food (start)
+static void sn_set(Snake &S, int cols, int rows, bool wrap, float tick, int cap, uint32_t seed) {
+  S.G = S.cols = cols, S.rows = rows, S.wrap = wrap;
+  S.tick = tick, S.cap = min(cap, SN_MAXL - 1), S.rnd = seed | 1;
+}
+static void sn_start(Snake &S) {
+  S.time = S.acc = 0, S.last_eat = -9, S.score = S.best = 0, S.ev_n = 0, S.shed_n = 0;
+  sn_spawn(S), sn_place_food(S);
+}
+// A board of cols × rows, all of it free
+static void sn_init_open(Snake &S, int cols, int rows, bool wrap, float tick, int cap, uint32_t seed) {
+  sn_set(S, cols, rows, wrap, tick, cap, seed);
+  for (int i = 0; i < cols * rows; i++) S.valid[i] = 1, S.obst[i] = 0;
+  sn_start(S);
+}
+
 // The board: G cells across inside a circle of radius inner (px); a cell is on it if its middle is within G/2 − edge
 // cells of the centre; walls — cells; seed — the game's own
 static void sn_init(Snake &S, int G, float tick, int cap, const int16_t *walls, int wn, uint32_t seed, float inner = 212,
                     float edge = 0.6f) {
-  S.G = S.cols = S.rows = G, S.wrap = false;
-  S.tick = tick, S.cap = min(cap, SN_MAXL - 1), S.inner = inner, S.cs = 2 * inner / G, S.rnd = seed | 1;
+  sn_set(S, G, G, false, tick, cap, seed);
+  S.inner = inner, S.cs = 2 * inner / G;
   for (int y = 0; y < G; y++)
     for (int x = 0; x < G; x++) {
       const float dx = x + 0.5f - G / 2.0f, dy = y + 0.5f - G / 2.0f, r = G / 2.0f - edge;
@@ -158,29 +176,10 @@ static void sn_init(Snake &S, int G, float tick, int cap, const int16_t *walls, 
     }
   for (int i = 0; i + 1 < wn; i += 2)
     if (walls[i] >= 0 && walls[i + 1] >= 0 && walls[i] < G && walls[i + 1] < G) S.obst[walls[i + 1] * G + walls[i]] = 1;
-  S.time = S.acc = 0, S.last_eat = -9, S.score = S.best = 0, S.ev_n = 0, S.shed_n = 0;
-  sn_spawn(S), sn_place_food(S);
+  sn_start(S);
 }
-
-// A polar board: A angles round (wrapping) × R rings, all free (the renderer maps them to orbits)
-static void sn_init_polar(Snake &S, int A, int R, float tick, int cap, uint32_t seed) {
-  S.G = S.cols = A, S.rows = R, S.wrap = true;
-  S.tick = tick, S.cap = min(cap, SN_MAXL - 1), S.rnd = seed | 1;
-  for (int i = 0; i < A * R; i++) S.valid[i] = 1, S.obst[i] = 0;
-  S.time = S.acc = 0, S.last_eat = -9, S.score = S.best = 0, S.ev_n = 0, S.shed_n = 0;
-  sn_spawn(S), sn_place_food(S);
-}
-
-#ifndef HALO_ROUND
-// A rectangular board, all of it free (Dot Snake on a rectangular screen)
-static void sn_init_rect(Snake &S, int C, int R, float tick, int cap, uint32_t seed) {
-  S.G = S.cols = C, S.rows = R, S.wrap = false;
-  S.tick = tick, S.cap = min(cap, SN_MAXL - 1), S.rnd = seed | 1;
-  for (int i = 0; i < C * R; i++) S.valid[i] = 1, S.obst[i] = 0;
-  S.time = S.acc = 0, S.last_eat = -9, S.score = S.best = 0, S.ev_n = 0, S.shed_n = 0;
-  sn_spawn(S), sn_place_food(S);
-}
-#endif
+// A polar board: A angles round (wrapping) × R rings, all free (the renderer maps them to orbits) — sn_init_open(…, true, …);
+// a rectangular one (Dot Snake on a rectangular screen) — sn_init_open(…, false, …)
 
 static void sn_step(Snake &S) {
   if (S.before_step) S.before_step(S);

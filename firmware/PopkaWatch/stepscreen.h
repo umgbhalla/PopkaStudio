@@ -25,6 +25,18 @@
 #error "the Steps screen needs the pedometer: FN_STEPS (studio.py sets it with the screen)"
 #endif
 
+#if HAS_STEPS
+static void ss_commas(char *o, uint32_t n) {  // 6420 → "6,420" (the Steps layer's number too: steps.h)
+  char s[12];
+  const int len = snprintf(s, sizeof(s), "%lu", (unsigned long)n);
+  for (int i = 0; i < len; i++) {
+    *o++ = s[i];
+    if ((len - 1 - i) % 3 == 0 && i < len - 1) *o++ = ',';
+  }
+  *o = 0;
+}
+#endif
+
 #if HAS_STEPSCR
 // ---------- The history (steps.h fills it) ----------
 static uint16_t ss_hour[24];                                // today, an hour each
@@ -110,15 +122,6 @@ static SsData ss_data(uint32_t goal) {
   return d;
 }
 
-static void ss_commas(char *o, uint32_t n) {  // 6420 → "6,420"
-  char s[12];
-  const int len = snprintf(s, sizeof(s), "%lu", (unsigned long)n);
-  for (int i = 0; i < len; i++) {
-    *o++ = s[i];
-    if ((len - 1 - i) % 3 == 0 && i < len - 1) *o++ = ',';
-  }
-  *o = 0;
-}
 static uint32_t ss_lighter(uint32_t c) {  // this hour, today below the goal: the accent halfway to white
   const uint32_t r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
   return ((r + 255) / 2) << 16 | ((g + 255) / 2) << 8 | (b + 255) / 2;
