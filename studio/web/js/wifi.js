@@ -10,13 +10,14 @@
 // beside it — nothing changes.
 import { setFn, fnOf, sync as saved } from './state.js';
 
-const SIG = (rssi) => {
+// Wi-Fi's strength: n of its 3 arcs lit (the board's dBm: -60 and up — 3, -75 and up — 2); Properties' Wi-Fi uses it too
+export const signal = (rssi) => {
   const n = rssi == null ? 3 : rssi >= -60 ? 3 : rssi >= -75 ? 2 : 1;
   return `<svg class="sig" viewBox="0 0 16 16"><path${n < 3 ? ' class="off"' : ''} d="M1.6 6.2a9.2 9.2 0 0 1 12.8 0"/><path${n < 2 ? ' class="off"' : ''} d="M3.7 8.4a6.2 6.2 0 0 1 8.6 0"/><path d="M5.8 10.6a3.2 3.2 0 0 1 4.4 0"/><circle cx="8" cy="12.9" r=".6"/></svg>`;
 };
 const LOCK = '<svg viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>';
 const AGAIN = '<svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5v3h-3"/></svg>';
-const OTHER = '\u0000other';  // (the picked row: Other network…)
+export const OTHER = '\u0000other';  // (the picked row: Other network…; Properties' Wi-Fi too)
 let open = null;
 
 // The window: resolves true — saved (Wi-Fi on), false — nothing changed
@@ -73,7 +74,7 @@ export function openWifi() {
     for (const n of shown) {
       const r = document.createElement('button');
       r.className = 'wifi-row' + (w.pick === n.ssid ? ' on' : '');
-      r.innerHTML = `${SIG(n.rssi)}<span class="wifi-name"></span>${known(n.ssid) ? '<span class="wifi-tag">saved</span>' : ''}${n.lock ? `<span class="wifi-lock">${LOCK}</span>` : ''}`;
+      r.innerHTML = `${signal(n.rssi)}<span class="wifi-name"></span>${known(n.ssid) ? '<span class="wifi-tag">saved</span>' : ''}${n.lock ? `<span class="wifi-lock">${LOCK}</span>` : ''}`;
       r.querySelector('.wifi-name').textContent = n.ssid;
       r.onclick = () => { if (w.pick !== n.ssid) w.pick = n.ssid, w.pass = ''; render(); };
       rows.push(r);

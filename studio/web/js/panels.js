@@ -14,7 +14,7 @@ import {
   RADIO_PARTS, isRadio, allowedOn, RADIO_LINKED, radioTarget,
 } from './state.js';
 import { thumb } from './previews.js';
-import { openWifi, needWifi } from './wifi.js';
+import { openWifi, needWifi, signal, OTHER } from './wifi.js';
 import { clipsGroup, streamGroup } from './video.js';
 
 // What a tile adds, made apart from the project (for its picture): layers on a screen of their own
@@ -144,11 +144,6 @@ const ICON = {
   pen: '<svg viewBox="0 0 16 16"><path d="M3 13h2.3l6.9-6.9-2.3-2.3L3 10.7zM8.6 4.8l2.5 2.5"/></svg>',
   saved: '<svg viewBox="0 0 16 16"><path d="M4.5 2.5h7v11L8 10.8l-3.5 2.7z"/></svg>',
   info: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8"/><path d="M8 7.4v3.4"/><circle cx="8" cy="5.1" r=".55" fill="currentColor" stroke="none"/></svg>',
-};
-// Wi-Fi's strength: n of its 3 arcs lit (the board's dBm: -60 and up — 3, -75 and up — 2)
-const signal = (rssi) => {
-  const n = rssi == null ? 3 : rssi >= -60 ? 3 : rssi >= -75 ? 2 : 1;
-  return `<svg class="sig" viewBox="0 0 16 16"><path${n < 3 ? ' class="off"' : ''} d="M1.6 6.2a9.2 9.2 0 0 1 12.8 0"/><path${n < 2 ? ' class="off"' : ''} d="M3.7 8.4a6.2 6.2 0 0 1 8.6 0"/><path d="M5.8 10.6a3.2 3.2 0 0 1 4.4 0"/><circle cx="8" cy="12.9" r=".6"/></svg>`;
 };
 
 // ---------- Elements: three folders at the top of the left card, under its head — Faces, Layers, App: equal low tiles,
@@ -678,7 +673,6 @@ function setRow(id, on) {
 // networks the board sees (studio.py asks it over USB: wifi scan; ↻ — again), a password under the picked one; Join —
 // studio.py keeps it on this Mac (secrets/wifi.json: never in the project, never in git), the board joins it after
 // Flash. Other… — a network by its name (a hidden one, or the board not on USB) ----------
-const OTHER = '\u0000other';
 const wifi = { asked: false, loaded: false, busy: false, nets: [], status: null, current: '', saved: [], pick: null, err: '',
                name: '', pass: '', show: false, focus: false };
 let wifiEl = null;

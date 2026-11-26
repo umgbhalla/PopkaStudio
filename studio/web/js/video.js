@@ -29,20 +29,39 @@ async function refresh() {
   }
 }
 
-// Follows the studio's one job (a conversion or a write) in its row; done(job) after
-function follow(name, label, done) {
-  busy = { name, label, pct: 0 };
-  draw();
+// The studio's one job (a conversion or a write) followed: tick(job) while it runs, done(job) after
+function followJob(tick, done) {
   const poll = async () => {
     const j = await (await fetch('/api/job?from=99999')).json().catch(() => null);
     if (!j || j.state === 'running') {
-      if (j) busy.pct = Math.round(j.progress || 0), draw();
+      if (j) tick(j);
       return setTimeout(poll, 500);
     }
-    busy = null;
     done(j);
   };
   setTimeout(poll, 400);
+}
+// A clip's job in its row: its label and percent there; done(job) after
+function follow(name, label, done) {
+  busy = { name, label, pct: 0 };
+  draw();
+  followJob((j) => { busy.pct = Math.round(j.progress || 0), draw(); }, (j) => { busy = null, done(j); });
+}
+
+// ---------- One list for both, Clips and Stream: the busy one first (its row before the studio lists it), a row per
+// clip — its poster, title, tag and buttons; looked at again every 3 s while it is on screen (not while busy) ----------
+const withBusy = (clips, b) => {
+  const items = [...(clips || [])];
+  if (b && !items.some((c) => c.name === b.name)) items.unshift({ name: b.name, title: b.name, seconds: 0, pending: true });
+  return items;
+};
+const clipRow = (c, tag, poster, acts, bad = false) => h0('li', { class: 'layer clip' + (bad ? ' bad' : '') },
+  c.pending ? h0('span', { class: 'clip-pic' }) : h0('img', { class: 'clip-pic', src: `/api/video/poster?${poster}name=${encodeURIComponent(c.name)}`, alt: '' }),
+  h0('span', { class: 'layer-name' }, c.title), h0('span', { class: 'tag', title: tag }, tag), h0('span', { class: 'acts' }, ...acts));
+const binOf = (remove) => h0('button', { class: 'icon-btn', title: 'Remove', 'aria-label': 'Remove', html: icons0.trash, onclick: remove });
+function watch(list0, shown, busyNow, again) {  // (shown() — still this list)
+  const tick = () => { if (!list0.isConnected || !shown()) return; if (!busyNow()) again(); setTimeout(tick, 3000); };
+  setTimeout(tick, 3000);
 }
 
 function send(name) {
@@ -76,16 +95,12 @@ function add(file) {
 function draw() {
   if (!target) return;
   const h = h0, rows = [];
-  const items = [...(list || [])];
-  if (busy && !items.some((c) => c.name === busy.name)) items.unshift({ name: busy.name, title: busy.name, seconds: 0, pending: true });
-  for (const c of items) {
+  for (const c of withBusy(list, busy)) {
     const on = (macCard || cardNames)?.includes(c.name), here = busy?.name === c.name, bad = problem?.name === c.name;
     const tag = here ? `${busy.label} ${busy.pct}%` : bad ? problem.text : on ? `${fmt(c.seconds)} · on the card` : fmt(c.seconds);
     const up = !here && !on && !c.pending && canWrite() ? h('button', { class: 'icon-btn', title: 'Write to the card', 'aria-label': 'Write to the card', html: UP, onclick: () => send(c.name) }) : null;
-    const bin = !here && !c.pending ? h('button', { class: 'icon-btn', title: 'Remove', 'aria-label': 'Remove', html: icons0.trash, onclick: () => post('/api/video/delete', { name: c.name, port: port() }).then(() => { cardNames = cardNames?.filter((n) => n !== c.name) ?? null; refresh(); }) }) : null;
-    rows.push(h('li', { class: 'layer clip' + (bad ? ' bad' : '') },
-      c.pending ? h('span', { class: 'clip-pic' }) : h('img', { class: 'clip-pic', src: `/api/video/poster?name=${encodeURIComponent(c.name)}`, alt: '' }),
-      h('span', { class: 'layer-name' }, c.title), h('span', { class: 'tag', title: tag }, tag), h('span', { class: 'acts' }, up, bin)));
+    const bin = !here && !c.pending ? binOf(() => post('/api/video/delete', { name: c.name, port: port() }).then(() => { cardNames = cardNames?.filter((n) => n !== c.name) ?? null; refresh(); })) : null;
+    rows.push(clipRow(c, tag, '', [up, bin], bad));
   }
   target.replaceChildren(...rows);
 }
@@ -98,8 +113,8 @@ export function clipsGroup(h, icons) {
   draw();
   refresh();
   // A card put into the Mac's reader or taken out — seen within a few seconds, while the list is on screen
-  const list0 = target, tick = () => { if (!list0.isConnected || target !== list0) return; if (!busy) refresh(); setTimeout(tick, 3000); };
-  setTimeout(tick, 3000);
+  const list0 = target;
+  watch(list0, () => target === list0, () => busy, refresh);
   return h('div', { class: 'group' }, h('h3', {}, 'Clips', plus), target, input);
 }
 
@@ -137,32 +152,22 @@ function sAdd(file) {
     const a = await r.json().catch(() => ({}));
     if (!r.ok) return (sBusy = null), (sProblem = a.error || 'Failed'), sDraw();
     sBusy = { name: a.name, label: 'Converting', pct: 0 };
-    const poll = async () => {
-      const j = await (await fetch('/api/job?from=99999')).json().catch(() => null);
-      if (!j || j.state === 'running') {
-        if (j && sBusy) sBusy.pct = Math.round(j.progress || 0), sDraw();
-        return setTimeout(poll, 500);
-      }
+    followJob((j) => { if (sBusy) sBusy.pct = Math.round(j.progress || 0), sDraw(); }, (j) => {
       if (j.state !== 'done') sProblem = j.step;
       sBusy = null;
       sRefresh().then(sDraw);
-    };
-    setTimeout(poll, 400);
+    });
   });
 }
 
 function sDraw() {
   if (!sTarget) return;
   const h = h0, rows = [];
-  const items = [...(sState?.clips || [])];
-  if (sBusy && !items.some((c) => c.name === sBusy.name)) items.unshift({ name: sBusy.name, title: sBusy.name, seconds: 0, pending: true });
-  for (const c of items) {
+  for (const c of withBusy(sState?.clips, sBusy)) {
     const here = sBusy?.name === c.name;
     const tag = here ? `${sBusy.label} ${sBusy.pct}%` : `${fmt(c.seconds)} · ${c.mb_s.toFixed(1)} MB/s`;
-    const bin = !here && !c.pending ? h('button', { class: 'icon-btn', title: 'Remove', 'aria-label': 'Remove', html: icons0.trash, onclick: () => post('/api/stream', { delete: c.name }).then(sRefresh) }) : null;
-    rows.push(h('li', { class: 'layer clip' },
-      c.pending ? h('span', { class: 'clip-pic' }) : h('img', { class: 'clip-pic', src: `/api/video/poster?stream=1&name=${encodeURIComponent(c.name)}`, alt: '' }),
-      h('span', { class: 'layer-name' }, c.title), h('span', { class: 'tag', title: tag }, tag), h('span', { class: 'acts' }, bin)));
+    const bin = !here && !c.pending ? binOf(() => post('/api/stream', { delete: c.name }).then(sRefresh)) : null;
+    rows.push(clipRow(c, tag, 'stream=1&', [bin]));
   }
   if (sProblem) rows.push(h('li', { class: 'layer clip bad' }, h('span', { class: 'layer-name' }, sProblem)));
   sTarget.replaceChildren(...rows);
@@ -178,7 +183,7 @@ export function streamGroup(h, icons) {
   sTarget = h('ul', { class: 'layers clips' });
   sDraw();
   sRefresh();
-  const list0 = sTarget, tick = () => { if (!list0.isConnected || sTarget !== list0) return; if (!sBusy) sRefresh(); setTimeout(tick, 3000); };
-  setTimeout(tick, 3000);
+  const list0 = sTarget;
+  watch(list0, () => sTarget === list0, () => sBusy, sRefresh);
   return h('div', { class: 'group' }, h('h3', {}, 'Stream', h('span', { class: 'h3-acts' }, sw, plus)), sTarget, input);
 }
