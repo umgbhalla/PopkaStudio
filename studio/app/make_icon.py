@@ -6,17 +6,17 @@ from — studio/web/mockups/icons.py (variant 7).
 
     $PY studio/app/make_icon.py
 """
-import importlib.util
 import os
 import subprocess
+import sys
 import tempfile
 
-import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FONT = os.path.join(HERE, "../../tools/fonts/GoogleSansFlex.ttf")
-PARROT = os.path.join(HERE, "../../firmware/PopkaWatch/assets/make_parrot.py")
+sys.path[:0] = [os.path.join(HERE, "../../tools"), os.path.join(HERE, "../../firmware/PopkaWatch/assets")]
+import halo_assets as ha  # noqa: E402 — the board's fonts (tools/fonts) and their axes
+import make_parrot as mp  # noqa: E402 — Popka's cells and colors
 S = 2048  # drawn at twice the size, then made smaller: smooth edges
 ACCENT = (76, 141, 255)
 TILE_TOP, TILE_BOTTOM = (78, 82, 92), (42, 44, 50)  # graphite: lighter than the watch's black, the blue frame still bright
@@ -45,22 +45,14 @@ def disc(size, cx, cy, r):
 
 
 def font(px, wght):
-    f = ImageFont.truetype(FONT, px)
-    f.set_variation_by_axes([144, 100, wght, 100, 0])  # opsz, wdth, wght, ROND (rounded ends — as on the board), slnt
+    f = ImageFont.truetype(ha.font_path("GoogleSansFlex.ttf"), px)
+    ha.set_axes(f, px, f"opsz=144,wdth=100,wght={wght},ROND=100,slnt=0")  # ROND: rounded ends — as on the board
     return f
 
 
 def parrot():
     """Popka's first frame (wings up) without its notes and twinkles, one px a cell, cut to what is drawn"""
-    spec = importlib.util.spec_from_file_location("make_parrot", PARROT)
-    mp = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mp)
-    g = mp.frame(0)
-    a = np.zeros((mp.H, mp.W, 4), np.uint8)
-    for ch, c in mp.COLORS.items():
-        if ch not in ".NT":
-            a[g == ch] = ((c >> 16) & 255, (c >> 8) & 255, c & 255, 255)
-    im = Image.fromarray(a, "RGBA")
+    im = Image.fromarray(mp.paint(mp.frame(0), ".NT"), "RGBA")
     return im.crop(im.getbbox())
 
 

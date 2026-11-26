@@ -16,10 +16,11 @@ import http.server
 import os
 import re
 import socket
-import struct
 import subprocess
 import threading
 import time
+
+import p4v  # (the clips' header: p4v.clip_info)
 
 PORT = 8470
 HELLO_PORT = 8471
@@ -45,29 +46,18 @@ def lan_address():
         s.close()
 
 
-def clip_info(path):
-    """(size, seconds, title) of a .p4v, or None. The title: the name without its ending, _ as spaces."""
-    try:
-        with open(path, "rb") as f:
-            h = struct.unpack("<4s15I", f.read(64))
-    except (OSError, struct.error):
-        return None
-    if h[0] != b"P4V2" or not h[4] or not h[5]:
-        return None
-    seconds = h[6] * h[5] / h[4]
-    size = os.path.getsize(path)
-    return size, seconds, os.path.basename(path)[:-4].replace("_", " ")
-
-
 def clips(folder):
-    """The folder's clips: [{name, title, seconds, mb_s}] by name."""
+    """The folder's clips: [{name, title, seconds, mb_s}] by name (those with a frame rate; one that can't be read is left out)."""
     out = []
     if os.path.isdir(folder):
         for n in sorted(os.listdir(folder), key=str.lower):
             if n.lower().endswith(".p4v") and not n.startswith("."):
-                info = clip_info(os.path.join(folder, n))
-                if info:
-                    out.append({"name": n, "title": info[2], "seconds": round(info[1], 1), "mb_s": round(info[0] / 1048576 / info[1], 2)})
+                try:
+                    c = p4v.clip_info(os.path.join(folder, n))
+                except OSError:
+                    c = None
+                if c and c["num"] and c["den"]:
+                    out.append({"name": n, "title": c["title"], "seconds": round(c["seconds"], 1), "mb_s": round(c["size"] / 1048576 / c["seconds"], 2)})
     return out
 
 

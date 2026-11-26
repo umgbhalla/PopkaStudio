@@ -23,6 +23,7 @@ import tempfile
 W, H, ALIGN = 1024, 576, 512
 RATE = 32000
 TIME_LIMIT = 3.9 * 2**30  # FAT32: a file under 4 GB
+HEAD = "<4s10I"  # the header's fields (then zeros to 64 bytes): written by convert(), read by clip_info()
 FPS = [(24000, 1001), (24, 1), (25, 1), (30000, 1001), (30, 1), (50, 1), (60000, 1001), (60, 1)]
 
 
@@ -135,7 +136,7 @@ def convert(source, out, quality=3, start=0, seconds=0, progress=None, mbit=0):
                 f.write(small + b"\0" * (-len(small) % ALIGN))
                 total = (small_at + len(small) + 4095) & ~4095
                 f.truncate(total)
-                head = struct.pack("<4s10I", b"P4V2", 0, W, H, num, den, len(sizes), total, rate, small_at if small else 0, len(small)).ljust(64, b"\0")
+                head = struct.pack(HEAD, b"P4V2", 0, W, H, num, den, len(sizes), total, rate, small_at if small else 0, len(small)).ljust(64, b"\0")
                 f.seek(0)
                 f.write(head)
                 f.write(struct.pack(f"<{len(offsets)}I", *offsets))
@@ -149,6 +150,19 @@ def convert(source, out, quality=3, start=0, seconds=0, progress=None, mbit=0):
             if os.path.exists(tmp_out):
                 os.remove(tmp_out)
     return {"frames": len(sizes), "fps": fps, "seconds": len(sizes) / fps, "size": os.path.getsize(out), "sound": has_sound}
+
+
+def clip_info(path):
+    """A clip's header: {name, title, size, seconds, num, den (its fps), poster, poster_size}; None — not a clip (OSError —
+    it can't be read). The title: the name without its ending, _ as spaces."""
+    with open(path, "rb") as f:
+        head = f.read(64)
+    if len(head) < 64 or head[:4] != b"P4V2":
+        return None
+    _, _codec, _w, _h, num, den, count, _total, _rate, poster, poster_size = struct.unpack_from(HEAD, head)
+    name = os.path.basename(path)
+    return {"name": name, "title": name[:-4].replace("_", " "), "size": os.path.getsize(path),
+            "seconds": count * den / num if num else 0, "num": num, "den": den, "poster": poster, "poster_size": poster_size}
 
 
 def main():
