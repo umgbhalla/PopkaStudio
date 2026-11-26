@@ -225,13 +225,6 @@ static void rw_chart_tick() {
     }
 }
 
-// Text by the middle of its letters; align: 0 — x is its left end, 2 — its right end
-static void rw_text(HaloItem &it, const HaloFont &f, const char *s, float mid, int align, float x, float y, float sc,
-                    uint32_t color, float alpha, const HaloItem *on, int sp) {
-  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = align, it.color = color, it.on = on, it.on_black = true;
-  it.x = x, it.y = y + (f.line / 2.0f - mid) * sc, it.scale = sc, it.alpha = alpha, it.spacing = sp;
-}
-
 static void wx_layout_page(const FaceScreen &S, int i, int page, const WxPageView &P, float a, const HaloView &v) {
   const FaceLayer &L = S.layers[i];
   FaceRun &R = S.run[i];
@@ -240,7 +233,7 @@ static void wx_layout_page(const FaceScreen &S, int i, int page, const WxPageVie
   const float s = P.s, k = P.k * a;
   switch (L.kind) {
     case FL_CITY:
-      rw_text(w.it[0], *L.font, wx_city[page].name, R.mid, 0, P.X(RW_CITY_X + L.dx), P.Y(RW_CITY_Y + L.dy), s, L.color, k,
+      wx_text_at(w.it[0], *L.font, wx_city[page].name, R.mid, 0, P.X(RW_CITY_X + L.dx), P.Y(RW_CITY_Y + L.dy), s, L.color, k,
               &halo_black, L.spacing);
       halo_view_commit(w.it[0], v);
       break;
@@ -256,14 +249,14 @@ static void wx_layout_page(const FaceScreen &S, int i, int page, const WxPageVie
       break;
     }
     case FL_WXHILO:
-      rw_text(w.it[0], *L.font, wx_word_s[page], R.mid, RW_TEXT_A, P.X(RW_TEXT_R + L.dx), P.Y(RW_WORD_Y + L.dy), s, L.color,
+      wx_text_at(w.it[0], *L.font, wx_word_s[page], R.mid, RW_TEXT_A, P.X(RW_TEXT_R + L.dx), P.Y(RW_WORD_Y + L.dy), s, L.color,
               k, &halo_black, L.spacing);
-      rw_text(w.it[1], *L.font, wx_hl_s[page], R.mid, RW_TEXT_A, P.X(RW_TEXT_R + L.dx), P.Y(RW_HILO_Y + L.dy), s, L.color2,
+      wx_text_at(w.it[1], *L.font, wx_hl_s[page], R.mid, RW_TEXT_A, P.X(RW_TEXT_R + L.dx), P.Y(RW_HILO_Y + L.dy), s, L.color2,
               k, &halo_black, L.spacing);
       halo_view_commit(w.it[0], v), halo_view_commit(w.it[1], v);
       break;
     case FL_FEELS:
-      rw_text(w.it[0], *L.font, wx_feels_s[page], R.mid, RW_TEXT_A, P.X(RW_TEXT_R + L.dx), P.Y(RW_FEELS_Y + L.dy), s,
+      wx_text_at(w.it[0], *L.font, wx_feels_s[page], R.mid, RW_TEXT_A, P.X(RW_TEXT_R + L.dx), P.Y(RW_FEELS_Y + L.dy), s,
               L.color, k, &halo_black, L.spacing);
       halo_view_commit(w.it[0], v);
       break;
@@ -275,7 +268,7 @@ static void wx_layout_page(const FaceScreen &S, int i, int page, const WxPageVie
       c.v = (w.chart_sig & 255) / 256.0f;  // (not used by a mask: new numbers in the same memory must redraw it)
       halo_view_commit(c, v);
       for (int j = 0; j < RW_LABELS; j++) {
-        rw_text(w.it[1 + j], *L.font, rw_label[j], R.mid, RW_LABEL_A, P.X(RW_LABEL_X + j * RW_LABEL_STEP + L.dx), P.Y(RW_LABEL_Y + L.dy),
+        wx_text_at(w.it[1 + j], *L.font, rw_label[j], R.mid, RW_LABEL_A, P.X(RW_LABEL_X + j * RW_LABEL_STEP + L.dx), P.Y(RW_LABEL_Y + L.dy),
                 s, L.color2, k, &halo_black, L.spacing);
         halo_view_commit(w.it[1 + j], v);
       }
@@ -298,7 +291,7 @@ static void wx_layout_static(const FaceScreen &S, int i, float a, const HaloView
     }
     // On a list it goes up and fades as the page scrolls (gallery_rect.h: tt_k)
     const float k = S.gal && S.gal->list.n ? S.gal->tt_k : 1, y = RW_TIME_Y - 24 * DP * (1 - k);
-    rw_text(c, *L.font, wx_time, R.mid, 2, RW_TIME_R, y, 1, L.color, k > 0.02f ? k * a : 0, &halo_black, L.spacing);
+    wx_text_at(c, *L.font, wx_time, R.mid, 2, RW_TIME_R, y, 1, L.color, k > 0.02f ? k * a : 0, &halo_black, L.spacing);
     R.ax = RW_TIME_R + L.dx, R.ay = RW_TIME_Y + L.dy;
     halo_view_commit(c, v);
     return;

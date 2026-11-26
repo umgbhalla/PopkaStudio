@@ -24,6 +24,7 @@
 #endif
 
 enum : uint8_t { WX_PARTLY, WX_SUN, WX_CLOUD, WX_RAIN };
+#define WX_SNOW 4  // a fifth sky for the screens with a snow icon (the others have four: snow is a flag, its kind WX_CLOUD)
 // What the screens show of a city now
 struct WxDay {
   int16_t now, hi, lo;
@@ -87,6 +88,11 @@ static inline uint8_t wx_kind_of(int wmo) {
 static inline bool wx_snow_of(int wmo) {  // snow (its kind is WX_CLOUD)
   return (wmo >= 71 && wmo <= 77) || wmo == 85 || wmo == 86;
 }
+// The sky as the screens with a snow icon show it: a cloud with snow — WX_SNOW
+static inline uint8_t wx_sky_of(uint8_t kind, bool snow) {
+  kind &= 3;
+  return snow && kind == WX_CLOUD ? WX_SNOW : kind;
+}
 
 #include "wxdata.h"  // WXD_N, WXD_F and wx_city[] — the editor's cities and their weather at Flash
 // The units now: the editor's at first, then Settings > Weather's (sysset.h: kept) — the next fetch asks in them
@@ -108,9 +114,9 @@ static WxDay wx_day(int page) {
   return d;
 }
 
-// "21°", "--°" (nothing yet); a number alone: "21", "--"
-static inline void wx_deg(char *s, size_t n, int16_t v) {
-  if (v == WX_NONE) snprintf(s, n, "--°");
+// "21°", "--°" (nothing yet; or `none`); a number alone: "21", "--"
+static inline void wx_deg(char *s, size_t n, int16_t v, const char *none = "--°") {
+  if (v == WX_NONE) snprintf(s, n, "%s", none);
   else snprintf(s, n, "%d°", v);
 }
 static inline void wx_num(char *s, size_t n, int16_t v) {

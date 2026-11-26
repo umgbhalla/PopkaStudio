@@ -45,6 +45,13 @@ static char rw_label[RW_LABELS][8];                       // "Now", "2 PM" ...
 #endif
 static HaloSpringK K_PAGER;
 
+// An hour as the clock shows it: "13" or "1PM"; with mins — "13:00"; gap — between the hour and AM/PM ("1 PM")
+static void wx_hour_name(char *o, int n, int h, bool mins = false, const char *gap = "") {
+  h = ((h % 24) + 24) % 24;
+  if (fc_h24) snprintf(o, n, mins ? "%02d:00" : "%02d", h);
+  else snprintf(o, n, "%d%s%s", h % 12 ? h % 12 : 12, gap, h < 12 ? "AM" : "PM");
+}
+
 // Strings of all pages; hours — this one and the next two: "7AM"
 static void wx_fill(bool animate = false) {
   for (int p = 0; p < wx_pages; p++) {
@@ -52,8 +59,9 @@ static void wx_fill(bool animate = false) {
     wx_deg(wx_now_s[p], sizeof(wx_now_s[p]), d.now);
     wx_num(wx_hi_s[p], sizeof(wx_hi_s[p]), d.hi);
     wx_num(wx_lo_s[p], sizeof(wx_lo_s[p]), d.lo);
-    if (d.feels == WX_NONE) snprintf(wx_feels_s[p], sizeof(wx_feels_s[p]), "Feels like --°");
-    else snprintf(wx_feels_s[p], sizeof(wx_feels_s[p]), "Feels like %d°", d.feels);
+    char f[9];  // ("-32768°")
+    wx_deg(f, sizeof(f), d.feels);
+    snprintf(wx_feels_s[p], sizeof(wx_feels_s[p]), "Feels like %s", f);
 #ifndef HALO_ROUND
     snprintf(wx_word_s[p], sizeof(wx_word_s[p]), "%s", RW_WORD[d.kind & 3]);
     snprintf(wx_hl_s[p], sizeof(wx_hl_s[p]), "H %s° L %s°", wx_hi_s[p], wx_lo_s[p]);
@@ -72,18 +80,10 @@ static void wx_fill(bool animate = false) {
     localtime_r(&now, &t);
     h = t.tm_hour;
   }
-  for (int i = 0; i < WX_HOURS; i++) {
-    const int hh = (h + i) % 24;
-    if (fc_h24) snprintf(wx_hour[i], sizeof(wx_hour[i]), "%02d:00", hh);
-    else snprintf(wx_hour[i], sizeof(wx_hour[i]), "%d%s", hh % 12 ? hh % 12 : 12, hh < 12 ? "AM" : "PM");
-  }
+  for (int i = 0; i < WX_HOURS; i++) wx_hour_name(wx_hour[i], sizeof(wx_hour[i]), h + i, true);
 #ifndef HALO_ROUND
   strcpy(rw_label[0], "Now");
-  for (int i = 1; i < RW_LABELS; i++) {
-    const int hh = (h + 2 * i) % 24;
-    if (fc_h24) snprintf(rw_label[i], sizeof(rw_label[i]), "%02d:00", hh);
-    else snprintf(rw_label[i], sizeof(rw_label[i]), "%d %s", hh % 12 ? hh % 12 : 12, hh < 12 ? "AM" : "PM");
-  }
+  for (int i = 1; i < RW_LABELS; i++) wx_hour_name(rw_label[i], sizeof(rw_label[i]), h + 2 * i, true, " ");
 #endif
 }
 
@@ -130,11 +130,16 @@ static float wx_ink_x(const HaloFont &f, const char *s, int align, float x, floa
   return align == 2 ? x + (pen - ink1) * sc : x + (pen / 2 - (ink0 + ink1) / 2) * sc;
 }
 
+// Text by the middle of its letters, x as it is (align: 0 — its left end, 2 — its right end)
+static void wx_text_at(HaloItem &it, const HaloFont &f, const char *s, float mid, int align, float x, float y, float sc,
+                       uint32_t color, float alpha, const HaloItem *on, int sp = 0) {
+  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = align, it.color = color, it.on = on, it.on_black = true;
+  it.x = x, it.y = y + (f.line / 2.0f - mid) * sc, it.scale = sc, it.alpha = alpha, it.spacing = sp;
+}
+// The same, x by its ink (HaloWatch's)
 static void wx_text(HaloItem &it, const HaloFont &f, const char *s, float mid, int align, float x, float y, float sc,
                     uint32_t color, float alpha, const HaloItem *on, int sp = 0) {
-  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = align, it.color = color, it.on = on, it.on_black = true;
-  it.x = wx_ink_x(f, s, align, x, sc, sp), it.y = y + (f.line / 2.0f - mid) * sc, it.scale = sc, it.alpha = alpha;
-  it.spacing = sp;
+  wx_text_at(it, f, s, mid, align, wx_ink_x(f, s, align, x, sc, sp), y, sc, color, alpha, on, sp);
 }
 
 // ---------- Layers ----------
