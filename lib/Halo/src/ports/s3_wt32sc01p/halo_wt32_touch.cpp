@@ -14,6 +14,8 @@
 
 #include <driver/gpio.h>
 #include <driver/i2c_master.h>
+#include "../esp32_common/halo_i2c.h"
+#include "../esp32_common/halo_touch_ring.h"
 
 static i2c_master_bus_handle_t bus;
 static i2c_master_dev_handle_t tp;
@@ -28,37 +30,12 @@ static uint8_t turn = 1 | 4;
 static uint8_t turn = 0;
 #endif
 
-#define HIST 8
-static HaloTouchSample hist[HIST];
-static int hist_n, hist_head;
-static portMUX_TYPE hist_mux = portMUX_INITIALIZER_UNLOCKED;
-
-int halo_touch_samples(HaloTouchSample *out, int max) {
-  portENTER_CRITICAL(&hist_mux);
-  const int n = min(max, hist_n);
-  for (int i = 0; i < n; i++) out[i] = hist[(hist_head - i + HIST) % HIST];
-  portEXIT_CRITICAL(&hist_mux);
-  return n;
-}
-
 static void IRAM_ATTR tp_isr(void *) {
   irq_us = (uint32_t)esp_timer_get_time();
   if (halo_trace_on) halo_trace_put(TR_TOUCH, irq_us, 0, 0);
   BaseType_t woken = pdFALSE;
   if (task) vTaskNotifyGiveFromISR(task, &woken);
   if (woken) portYIELD_FROM_ISR();
-}
-
-static int16_t down_x, down_y, last_x, last_y;
-static uint16_t reports;
-
-static void release(const char *why) {
-  portENTER_CRITICAL(&hist_mux);
-  hist_n = 0;
-  portEXIT_CRITICAL(&hist_mux);
-  if (reports) LOG("touch up %d,%d: moved %+d,%+d, %u reports (%s)\n", last_x, last_y, last_x - down_x, last_y - down_y,
-                   reports, why);
-  reports = 0;
 }
 
 static void touch_task(void *) {
@@ -82,33 +59,12 @@ static void touch_task(void *) {
     if (turn & 1) x = ry, y = rx, w = 480, h = 320;
     if (turn & 2) x = w - 1 - x;
     if (turn & 4) y = h - 1 - y;
-    const HaloTouchSample s = {(int16_t)constrain(x, 0, HALO_W - 1), (int16_t)constrain(y, 0, HALO_H - 1), t};
-    portENTER_CRITICAL(&hist_mux);
-    hist_head = (hist_head + 1) % HIST;
-    hist[hist_head] = s;
-    if (hist_n < HIST) hist_n++;
-    portEXIT_CRITICAL(&hist_mux);
-    trace_mark(TR_TOUCH_READ, s.x, s.y);
-    if (!reports++) down_x = s.x, down_y = s.y, LOG("touch down %d,%d\n", s.x, s.y);
-    last_x = s.x, last_y = s.y;
+    touch_put({(int16_t)constrain(x, 0, HALO_W - 1), (int16_t)constrain(y, 0, HALO_H - 1), t});
   }
 }
 
-HaloI2c halo_i2c(uint8_t addr) {
-  if (!bus || i2c_master_probe(bus, addr, 50) != ESP_OK) return nullptr;
-  i2c_device_config_t dc = {};
-  dc.dev_addr_length = I2C_ADDR_BIT_LEN_7, dc.device_address = addr, dc.scl_speed_hz = 400000;
-  i2c_master_dev_handle_t h = nullptr;
-  return i2c_master_bus_add_device(bus, &dc, &h) == ESP_OK ? h : nullptr;
-}
-
-bool halo_i2c_write(HaloI2c d, uint8_t reg, uint8_t val) {  // (the bus driver takes turns between tasks by itself)
-  const uint8_t w[2] = {reg, val};
-  return d && i2c_master_transmit(d, w, 2, 20) == ESP_OK;
-}
-
-bool halo_i2c_read(HaloI2c d, uint8_t reg, uint8_t *buf, int n) {
-  return d && i2c_master_transmit_receive(d, &reg, 1, buf, n, 20) == ESP_OK;
+HaloI2c halo_i2c(uint8_t addr) {  // (halo_i2c.cpp: its reads and writes)
+  return halo_i2c_device(bus, addr);
 }
 
 bool ht_begin() {

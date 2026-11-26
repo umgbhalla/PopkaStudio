@@ -15,13 +15,10 @@
 #define HALO_W 1024
 #define HALO_H 600
 #endif
-#define HALO_ROWS 16
 // Wi-Fi goes through the ESP32-C6: its driver takes one big block of internal memory when it starts (144 KB in all) and, once
 // the memory is in use, can't get that block a second time: the second start ends in an assert. So after the first start
 // it stays up, and a sketch only disconnects (HaloClock.h)
 #define HALO_WIFI_KEEP 1
-#define HALO_BANDS ((HALO_H + HALO_ROWS - 1) / HALO_ROWS)
-#define HALO_HOT IRAM_ATTR __attribute__((noinline))
 #define HALO_PX(c) ((uint16_t)(c))  // a pixel in memory: the frame buffer is read by the display controller as it is
 #ifdef F_CPU
 #define HALO_CPU_MHZ (F_CPU / 1000000)  // (a chip of revision 3 runs at 400)

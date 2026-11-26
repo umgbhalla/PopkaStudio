@@ -18,3 +18,15 @@
 #else
 #error "Halo: no port for this board yet (lib/Halo/src/ports/README.md)"
 #endif
+
+// What every board has the same: the port's board.h above gives its screen (HALO_W, HALO_H, HALO_PX) and only what its
+// chip does otherwise (HALO_CPU_MHZ, HALO_TLS)
+#define HALO_ROWS 16                                // rows in a band
+#define HALO_BANDS ((HALO_H + HALO_ROWS - 1) / HALO_ROWS)
+#define HALO_HOT IRAM_ATTR __attribute__((noinline))  // hot drawing code — in internal memory
+#ifndef HALO_CPU_MHZ
+#define HALO_CPU_MHZ 240
+#endif
+#ifndef HALO_TLS
+#define HALO_TLS __thread
+#endif
