@@ -116,13 +116,18 @@ static bool vn_wifi(uint32_t wait_ms) {
   return true;
 }
 
+// The request for /path: n bytes from a (n 0 — the whole file); close — the server ends the connection after it
+static void vn_ask(WiFiClient &c, const char *path, uint32_t a, uint32_t n, bool close) {
+  if (n) c.printf("GET /%s HTTP/1.1\r\nHost: %s\r\nRange: bytes=%lu-%lu\r\n%s\r\n", path, vn_host, (unsigned long)a, (unsigned long)(a + n - 1), close ? "Connection: close\r\n" : "");
+  else c.printf("GET /%s HTTP/1.1\r\nHost: %s\r\n%s\r\n", path, vn_host, close ? "Connection: close\r\n" : "");
+}
+
 // One whole answer on its own connection (the list, a header, a picture): n bytes from a into to; the length, or -1
 static int vn_get(const char *path, uint32_t a, uint32_t n, uint8_t *to, uint32_t cap) {
   if (!vn_wifi(20000)) return -1;
   WiFiClient c;
   if (!c.connect(vn_host, vn_port, 3000)) return -1;
-  if (n) c.printf("GET /%s HTTP/1.1\r\nHost: %s\r\nRange: bytes=%lu-%lu\r\nConnection: close\r\n\r\n", path, vn_host, (unsigned long)a, (unsigned long)(a + n - 1));
-  else c.printf("GET /%s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path, vn_host);
+  vn_ask(c, path, a, n, true);
   char line[128];
   int len = -1, code = 0;
   const uint32_t t0 = millis();
@@ -270,7 +275,7 @@ static bool vn_step(VnConn &q) {
     if (!q.c.connected() && !q.c.connect(vn_host, vn_port, 3000)) return false;
     q.c.setNoDelay(true);
     const uint32_t a = (uint32_t)k * VN_CHUNK, b = min((uint32_t)(k + 1) * VN_CHUNK, vn_size) - 1;
-    q.c.printf("GET /%s HTTP/1.1\r\nHost: %s\r\nRange: bytes=%lu-%lu\r\n\r\n", vn_name, vn_host, (unsigned long)a, (unsigned long)b);
+    vn_ask(q.c, vn_name, a, b - a + 1, false);
     vn_busy[k % VN_CHUNKS] = true;
     q.chunk = k, q.gen = vn_gen, q.got = 0, q.want = b - a + 1, q.hn = 0, q.body = false, q.last = millis();
     return true;
@@ -397,7 +402,7 @@ static void vn_commands() {
     WiFiClient c;
     if (!c.connect(vn_host, vn_port, 3000)) return (void)LOG("vget: no connection\n");
     c.setNoDelay(true);
-    c.printf("GET /%s HTTP/1.1\r\nHost: %s\r\nRange: bytes=%lu-%lu\r\nConnection: close\r\n\r\n", name, vn_host, at, at + n - 1);
+    vn_ask(c, name, at, n, true);
     uint32_t got = 0, win = 0;
     const uint32_t t0 = millis();
     uint32_t tw = t0, last = t0;

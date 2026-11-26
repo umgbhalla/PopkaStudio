@@ -9,6 +9,7 @@
 #pragma once
 #ifndef __EMSCRIPTEN__
 #include <WiFi.h>
+#include <HaloWifiList.h>
 
 static TaskHandle_t ws_task;
 
@@ -18,10 +19,7 @@ static void ws_scan(void *) {
   int n = -1;
   if (WiFi.mode(WIFI_STA)) {
     n = WiFi.scanNetworks();
-    for (int i = 0; i < n; i++)
-      if (WiFi.SSID(i).length())  // (hidden networks have no name)
-        LOG("wifi: net %d %d %s\n", (int)WiFi.RSSI(i), WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? 0 : 1, WiFi.SSID(i).c_str());
-    WiFi.scanDelete();
+    halo_wifi_list(n);
   }
 #ifndef HALO_WIFI_KEEP
   WiFi.mode(WIFI_OFF);  // (its memory back: the screen's buffers need it)

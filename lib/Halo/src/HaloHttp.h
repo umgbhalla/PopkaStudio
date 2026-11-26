@@ -1,5 +1,5 @@
-// HaloHttp — a JSON answer over plain HTTP for sketches on Halo (with HaloClock: Wi-Fi). The same way as
-// net_http_get_json in AmoledNet: the address by lwip_getaddrinfo (thread-safe, unlike hostByName in core 3.3.11),
+// HaloHttp — a JSON answer over plain HTTP for sketches on Halo (with HaloClock: Wi-Fi). The address by
+// lwip_getaddrinfo (thread-safe, unlike hostByName in core 3.3.11: halo_http_lookup — the Radio's stream uses it too),
 // HTTP/1.0 (the whole body, no chunks), not HTTPClient (it crashes the board in core 3.3.11); the JSON's memory in PSRAM
 // (internal memory is tight next to the panel's buffers and Wi-Fi). Call it while Wi-Fi is up — from HaloClock's job:
 //   halo_clock_online(fetch, 30 * 60);  // before halo_clock_begin
@@ -25,17 +25,24 @@ struct HaloPsram : ArduinoJson::Allocator {
   }
 };
 
-// GET http://host/path into doc (filter — keep only these fields); false — no answer (the log says why)
-static bool halo_http_get_json(const char *host, const char *path, JsonDocument &doc, const JsonDocument *filter = nullptr) {
+// host's IPv4 address into ip; false — not found
+static bool halo_http_lookup(const char *host, IPAddress &ip) {
   struct addrinfo hints = {}, *res = nullptr;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
-  if (lwip_getaddrinfo(host, nullptr, &hints, &res) != 0 || !res) {
+  if (lwip_getaddrinfo(host, nullptr, &hints, &res) != 0 || !res) return false;
+  ip = IPAddress(((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr);
+  lwip_freeaddrinfo(res);
+  return true;
+}
+
+// GET http://host/path into doc (filter — keep only these fields); false — no answer (the log says why)
+static bool halo_http_get_json(const char *host, const char *path, JsonDocument &doc, const JsonDocument *filter = nullptr) {
+  IPAddress ip;
+  if (!halo_http_lookup(host, ip)) {
     LOG("http: %s not found\n", host);
     return false;
   }
-  IPAddress ip(((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr);
-  lwip_freeaddrinfo(res);
   NetworkClient client;
   if (!client.connect(ip, 80, 5000)) {
     LOG("http: can't connect to %s\n", host);
