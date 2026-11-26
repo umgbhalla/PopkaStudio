@@ -27,7 +27,7 @@ static float cf_mid_title, cf_mid_body, cf_mid_ic;
 static constexpr float CF_BADGE_Y = 116, CF_TITLE_Y = 190, CF_BODY_Y = 232, CF_BTN_Y = 330, CF_BTN_H = 84;
 static constexpr float CF_SQ_W = 84, CF_PILL_W = 152, CF_GAP = 16;  // (the square and the pill, centered as a pair)
 
-static uint32_t cf_mix(uint32_t a, uint32_t b, float t) {  // a toward b by t
+static uint32_t ui_mix(uint32_t a, uint32_t b, float t) {  // a toward b by t (the whole UI kit's: ui.h uses it too)
   uint32_t out = 0;
   for (int s = 0; s <= 16; s += 8) {
     const int ca = a >> s & 255, cb = b >> s & 255;
@@ -49,22 +49,18 @@ static void ui_confirm_update(float) {
 
 static void ui_confirm_layout(const HaloView &v) {
   if (cf_title != cf_title_was) cf_mid_title = halo_text_mid(gl_title, cf_title), cf_title_was = cf_title;
-  const uint32_t deep = cf_mix(cf.accent, 0x000000, 0.72f), on_acc = cf_mix(cf.accent, 0x000000, 0.8f);
+  const uint32_t deep = ui_mix(cf.accent, 0x000000, 0.72f), on_acc = ui_mix(cf.accent, 0x000000, 0.8f);
   HaloItem &badge = cf_it[0], &ic = cf_it[1], &title = cf_it[2], &body = cf_it[3], &sq = cf_it[4], &pill = cf_it[5],
            &glyphs = cf_it[6];
-  badge.kind = HI_CIRCLE, badge.x = CX, badge.y = CF_BADGE_Y, badge.r = 34, badge.scale = 1, badge.color = deep;
-  badge.alpha = cf.icon ? 1 : 0, badge.on_black = true, badge.on = nullptr;
+  halo_item_circle(badge, CX, CF_BADGE_Y, 34, 1, deep, cf.icon ? 1 : 0);
   gl_text_mid(ic, gl_cf_ic, gl_str(cf.icon), cf_mid_ic, CX, CF_BADGE_Y, 1, cf.accent, cf.icon ? 1 : 0, &badge);
   gl_text_mid(title, gl_title, gl_str(cf_title), cf_mid_title, CX, CF_TITLE_Y, 1, GL_TEXT, 1, &halo_black);
   title.on_black = true, title.fit = 340;
   gl_text_mid(body, gl_t20, gl_str(cf.body), cf_mid_body, CX, CF_BODY_Y, 1, GL_DIM, cf.body ? 1 : 0, &halo_black);
   body.on_black = true, body.fit = 320;
   const float x0 = cf_x0();
-  sq.kind = HI_RRECT, sq.x = x0 + CF_SQ_W / 2, sq.y = CF_BTN_Y, sq.w = CF_SQ_W, sq.h = CF_BTN_H, sq.r = 26;
-  sq.color = 0x2E3034, sq.alpha = 1, sq.scale = 1, sq.on_black = true, sq.on = nullptr;
-  pill.kind = HI_RRECT, pill.x = x0 + CF_SQ_W + CF_GAP + CF_PILL_W / 2, pill.y = CF_BTN_Y, pill.w = CF_PILL_W;
-  pill.h = CF_BTN_H, pill.r = CF_BTN_H / 2, pill.color = cf.accent, pill.alpha = 1, pill.scale = 1, pill.on_black = true;
-  pill.on = nullptr;
+  halo_item_rrect(sq, x0 + CF_SQ_W / 2, CF_BTN_Y, CF_SQ_W, CF_BTN_H, 26, 1, 0x2E3034, 1);
+  halo_item_rrect(pill, x0 + CF_SQ_W + CF_GAP + CF_PILL_W / 2, CF_BTN_Y, CF_PILL_W, CF_BTN_H, CF_BTN_H / 2, 1, cf.accent, 1);
   gl_text_mid(glyphs, gl_cf_ic, UI_IC_CHECK, cf_mid_ic, pill.x, CF_BTN_Y, 1, on_acc, 1, &pill);
   for (HaloItem *it : {&badge, &ic, &title, &body, &sq, &pill, &glyphs}) halo_view_commit(*it, v);
 }
@@ -115,12 +111,11 @@ static void ur_update(float dt) {
 }
 static void ur_layout(const HaloView &v) {
   const float s = ur_pop.x, cy = CY - 18;
-  const uint32_t on_acc = cf_mix(ur_accent, 0x000000, 0.8f);
+  const uint32_t on_acc = ui_mix(ur_accent, 0x000000, 0.8f);
   for (int i = 0; i < 9; i++) {  // the cookie: the core, then its eight bumps
     HaloItem &c = ur_it[i];
     const float an = i * (HALO_PI / 4), r = i == 8 ? 58 : 24, d = i == 8 ? 0 : 52;
-    c.kind = HI_CIRCLE, c.x = CX + d * s * sinf(an), c.y = cy - d * s * cosf(an), c.r = r * s, c.scale = 1;
-    c.color = ur_accent, c.alpha = s > 0.05f ? 1 : 0, c.on_black = true, c.on = nullptr;
+    halo_item_circle(c, CX + d * s * sinf(an), cy - d * s * cosf(an), r * s, 1, ur_accent, s > 0.05f ? 1 : 0);
   }
   gl_text_mid(ur_it[9], gl_cf_ic, ur_ok ? UI_IC_CHECK : UI_IC_X, cf_mid_ic, CX, cy, 1.7f * s, on_acc, 1, &ur_it[8]);
   if (ur_label != ur_arc_of) {  // (the label along the bottom edge: made into a mask when it changes)

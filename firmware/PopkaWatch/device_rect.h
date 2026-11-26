@@ -78,7 +78,8 @@ static void dv_detail_layout(const FaceLayer &, DvRun &d, const HaloView &v) {
   };
   auto bar = [&](float cx, float cy, float w, float h, float r, uint32_t c, bool black) -> HaloItem & {
     HaloItem &q = it[n++];
-    q.kind = HI_RRECT, q.x = cx, q.y = cy, q.w = w, q.h = h, q.r = r, q.scale = 1, q.color = c, q.alpha = 1, q.on_black = black, q.on = nullptr;
+    halo_item_rrect(q, cx, cy, w, h, r, 1, c, 1);
+    q.on_black = black;
     return q;
   };
   text(gl_r_title, "About", dq_mid_title, 0, RG_PAD, RG_TITLE_Y, DV_TEXT, &halo_black);
@@ -87,7 +88,8 @@ static void dv_detail_layout(const FaceLayer &, DvRun &d, const HaloView &v) {
     const uint32_t col = DQ_COL[i], tint = dv_mix(DQ_CARD, col, 0.25f);
     HaloItem &b = bar(DQ_X + DQ_W / 2, cy, DQ_W, DQ_H, DQ_R, DQ_CARD, true);
     HaloItem &c = it[n++];
-    c.kind = HI_CIRCLE, c.x = DQ_IC_X, c.y = cy, c.r = DQ_IC_R, c.scale = 1, c.color = tint, c.alpha = 1, c.on_black = false, c.on = nullptr;
+    halo_item_circle(c, DQ_IC_X, cy, DQ_IC_R, 1, tint, 1);
+    c.on_black = false;
     text(gl_q_ic22, DQ_ICON[i], dq_mid_ic, 1, DQ_IC_X, cy, col, &c);
     text(gl_c_t14, DQ_NAME[i], dq_mid_name, 0, DQ_TX, y + DQ_NAME_Y, DV_DIM, &b);
     text(gl_r_n36, i < 4 ? d.row[i] : d.val, dq_mid_val, 0, DQ_TX, y + DQ_VAL_Y, DV_TEXT, &b);
@@ -115,8 +117,8 @@ static void dv_detail_layout(const FaceLayer &, DvRun &d, const HaloView &v) {
       m.kind = HI_MASK, m.mask = ch.cur >= 0 ? &ch.m[ch.cur] : nullptr, m.color = col, m.x = x0 + DQ_CH_W / 2.0f, m.y = y0 + DQ_CH_H / 2.0f;
       m.scale = 1, m.alpha = m.mask ? 1 : 0, m.on = &b, m.on_black = false;
       HaloItem &e = it[n++];
-      e.kind = HI_CIRCLE, e.x = x0 + DQ_CH_W, e.y = y0 + ch.last_y, e.r = 5, e.scale = 1, e.color = col;
-      e.alpha = m.mask ? 1 : 0, e.on_black = false, e.on = nullptr;
+      halo_item_circle(e, x0 + DQ_CH_W, y0 + ch.last_y, 5, 1, col, m.mask ? 1 : 0);
+      e.on_black = false;
     }
   }
   dv_commit(d, n, v, nullptr);
@@ -288,7 +290,8 @@ static void dv_detail_layout(const FaceLayer &L, DvRun &d, const HaloView &v) {
   };
   auto bar = [&](float cx, float cy, float w, float h, float r, uint32_t c, bool black, float a = 1) -> HaloItem & {
     HaloItem &q = it[n++];
-    q.kind = HI_RRECT, q.x = cx, q.y = cy, q.w = w, q.h = h, q.r = r, q.scale = 1, q.color = c, q.alpha = a, q.on_black = black, q.on = nullptr;
+    halo_item_rrect(q, cx, cy, w, h, r, 1, c, a);
+    q.on_black = black;
     return q;
   };
   text(gl_r_title, "About", da_mid_title, 0, RG_PAD, RG_TITLE_Y, DV_TEXT, &halo_black);
@@ -306,8 +309,8 @@ static void dv_detail_layout(const FaceLayer &L, DvRun &d, const HaloView &v) {
       const float bh = 10 + (ch - 24) * dv_band[j], x = cx0 + pitch * (j + 0.5f);
       bar(x, cy0 + ch - bh / 2, 20, bh, 10, dv_mix(0x4A5A52, acc, dv_band[j]), false);
       HaloItem &pk = it[n++];
-      pk.kind = HI_CIRCLE, pk.x = x, pk.y = cy0 + ch - (10 + (ch - 24) * dv_peak[j]) - 10, pk.r = 4, pk.scale = 1;
-      pk.color = DV_TEXT, pk.alpha = dv_peak[j] > 0.02f ? 0.75f : 0, pk.on_black = false, pk.on = nullptr;
+      halo_item_circle(pk, x, cy0 + ch - (10 + (ch - 24) * dv_peak[j]) - 10, 4, 1, DV_TEXT, dv_peak[j] > 0.02f ? 0.75f : 0);
+      pk.on_black = false;
     }
   } else {
     if (!fc_calm || d.chart.cur < 0) dv_chart(d, what, DA_CH_W, DA_CH_H, true);
@@ -316,8 +319,9 @@ static void dv_detail_layout(const FaceLayer &L, DvRun &d, const HaloView &v) {
     m.scale = 1, m.alpha = m.mask ? 1 : 0, m.on = &card, m.on_black = false;
     for (int j = 0; j < (what == DV_CPU ? 2 : 1); j++) {
       HaloItem &e = it[n++];
-      e.kind = HI_CIRCLE, e.x = cx0 + cw, e.y = cy0 + (j ? d.chart.last_y2 : d.chart.last_y), e.r = j ? 4.5f : 6, e.scale = 1;
-      e.color = acc, e.alpha = m.mask ? (j ? 0.6f : 1) : 0, e.on_black = false, e.on = nullptr;
+      halo_item_circle(e, cx0 + cw, cy0 + (j ? d.chart.last_y2 : d.chart.last_y), j ? 4.5f : 6, 1, acc,
+                       m.mask ? (j ? 0.6f : 1) : 0);
+      e.on_black = false;
     }
   }
   // The list

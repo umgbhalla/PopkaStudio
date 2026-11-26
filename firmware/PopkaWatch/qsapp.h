@@ -146,18 +146,18 @@ static void qs_begin() {  // (face_build: the two settings back from flash)
   qs_on_levels = qs_prefs.getUChar("open", 0), qs_battery = qs_prefs.getUChar("bat", 1);
   K_QS_SW = halo_spring(0.25f, 0.85f);
   halo_spring_set(qs_sw, qs_battery ? 1 : 0);
-  halo_command("qscheck", [](const char *) { up_swap(qs_st), up_audit(), up_swap(qs_st); });  // (upager.h's audit)
+  halo_command("qscheck", [](const char *) { up_with(qs_st, up_audit); });  // (upager.h's audit)
 }
 static void qs_open_page() {  // a new pull: the page the setting picks
-  up_swap(qs_st), up_open(&QS_APP, qs_on_levels ? 1 : 0), up_swap(qs_st);
+  up_with(qs_st, [] { up_open(&QS_APP, qs_on_levels ? 1 : 0); });
 }
 // The panel's finger while it is out: sideways — the pages; a tap (open, the page at rest) — the page's
 static void qs_tick(float dt, bool tap, float x, float y) {
   if (!qs_st.app) qs_open_page();
-  up_swap(qs_st);
-  up_update(dt);
-  if (tap && fabsf(up_pos.x - up_page) < 0.05f) qs_tap(up_page, x, y);
-  up_swap(qs_st);
+  up_with(qs_st, [&] {
+    up_update(dt);
+    if (tap && fabsf(up_pos.x - up_page) < 0.05f) qs_tap(up_page, x, y);
+  });
 }
 // The pages on the disc (ty: where the disc is), or hidden once when it is gone
 static void qs_layout(const HaloView &v, float ty, bool shown) {
@@ -167,7 +167,7 @@ static void qs_layout(const HaloView &v, float ty, bool shown) {
   q.y += ty * v.s;
   if (!shown) q.a = 0;
   qs_shown = shown;
-  up_swap(qs_st), up_layout(q), up_swap(qs_st);
+  up_with(qs_st, [&] { up_layout(q); });
 }
 static void qs_draw() {
   if (qs_shown) up_draw_of(qs_st);

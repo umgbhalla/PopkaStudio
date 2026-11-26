@@ -161,6 +161,16 @@ void halo_view_commit(HaloItem &it, const HaloView &v) {
   halo_item_commit(it);
 }
 
+// Команда back: её ставят и halo_nav_begin, и halo_nav_face (любой бывает без другого; второй раз — та же запись)
+static void on_back(const char *) {
+  cmd_back = true;
+}
+
+// Жест назад: вбок вправо от левого края (полоса back_zone)
+static bool edge_back(const HaloFinger &f) {
+  return f.drag_start && f.horiz && f.x > f.x0 && f.x0 < back_zone;
+}
+
 void halo_nav_begin(const HaloScreen &h) {
   sheet_corner_open = false;
   if (has_main) {  // главный меняют: прежний и открытые на нём — спрятать, на циферблат
@@ -182,7 +192,7 @@ void halo_nav_begin(const HaloScreen &h) {
   halo_ease_make(E_AXIS, 0.2f, 0, 0, 1);  // Material standard
 #endif
   cover.kind = COVER_KIND, cover.color = 0, cover.alpha = 0;
-  halo_command("back", [](const char *) { cmd_back = true; });
+  halo_command("back", on_back);
 }
 
 // Открытый экран уже на месте для глаза: пружина сдвига ещё ~0,2 с доигрывает перелёт в 3–4 px (у круга — до 467 мс от
@@ -270,7 +280,7 @@ void halo_nav_face(const HaloScreen &f, float zone) {
   over_cover.kind = COVER_KIND, over_cover.color = 0, over_cover.alpha = 0;
   if (face.enter) face.enter();
   halo_command("face", [](const char *a) { cmd_face = strstr(a, "off") ? 1 : 0; });
-  halo_command("back", [](const char *) { cmd_back = true; });  // и без главного: закрыть экран поверх циферблата
+  halo_command("back", on_back);  // и без главного: закрыть экран поверх циферблата
 }
 
 void halo_nav_side(bool side) {
@@ -344,13 +354,12 @@ static bool over_update(float dt) {
   if (nav_bottom_back && open && f.drag_start && !f.horiz && f.y < f.y0 && f.y0 > HALO_H - OVER_ZONE && !over_drag &&
       halo_finger_claim(&over_owner))
     over_drag = over_closing = true, over_ax = false, over_y0 = f.y;
-  const bool edge_back = nav_side || !nav_bottom_back;
-  if (edge_back && open && f.drag_start && f.horiz && f.x > f.x0 && f.x0 < back_zone && !over_drag &&
-      halo_finger_claim(&over_owner))
+  const bool side_back = nav_side || !nav_bottom_back;
+  if (side_back && open && edge_back(f) && !over_drag && halo_finger_claim(&over_owner))
     over_drag = over_closing = over_ax = true, over_y0 = f.x;
   if (cmd_back) {
     cmd_back = false;
-    if (!over_drag) over_closing = true, over_ax = edge_back, over_q.target = 0;
+    if (!over_drag) over_closing = true, over_ax = side_back, over_q.target = 0;
   }
   if (over_drag) {
     if (f.down && f.owner == &over_owner) {  // переход — за пальцем
@@ -365,7 +374,7 @@ static bool over_update(float dt) {
       }
     } else {  // отпустили: дальше трети пути или бросок вверх (вбок — вправо) быстрее 700 px/с — закрыть, иначе обратно
       over_drag = false;
-      over_q.target = over_q.x < 0.67f || (over_ax ? f.vx > 700 : f.vy < -700) ? 0 : 1;
+      over_q.target = halo_land(-over_q.x, over_ax ? f.vx : -f.vy, -0.67f, 700) ? 0 : 1;  // (к закрытию: от 1 к 0)
     }
   }
   if (!over_drag) {
@@ -559,7 +568,7 @@ static bool sheet_update(float dt) {
       if (up) dir = list ? 0 : home_gesture(f);
       else if (!nav_side && f.y < f.y0) dir = 1;
     } else if (nav_side) {
-      ax = up ? view == V_HOME && f.x > f.x0 && f.x0 < back_zone : f.x < f.x0;
+      ax = up ? view == V_HOME && edge_back(f) : f.x < f.x0;
       dir = ax ? 1 : 0;
     }
     if (dir != 0 && halo_finger_claim(&sheet_owner)) {
@@ -604,7 +613,8 @@ static bool sheet_update(float dt) {
     } else {  // отпустили: бросок быстрее 700 px/с — куда бросили, иначе — дальше трети пути от начала
       sheet_drag = false;
       const float u = -(sheet_ax ? f.vx : f.vy) * sheet_dir;  // скорость к главному, px/с
-      sheet.target = u > 700 ? 1 : u < -700 ? 0 : sheet_in ? (sheet.x > 0.33f ? 1 : 0) : (sheet.x < 0.67f ? 0 : 1);
+      sheet.target = sheet_in ? (halo_land(sheet.x, u, 0.33f, 700, true) ? 1 : 0)
+                              : (halo_land(-sheet.x, -u, -0.67f, 700, true) ? 0 : 1);  // (к циферблату: от 1 к 0)
 #ifndef HALO_ROUND
       sh_restart = true;
 #endif
@@ -660,7 +670,7 @@ static bool sheet_update(float dt) {
 // Кадр верхнего экрана: жест назад от левого края — или его собственное обновление (может открыть ещё один поверх)
 static void top_frame(float dt) {
   HaloFinger &f = halo_finger;
-  bool go = f.drag_start && f.horiz && f.x > f.x0 && f.x0 < back_zone && halo_finger_claim(&nav_owner);
+  bool go = edge_back(f) && halo_finger_claim(&nav_owner);
   if (cmd_back) cmd_back = false, go = true;
   if (go) {
     if (view == V_OPEN) finish_open();  // (открытие ещё доигрывало хвост)
@@ -718,7 +728,7 @@ void halo_nav_update(float dt) {
           back_p.x = halo_clamp01((f.x - f.x0) / OVER_TRAVEL);
         } else {
           back_drag = false;
-          back_p.target = f.vx > 700 ? 1 : f.vx < -700 ? 0 : back_p.x > 0.33f ? 1 : 0;
+          back_p.target = halo_land(back_p.x, f.vx, 0.33f, 700, true) ? 1 : 0;
           ax_t = 0, ax_e0 = back_p.x;
         }
       }
@@ -736,7 +746,7 @@ void halo_nav_update(float dt) {
           back_p.x = halo_clamp01((f.x - f.x0) / (HALO_W - f.x0)), back_p.v = 0;
         } else {  // отпустили: дальше половины или бросок быстрее 800 dp/с — назад, иначе обратно
           back_drag = false;
-          back_p.target = back_p.x > 0.5f || f.vx > 1600 ? 1 : 0;
+          back_p.target = halo_land(back_p.x, f.vx, 0.5f, 1600) ? 1 : 0;
           back_p.v = f.vx / HALO_W;
         }
       }

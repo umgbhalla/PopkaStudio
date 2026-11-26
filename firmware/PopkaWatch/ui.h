@@ -152,14 +152,7 @@ static bool ui_begin() {
   ui_mid_t20 = halo_text_mid(gl_t20, "Hxg"), ui_mid_ic = halo_text_mid(gl_ic24, "\xEF\x80\x93");
   return true;
 }
-static uint32_t ui_mix(uint32_t a, uint32_t b, float t) {
-  uint32_t out = 0;
-  for (int s = 0; s <= 16; s += 8) {
-    const int ca = a >> s & 255, cb = b >> s & 255;
-    out |= (uint32_t)(ca + (cb - ca) * t + 0.5f) << s;
-  }
-  return out;
-}
+// (ui_mix — a colour toward another: confirm.h, included before this)
 
 // The page into level k: its rows' heights into the list (the title is the list's header), from its top
 static void ui_glow_make();
@@ -176,17 +169,14 @@ static void ui_set_page(int k, const UiPage *pg) {
 
 static void ui_text(HaloItem &it, const HaloFont &f, const char *s, float mid, float x, float y, float sc, int align,
                     uint32_t color, float a, const HaloItem *on, float fit = 0) {
-  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = align, it.spacing = 0, it.color = color, it.scale = sc;
-  it.alpha = a, it.on_black = false, it.on = on, it.fit = fit;
-  it.x = x, it.y = y + (f.line / 2.0f - mid) * sc;
+  halo_item_text(it, f, s, mid, x, y, sc, align, color, a, on);
+  it.spacing = 0, it.fit = fit;
 }
-static void ui_rrect(HaloItem &it, float x, float y, float w, float h, float r, float sc, uint32_t c, float a) {
-  it.kind = HI_RRECT, it.x = x, it.y = y, it.w = w, it.h = h, it.r = r, it.scale = sc, it.color = c, it.alpha = a;
-  it.on_black = true, it.on = nullptr;
+static inline void ui_rrect(HaloItem &it, float x, float y, float w, float h, float r, float sc, uint32_t c, float a) {
+  halo_item_rrect(it, x, y, w, h, r, sc, c, a);
 }
-static void ui_circle(HaloItem &it, float x, float y, float r, float sc, uint32_t c, float a) {
-  it.kind = HI_CIRCLE, it.x = x, it.y = y, it.r = r, it.scale = sc, it.color = c, it.alpha = a, it.on_black = true;
-  it.on = nullptr;
+static inline void ui_circle(HaloItem &it, float x, float y, float r, float sc, uint32_t c, float a) {
+  halo_item_circle(it, x, y, r, sc, c, a);
 }
 
 // The accent's roles (Material 3's tonal palette from one seed, simply): the primary itself, its deep container (an ON row,

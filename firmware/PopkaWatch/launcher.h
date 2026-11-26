@@ -39,8 +39,8 @@ static void ln_load() {
   ln_az = ln_prefs.getUChar("az", 0), ln_labels = ln_prefs.getUChar("labels", 1);
   halo_spring_set(ln_sw, ln_labels ? 1 : 0);
   // upager.h's audit of the launcher's page in front, of its settings (serial: lncheck, lnsetcheck)
-  halo_command("lncheck", [](const char *) { up_swap(ln_st), up_audit(), up_swap(ln_st); });
-  halo_command("lnsetcheck", [](const char *) { up_swap(ln_set_st), up_audit(), up_swap(ln_set_st); });
+  halo_command("lncheck", [](const char *) { up_with(ln_st, up_audit); });
+  halo_command("lnsetcheck", [](const char *) { up_with(ln_set_st, up_audit); });
 }
 // The tiles from the screen's layers: its visible cards, in its order or by name; Launcher last
 static void ln_collect() {
@@ -139,30 +139,31 @@ static void ln_set_upd(int, float dt) {
   halo_spring_run(ln_sw, K, dt);
 }
 static const UpApp LN_SET_APP = {ln_set_count, ln_set_lay, ln_set_tap, ln_set_upd, nullptr, LN_ACCENT};
-static void ln_set_update(float dt) { up_swap(ln_set_st), up_update(dt), up_swap(ln_set_st); }
-static void ln_set_layout(const HaloView &v) { up_swap(ln_set_st), up_layout(v), up_swap(ln_set_st); }
+static void ln_set_update(float dt) { up_with(ln_set_st, [=] { up_update(dt); }); }
+static void ln_set_layout(const HaloView &v) { up_with(ln_set_st, [&] { up_layout(v); }); }
 static void ln_set_draw() { up_draw_of(ln_set_st); }
 static void ln_set_open() {
   const int d = halo_nav_depth() + 1;
   if (d >= NAV_LEVELS) return;
-  up_swap(ln_set_st), up_open(&LN_SET_APP), up_swap(ln_set_st);
+  up_with(ln_set_st, [] { up_open(&LN_SET_APP); });
   halo_spring_set(ln_sw, ln_labels ? 1 : 0);
   nav_scr[d] = -1, nav_stub[d] = "Launcher";
   halo_nav_open({nullptr, ln_set_update, ln_set_layout, ln_set_draw});
 }
 
 // ---------- The screen (gallery.h calls these for the Apps screen) ----------
+static void ln_open() { up_with(ln_st, [] { up_open(&LN_APP); }); }
 static void ln_enter(const FaceScreen &S) {  // (from the face: the first page)
   ln_load();
   ln_scr = &S, ln_collect();
-  up_swap(ln_st), up_open(&LN_APP), up_swap(ln_st);
+  ln_open();
 }
 static void ln_update(const FaceScreen &S, float dt, int depth) {
   HaloFinger &f = halo_finger;
   ln_load();
   ln_scr = &S, ln_depth = depth, ln_collect();
-  if (!ln_st.app) up_swap(ln_st), up_open(&LN_APP), up_swap(ln_st);
-  up_swap(ln_st), up_update(dt), up_swap(ln_st);
+  if (!ln_st.app) ln_open();
+  up_with(ln_st, [=] { up_update(dt); });
   if (ln_want_set) ln_want_set = false, ln_set_open();
   // A drag down (not from the top edge: the quick settings') — back to the face, as the old list's pull
   if (depth == 0 && f.drag_start && !f.horiz && f.y > f.y0 && f.edge != HALO_EDGE_TOP && halo_finger_claim(&ln_owner))
@@ -175,10 +176,10 @@ static void ln_update(const FaceScreen &S, float dt, int depth) {
 static void ln_layout(const FaceScreen &S, float a, const HaloView &v) {
   ln_load();
   ln_scr = &S, ln_collect();
-  if (!ln_st.app) up_swap(ln_st), up_open(&LN_APP), up_swap(ln_st);
+  if (!ln_st.app) ln_open();
   HaloView lv = v;
   lv.a *= a;
-  up_swap(ln_st), up_layout(lv), up_swap(ln_st);
+  up_with(ln_st, [&] { up_layout(lv); });
 }
 static void ln_draw() { up_draw_of(ln_st); }
 #endif

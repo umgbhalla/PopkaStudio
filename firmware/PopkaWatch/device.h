@@ -59,9 +59,8 @@ static uint32_t dv_mix(uint32_t a, uint32_t b, float t) {  // color a toward b b
 // on — what it lies on (&halo_black — the black screen)
 static void dv_text(HaloItem &it, const HaloFont &f, const char *s, float mid, float x, float y, float sc,
                     uint32_t color, float alpha, int align, const HaloItem *on) {
-  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = align, it.color = color, it.on = on;
-  it.on_black = on == &halo_black, it.x = x, it.y = y + (f.line / 2.0f - mid) * sc, it.scale = sc;
-  it.alpha = alpha, it.spacing = 0;
+  halo_item_text(it, f, s, mid, x, y, sc, align, color, alpha, on);
+  it.on_black = on == &halo_black, it.spacing = 0;
 }
 
 // ---------- A chart: a mask baked anew when a sample comes ----------

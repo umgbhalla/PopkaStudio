@@ -124,14 +124,12 @@ static const char *gl_str(const char *s) {
 // Text by the middle of its letters (mid — halo_text_mid) at (x, y), as WearKit places text; on — what it lies on
 static void gl_text_mid(HaloItem &it, const HaloFont &f, const char *s, float mid, float x, float y, float sc,
                         uint32_t color, float alpha, const HaloItem *on) {
-  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = 1, it.color = color, it.on_black = false, it.on = on;
-  it.x = x, it.y = y + (f.line / 2.0f - mid) * sc, it.scale = sc, it.alpha = alpha;
+  halo_item_text(it, f, s, mid, x, y, sc, 1, color, alpha, on);
 }
 // Text from the left edge x, its baseline at y
 static void gl_text_base(HaloItem &it, const HaloFont &f, const char *s, float x, float y, float sc, uint32_t color,
                          float alpha, const HaloItem *on) {
-  it.kind = HI_TEXT, it.font = &f, it.text = s, it.align = 0, it.color = color, it.on_black = false, it.on = on;
-  it.x = x, it.y = y + (f.line / 2.0f - f.ascent) * sc, it.scale = sc, it.alpha = alpha;
+  halo_item_text(it, f, s, f.ascent, x, y, sc, 0, color, alpha, on);
 }
 
 #ifndef HALO_ROUND
