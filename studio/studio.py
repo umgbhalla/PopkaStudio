@@ -1770,12 +1770,10 @@ def write_sketch(project, folder, meta=None):
     # (the Weather app first: an older Weather screen earlier in the list must not win)
     os.makedirs(os.path.join(folder, "assets"), exist_ok=True)
     if os.path.abspath(folder) != os.path.abspath(FIRMWARE):
-        for name in ("PopkaWatch.ino", "face.h", "weather.h", "wxscreen.h", "gallery.h", "wxscreen_rect.h", "gallery_rect.h", "player_rect.h", "recorder_rect.h", "settings_rect.h", "device_rect.h", "game_dots_rect.h", "power.h", "steps.h", "stars.h",
-                     "pixelart.h", "parrot.h", "bt.h", "wxfetch.h", "settings.h", "stepscreen.h", "widgets.h", "widgets_rect.h", "wxwidgets.h",
-                     "music.h", "music_sd.h", "player.h", "pomodoro.h", "pomodoro_rect.h", "sound.h", "volume.h", "recorder.h", "radio.h", "radio_net.h", "radio_rect.h", "video.h", "video_hw.h", "video_net.h", "snake.h", "games.h", "game_dots.h",
-                     "game_space.h", "game_iso.h", "live.h", "device.h", "hello.h", "wifiscan.h", "shade_rect.h", "shade_round.h",
-                     "sclock.h", "confirm.h", "ui.h", "sysset.h", "wxapp.h", "clocks.h", "scene.h", "upager.h", "muapp.h"):
-            shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
+        # every sketch file (a list here went stale: launcher.h, qsapp.h, radioapp.h… were missing), not the two it writes
+        for name in sorted(os.listdir(FIRMWARE)):
+            if name.endswith((".h", ".ino")) and name not in ("config.h", "layers.h"):
+                shutil.copy(os.path.join(FIRMWARE, name), os.path.join(folder, name))
     if any(layer["type"] == "scene" for scr in screens for layer in scr["layers"]):  # the Scene layer's pictures,
         # built from their SVGs (tools/scene_pack.py: generated, not in git)
         subprocess.run([sys.executable, os.path.join(ROOT, "tools", "scene_pack.py"), folder], check=True,
