@@ -234,8 +234,7 @@ static void player_layout(const HaloView &v) {
   pr_knob.kind = HI_CIRCLE, pr_knob.x = PR_LINE_X + fx, pr_knob.y = PR_LINE_Y, pr_knob.r = kr, pr_knob.scale = 1;
   pr_knob.color = PR_ACC, pr_knob.alpha = pa, pr_knob.on_black = true, pr_knob.on = nullptr;
   halo_view_commit(pr_track, v), halo_view_commit(pr_fill, v), halo_view_commit(pr_knob, v);
-  const int e = (int)(pr_seek >= 0 ? pr_seek * len : pl_elapsed), l = (int)len;
-  snprintf(pr_s0, sizeof pr_s0, "%d:%02d", e / 60, e % 60), snprintf(pr_s1, sizeof pr_s1, "%d:%02d", l / 60, l % 60);
+  mmss(pr_s0, sizeof pr_s0, pr_seek >= 0 ? pr_seek * len : pl_elapsed), mmss(pr_s1, sizeof pr_s1, len);
   pr_text_item(pr_t0, gl_r_n24, pr_s0, pr_mid_n, 0, PR_LINE_X, PR_TIME_Y, GL_DIM, mu_n ? pa : 0, v, &halo_black);
   pr_text_item(pr_t1, gl_r_n24, pr_s1, pr_mid_n, 2, PR_LINE_X + PR_LINE_W, PR_TIME_Y, GL_DIM, mu_n ? pa : 0, v, &halo_black);
   // Previous and next: capsules; pressed they grow a little

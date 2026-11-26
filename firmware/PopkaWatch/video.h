@@ -544,8 +544,7 @@ static void vd_ctl_layout(const HaloView &v) {
   const bool on = vd_mode == VM_PLAY || vd_mode == VM_HOLD;
   if (on && vd_sel >= 0) {
     const float len = vh_length(), now = vd_seek_at >= 0 ? vd_seek_at * len : vh_position(), f = len > 0 ? halo_clamp01(now / len) : 0, fx = VP_LINE_W * f;
-    const int e = (int)now, l = (int)(len + 0.5f);
-    snprintf(vd_t0, sizeof vd_t0, "%d:%02d", e / 60, e % 60), snprintf(vd_t1, sizeof vd_t1, "%d:%02d", l / 60, l % 60);
+    mmss(vd_t0, sizeof vd_t0, now), mmss(vd_t1, sizeof vd_t1, len + 0.5f);
     const int pct = (int)lroundf(vd_vol * 100);
     snprintf(vd_num, sizeof vd_num, "%d", pct);
     const char *title = vh_files[vd_sel].title;
