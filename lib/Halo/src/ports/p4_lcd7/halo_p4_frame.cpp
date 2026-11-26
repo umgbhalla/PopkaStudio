@@ -26,52 +26,17 @@
 
 #pragma GCC optimize("O3", "fast-math")
 
-HALO_TLS HaloBand hb;
-uint32_t hf_finger_t;
-
-static HaloConfig cfg;
-static HaloUpdate m_update;
-static HaloDraw m_draw;
+// The band, the damage lists, animation time, the display's requests, the report's tail, the common commands: as on the S3
+#include "../esp32_common/halo_frame_common.h"
 
 // ---------- What changed ----------
-static HaloSpans dmg[HALO_BANDS];
 static HaloSpans last[HALO_BANDS];  // what the previous frame changed: the back buffer does not have it yet
-static portMUX_TYPE dmg_mux = portMUX_INITIALIZER_UNLOCKED;
-
-void halo_damage(int x0, int y0, int x1, int y1) {
-  x0 = max(x0, 0), y0 = max(y0, 0), x1 = min(x1, HALO_W - 1), y1 = min(y1, HALO_H - 1);
-  if (x0 > x1 || y0 > y1) return;
-  portENTER_CRITICAL(&dmg_mux);
-  for (int b = y0 / HALO_ROWS; b <= y1 / HALO_ROWS; b++) halo_spans_add(dmg[b], x0, x1);
-  portEXIT_CRITICAL(&dmg_mux);
-}
-
-void halo_damage_f(float x0, float y0, float x1, float y1) {
-  halo_damage(halo_floor(x0) - 1, halo_floor(y0) - 1, halo_floor(x1) + 2, halo_floor(y1) + 2);
-}
-
-void halo_damage_all() {
-  halo_damage(0, 0, HALO_W - 1, HALO_H - 1);
-}
 
 // A list that starts moving redraws most of the screen at once: the next frames start at once too, not late for a fresher
 // finger — their cost is not in frame_peak yet, and they would miss the boundary (a fling and a drag each lost a frame)
 static volatile uint8_t heavy_frames;
 void halo_heavy() {
   heavy_frames = 3;
-}
-
-// ---------- Animation time ----------
-static uint64_t m_clock;
-static volatile bool vt_paused, vt_fixed;
-static volatile int vt_steps;
-static volatile float slowmo = 1;
-
-uint32_t halo_us() {
-  return (uint32_t)m_clock;
-}
-uint32_t halo_ms() {
-  return (uint32_t)(m_clock / 1000);
 }
 
 // ---------- Drawing: both cores take jobs from one queue ----------
@@ -276,10 +241,6 @@ struct Stats {
   uint32_t ticks, drawn, jobs, px, sum_us, max_us, missed, update_us, update_max, flip_us, flip_max, lead_us;
 };
 static Stats stats, report;
-static uint32_t hp_report[2][HP_PARTS];
-static volatile bool report_ready;
-static volatile int bright_req = -1, power_req = -1;
-static volatile bool disp_on = true, boot_cmd, boot_long_cmd;
 static uint16_t *volatile shot_buf;
 static volatile bool shot_req, shot_ready;
 
@@ -566,18 +527,6 @@ static void cmd_bench(const char *a) {  // the whole frame on one core, into a s
   vt_paused = false;
 }
 
-void halo_brightness(uint8_t level) {
-  bright_req = level;
-}
-
-void halo_display_on(bool on) {
-  disp_on = on, power_req = on;
-}
-
-bool halo_display_is_on() {
-  return disp_on;
-}
-
 // The BOOT button: pressed two frames in a row after two released (contact bounce is shorter than a frame)
 static bool boot_down, boot_long_done = true, boot_swallow;
 static uint32_t boot_down_ms;
@@ -635,15 +584,7 @@ bool halo_begin(HaloUpdate update, HaloDraw draw, const HaloConfig &c) {
   halo_command("shot", cmd_shot);
   halo_command("bench", cmd_bench);
   halo_command("film", cmd_film);
-  halo_command("pause", [](const char *) { vt_steps = 0, vt_paused = true; });
-  halo_command("resume", [](const char *) { vt_steps = 0, vt_paused = false; });
-  halo_command("step", [](const char *a) { vt_steps += max(1, atoi(a)), vt_paused = true; });
-  halo_command("clock", [](const char *a) { vt_fixed = !strcmp(a, "fixed"); });
-  halo_command("slow", [](const char *a) { slowmo = 1 / constrain(atof(a), 1.0f, 100.0f); });
-  halo_command("bright", [](const char *a) { halo_brightness(atoi(a)); });
-  halo_command("boot", [](const char *a) { (strstr(a, "long") ? boot_long_cmd : boot_cmd) = true; });
-  halo_command("redraw", [](const char *) { halo_damage_all(); });
-  halo_command("prof", [](const char *) { hp_on = !hp_on; });
+  hf_commands();
   halo_command("late", [](const char *a) { late_start = strcmp(a, "off") != 0; });
   if (cfg.two_cores) xTaskCreatePinnedToCore(helper_task, "halo_helper", 4096, nullptr, 10, nullptr, 0);
   xTaskCreatePinnedToCore(frame_task, "halo_frames", 8192, nullptr, 5, nullptr, 1);
@@ -664,18 +605,8 @@ void halo_loop() {
           s.update_us / 1000.0f / max((uint32_t)1, s.ticks), s.update_max / 1000.0f, s.flip_us / 1000.0f / s.drawn,
           s.flip_max / 1000.0f, s.lead_us / 1000.0f / s.drawn, (unsigned long)s.missed);
     else
-      LOG("%s: idle (%.0f ticks/s), update %.2f ms\n", cfg.name, s.ticks / sec, s.update_us / 1000.0f / max((uint32_t)1, s.ticks));
-    if (hp_on && s.drawn) {
-      static const char *const N[HP_PARTS] = {"text", "mask", "image", "rrect", "circle", "ring", "arc", "edge", "pixels", "clear", "-"};
-      char line[280];
-      for (int half = 0; half < 2; half++) {
-        int n = snprintf(line, sizeof(line), "%s prof ms/frame (core1/core0):", cfg.name);
-        for (int i = half ? 6 : 0; i < (half ? HP_PARTS - 1 : 6); i++)
-          n += snprintf(line + n, sizeof(line) - n, " %s %.2f/%.2f", N[i], hp_report[1][i] / (HALO_CPU_MHZ * 1000.0f) / s.drawn,
-                        hp_report[0][i] / (HALO_CPU_MHZ * 1000.0f) / s.drawn);
-        LOG("%s\n", line);
-      }
-    }
+      hf_log_idle(s.ticks, s.update_us);
+    if (hp_on && s.drawn) hf_log_prof(s.drawn);
     report_ready = false;
   }
   delay(5);
