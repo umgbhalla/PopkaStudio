@@ -111,11 +111,14 @@ static void sc_seconds() {
   if (fc_calm) return;  // (Always On: the seconds stand)
   if (fs_drag || fs_off.x != 0 || fs_off.target != 0) return;  // (switching faces: the faces stand still — only the move
                                                                // is drawn, not the hands as well: face.h)
-  const time_t now = time(nullptr) + fc_offset;
+  const time_t now = fc_wall();
   if (now != last) last = now, at = halo_ms(), localtime_r(&now, &sc_tm);
   sc_sec_i = (int)(((now % 60) + 60) % 60);
   sc_sec = sc_sec_i + fminf(0.999f, (halo_ms() - at) / 1000.0f);
 }
+// The hands' angles now, degrees from 12 o'clock: the hour hand's (the minutes and seconds move it on), the minute's
+static inline float sc_hour_deg() { return ((sc_tm.tm_hour % 12) + sc_tm.tm_min / 60.0f + sc_sec / 3600) * 30; }
+static inline float sc_min_deg() { return (sc_tm.tm_min + sc_sec / 60) * 6; }
 
 static uint32_t sc_mix(uint32_t a, uint32_t b, float t) {  // color a toward b by t
   t = halo_clamp01(t);
@@ -291,13 +294,19 @@ static void sc_rrect(HaloItem &it, float x, float y, float w, float h, float r, 
   it.on_black = sc_ob, it.on = nullptr;
   halo_view_commit(it, v);
 }
-// Text: align 0 — from x, 1 — centered, 2 — up to x; the middle of its letters at y (mid — from the line's top)
-static void sc_text(HaloItem &it, const HaloFont *f, const char *s, float x, float y, float mid, int align, uint32_t c,
-                    float a, const HaloView &v) {
-  it.kind = HI_TEXT, it.font = f, it.text = s, it.align = align, it.spacing = 0, it.scale = 1, it.color = c;
-  it.alpha = f ? a : 0, it.on_black = sc_ob, it.on = sc_ob ? &halo_black : nullptr;
+// Text: align 0 — from x, 1 — centered, 2 — up to x; the middle of its letters at y (mid — from the line's top). On a
+// solid item (a bezel band, a subdial's disc: dl_text's on) its edges are in that item's colors — no dark fringe
+static void dl_text(HaloItem &it, const HaloFont *f, const char *str, float x, float y, float mid, int align, uint32_t col,
+                    float a, const HaloView &v, const HaloItem *on, int spacing = 0) {
+  it.kind = HI_TEXT, it.font = f, it.text = str, it.align = align, it.spacing = spacing, it.scale = 1, it.color = col;
+  it.alpha = f ? a : 0, it.on_black = on == &halo_black, it.on = on;
   if (f) it.x = x, it.y = y + (f->line / 2.0f - mid);
   halo_view_commit(it, v);
+}
+// …over black, or blended over what is under (sc_ob)
+static void sc_text(HaloItem &it, const HaloFont *f, const char *s, float x, float y, float mid, int align, uint32_t c,
+                    float a, const HaloView &v) {
+  dl_text(it, f, s, x, y, mid, align, c, a, v, sc_ob ? &halo_black : nullptr);
 }
 static void sc_hide(ScRun &c, int from, const HaloView &v) {
   for (int i = from; i < SC_ITEMS; i++)
@@ -324,23 +333,25 @@ static void dl_arc(HaloItem &it, float x, float y, float r, float w, float a0, f
   it.alpha = a, it.on_black = false, it.on = nullptr;
   halo_view_commit(it, v);
 }
-// Text on a solid item (a bezel band, a subdial's disc): its edges in that item's colors — no dark fringe
-static void dl_text(HaloItem &it, const HaloFont *f, const char *str, float x, float y, float mid, int align, uint32_t col,
-                    float a, const HaloView &v, const HaloItem *on, int spacing = 0) {
-  it.kind = HI_TEXT, it.font = f, it.text = str, it.align = align, it.spacing = spacing, it.scale = 1, it.color = col;
-  it.alpha = f ? a : 0, it.on_black = on == &halo_black, it.on = on;
-  if (f) it.x = x, it.y = y + (f->line / 2.0f - mid);
-  halo_view_commit(it, v);
-}
 // Optical balance (the dials' rules, 23 Nov 2026): three text sizes a face — the hero (the day), values, labels; labels
 // are small caps tracked open (+2 px) and dimmer; a pair of texts is centered as one by its measured width
 #define DL_TRACK 2
 static float dl_width(const HaloFont *f, const char *str, int spacing = 0) {
   return f ? halo_text_width(*f, str, spacing) : 0;
 }
-static inline void dl_at(float ax, float ay, float deg, float r, float &x, float &y) {
+// A point r from (ax, ay) at deg degrees clockwise from 12 o'clock; dl_dir — the direction once, for several points on it
+struct DlDir {
+  float sn, cs;
+};
+static inline DlDir dl_dir(float deg) {
   const float an = deg * (HALO_PI / 180);
-  x = ax + r * sinf(an), y = ay - r * cosf(an);
+  return {sinf(an), cosf(an)};
+}
+static inline void dl_at(float ax, float ay, DlDir d, float r, float &x, float &y) {
+  x = ax + r * d.sn, y = ay - r * d.cs;
+}
+static inline void dl_at(float ax, float ay, float deg, float r, float &x, float &y) {
+  dl_at(ax, ay, dl_dir(deg), r, x, y);
 }
 // A hand of Apple's family: a thin neck from the pivot, then a capsule blade (round ends) to the tip; hollow — a light
 // outline round a dark channel. Under it a soft shadow: three wider passes of black, a little lower (it shows over the
@@ -360,13 +371,12 @@ static int dl_hand(ScRun &c, int nc, float ax, float ay, float deg, float neck, 
 static int dl_hands(ScRun &c, int nc, float ax, float ay, float R, uint32_t light, uint32_t channel, uint32_t sec,
                     float hour_tip, float min_tip, float a, float sa, const HaloView &v, uint32_t hour = 0,
                     bool hour_hollow = true) {
-  const struct tm &t = sc_tm;
   // The hour and minute hands move by half a pixel at their tips — continuous to the eye, but not redrawn every frame
   // (each redraw is the hand, its shadow and all under it: measured 47 fps when they moved every frame). The second
   // hand alone sweeps every frame
   const float hq = 0.5f / hour_tip * (180 / HALO_PI), mq = 0.5f / min_tip * (180 / HALO_PI);
-  const float ha = floorf(((t.tm_hour % 12) + t.tm_min / 60.0f + sc_sec / 3600) * 30 / hq) * hq;
-  const float ma = floorf((t.tm_min + sc_sec / 60) * 6 / mq) * mq;
+  const float ha = floorf(sc_hour_deg() / hq) * hq;
+  const float ma = floorf(sc_min_deg() / mq) * mq;
   const float sdeg = sc_sec * 6;
   // (Wear OS's analog faces: a thick hour hand in the accent, solid; a thinner light minute hand)
   nc = dl_hand(c, nc, ax, ay, ha, R * 0.13f, hour_tip, R * (hour_hollow ? 0.068f : 0.078f), R * 0.016f, hour ? hour : light,
@@ -477,7 +487,7 @@ static void wv_update(int look, float ax, float ay, float R, float k, uint32_t c
   if (key != wv_key) {
     const bool same_look = wv_n > 0 && (wv_key >> 0) != 0 && wv_from;
     float tx, ty;
-    const float hd = (sc_tm.tm_min + sc_sec / 60) * 6;
+    const float hd = sc_min_deg();
     dl_at(ax, ay, hd, R * 0.55f, tx, ty);
     const int n = wv_field(look, ax, ay, R, k, tx, ty, hd);
     for (int i = 0; i < n; i++)  // (from: what is shown now — or, a new field of another size, itself)
@@ -507,12 +517,7 @@ static void sc_layer_free(FaceRun &R) {
   R.sc = nullptr;
 }
 static ScRun *sc_new() {
-#ifdef __EMSCRIPTEN__
-  void *p = calloc(1, sizeof(ScRun));
-#else
-  void *p = heap_caps_calloc(1, sizeof(ScRun), MALLOC_CAP_SPIRAM);
-  if (!p) p = calloc(1, sizeof(ScRun));
-#endif
+  void *p = psram_calloc(1, sizeof(ScRun));
   if (!p) return nullptr;
   ScRun *c = new (p) ScRun();
   for (auto &k : c->cap) k.o[4] = -1, k.a = 0;
@@ -1074,8 +1079,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
         const float cxs[4] = {x1 - r, x1 - r, x0 + r, x0 + r}, cys[4] = {y0 + r, y1 - r, y1 - r, y0 + r};
         for (int s = 0; s < 4; s++) {
           if (d < q) {
-            const float an = (s * 90 + d / q * 90) * (HALO_PI / 180);
-            return (void)(x = cxs[s] + r * sinf(an), y = cys[s] - r * cosf(an));
+            return dl_at(cxs[s], cys[s], s * 90 + d / q * 90, r, x, y);
           }
           d -= q;
           const float len = s % 2 == 0 ? y1 - y0 - 2 * r : x1 - x0 - 2 * r;
@@ -1129,19 +1133,22 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const float r = SCQ(226, 284) * k;
       int nc = 0;
       for (int j = 0; j < 60; j++) {
-        const float an = j * 6 * (HALO_PI / 180), sn = sinf(an), cs = cosf(an);
+        const DlDir d = dl_dir(j * 6);
+        float x0, y0, x1, y1;
         if (j % 5) {
-          sc_circle(c.it[n++], ax + r * 0.93f * sn, ay - r * 0.93f * cs, r * 0.009f, L.color3, a, v);
+          dl_at(ax, ay, d, r * 0.93f, x0, y0);
+          sc_circle(c.it[n++], x0, y0, r * 0.009f, L.color3, a, v);
         } else {
-          const float r0 = r * (j % 15 ? 0.86f : 0.81f), r1 = r * 0.95f;
-          sc_cap(c, nc++, ax + r0 * sn, ay - r0 * cs, ax + r1 * sn, ay - r1 * cs, r * (j % 15 ? 0.011f : 0.015f), j ? L.color : L.color2, a, v);
+          dl_at(ax, ay, d, r * (j % 15 ? 0.86f : 0.81f), x0, y0), dl_at(ax, ay, d, r * 0.95f, x1, y1);
+          sc_cap(c, nc++, x0, y0, x1, y1, r * (j % 15 ? 0.011f : 0.015f), j ? L.color : L.color2, a, v);
         }
       }
-      const struct tm &t = sc_tm;
-      const float ha = ((t.tm_hour % 12) + t.tm_min / 60.0f + sc_sec / 3600) * 30, ma = (t.tm_min + sc_sec / 60) * 6;
+      const float ha = sc_hour_deg(), ma = sc_min_deg();
       auto hand = [&](float deg, float r0, float r1, float hw, uint32_t col, float al) {
-        const float an = deg * (HALO_PI / 180), sn = sinf(an), cs = cosf(an);
-        sc_cap(c, nc++, ax + r0 * sn, ay - r0 * cs, ax + r1 * sn, ay - r1 * cs, hw, col, al, v);
+        const DlDir d = dl_dir(deg);
+        float x0, y0, x1, y1;
+        dl_at(ax, ay, d, r0, x0, y0), dl_at(ax, ay, d, r1, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, hw, col, al, v);
       };
       hand(ha, -r * 0.06f, r * 0.5f, r * 0.032f, L.color, a);
       hand(ma, -r * 0.06f, r * 0.78f, r * 0.021f, L.color, a);
@@ -1238,7 +1245,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       sc_rrect(c.it[n++], sx, ay, sw - 6 * k, sh - 6 * k, sh / 2 - 3 * k, 0x000000, a, v);
       snprintf(c.txt[0], 8, "%02d", mnow);
       dl_text(c.it[n++], L.font3, c.txt[0], sx, ay, c.g[2], 1, L.color, a, v, &c.it[1]);
-      snprintf(c.txt[1], 8, "%02d", fc_h24 ? sc_tm.tm_hour : (sc_tm.tm_hour + 11) % 12 + 1);
+      snprintf(c.txt[1], 8, "%02d", fc_shown_hour(sc_tm.tm_hour));
       dl_text(c.it[n++], L.font, c.txt[1], ax - R * 0.17f, ay, c.g[0], 1, L.color, a, v, &halo_black);
       int t = 2;
       for (int m = 0; m < 60; m += 5) {  // the numbers, upright, every five minutes — none in the slot
@@ -1315,7 +1322,7 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
     case SC_BIGTYPE: {
       // Big type (our own): the hours over the minutes, heavy and round, filling the dial — two tones of one hue.
       // color — the hours; color2 — the minutes
-      snprintf(c.txt[0], 8, "%02d", fc_h24 ? sc_tm.tm_hour : (sc_tm.tm_hour + 11) % 12 + 1);
+      snprintf(c.txt[0], 8, "%02d", fc_shown_hour(sc_tm.tm_hour));
       snprintf(c.txt[1], 8, "%02d", sc_tm.tm_min);
       sc_ob = ob;  // (over a scene or another layer: blended)
       dl_text(c.it[n++], L.font, c.txt[0], ax, ay - 94 * k, c.g[0], 1, L.color, a, v, &halo_black);
@@ -1335,13 +1342,15 @@ static void sc_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const uint32_t minor = sc_mix(L.color3, 0x000000, 0.6f);
       int nc = 0;
       for (int j = 0; j < 60; j++) {
-        const float an = (j * 6 + rot) * (HALO_PI / 180), sn = sinf(an), cs = cosf(an);
+        const DlDir d = dl_dir(j * 6 + rot);
         const bool big = j % 5 == 0;
-        const float r0 = (big ? 198 : 210) * k, r1 = 222 * k;
-        sc_cap(c, nc++, ax + r0 * sn, ay - r0 * cs, ax + r1 * sn, ay - r1 * cs, big ? 1.6f * k : 1.0f * k, big ? L.color3 : minor, a, v);
+        float x0, y0, x1, y1;
+        dl_at(ax, ay, d, (big ? 198 : 210) * k, x0, y0), dl_at(ax, ay, d, 222 * k, x1, y1);
+        sc_cap(c, nc++, x0, y0, x1, y1, big ? 1.6f * k : 1.0f * k, big ? L.color3 : minor, a, v);
         if (big) {
           snprintf(c.txt[j / 5], 8, "%02d", j);
-          sc_text(c.it[n++], L.font2, c.txt[j / 5], ax + 176 * k * sn, ay - 176 * k * cs, c.g[0], 1, L.color3, a, v);
+          dl_at(ax, ay, d, 176 * k, x0, y0);
+          sc_text(c.it[n++], L.font2, c.txt[j / 5], x0, y0, c.g[0], 1, L.color3, a, v);
         }
       }
       sc_cap(c, nc++, ax, ay - 231 * k, ax, ay - 190 * k, 2.5f * k, L.color2, a, v);

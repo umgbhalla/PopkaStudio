@@ -65,6 +65,14 @@ static inline float fsc(float v) {
 static const char *const WEEKDAY[7] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
 static const char *const MONTH[12] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
                                       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+// The face's date: "THU, 29 OCT" — the mockup's format (a rectangle's: "THU, OCT 29")
+static void fc_date_text(char *o, int n, const struct tm &t) {
+#ifdef HALO_ROUND
+  snprintf(o, n, "%s, %d %s", WEEKDAY[t.tm_wday], t.tm_mday, MONTH[t.tm_mon]);
+#else
+  snprintf(o, n, "%s, %s %d", WEEKDAY[t.tm_wday], MONTH[t.tm_mon], t.tm_mday);
+#endif
+}
 
 // ---------- Layers and screens ----------
 enum : uint8_t {
@@ -236,26 +244,25 @@ struct FaceScreen {
 #ifndef __EMSCRIPTEN__
 #include <esp_heap_caps.h>
 #endif
-template <int N> static FaceRun (&face_runs())[N] {
+// n zeroed things of size bytes: in PSRAM, or the internal heap when it has none left (the page: its heap)
+static inline void *psram_calloc(size_t n, size_t size) {
 #ifdef __EMSCRIPTEN__
-  FaceRun *p = new FaceRun[N]();
+  return calloc(n, size);
 #else
-  FaceRun *p = (FaceRun *)heap_caps_calloc(N, sizeof(FaceRun), MALLOC_CAP_SPIRAM);
-  if (!p) p = (FaceRun *)calloc(N, sizeof(FaceRun));
-  for (int i = 0; i < N; i++) new (p + i) FaceRun();
+  void *p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM);
+  return p ? p : calloc(n, size);
 #endif
-  return *(FaceRun(*)[N])p;
 }
-#if !defined(HALO_ROUND) && !defined(__EMSCRIPTEN__)
-// A rectangle's board: PSRAM joins the heap only in initArduino(), after the constructors — layers_alloc() (layers.h,
-// from setup()) makes these then
-static FaceRun *face_alloc(int n) {
-  FaceRun *p = (FaceRun *)heap_caps_calloc(n, sizeof(FaceRun), MALLOC_CAP_SPIRAM);
-  if (!p) p = (FaceRun *)calloc(n, sizeof(FaceRun));
+// (A rectangle's board: PSRAM joins the heap only in initArduino(), after the constructors — layers_alloc() (layers.h,
+// from setup()) makes its runs with face_alloc then)
+static inline FaceRun *face_alloc(int n) {
+  FaceRun *p = (FaceRun *)psram_calloc(n, sizeof(FaceRun));
   for (int i = 0; i < n; i++) new (p + i) FaceRun();
   return p;
 }
-#endif
+template <int N> static FaceRun (&face_runs())[N] {
+  return *(FaceRun(*)[N])face_alloc(N);
+}
 #include "layers.h"  // screens[SCREEN_N]: 0 — the watch face, then the screens it opens
 // Steps — only in a firmware with a Steps layer (FN_STEPS, written by the editor), always in the editor's page
 #if defined(__EMSCRIPTEN__) || (defined(FN_STEPS) && FN_STEPS)
@@ -377,7 +384,18 @@ static bool fc_h24 = CLOCK_24H;  // the clock: 24 hours ("13:05") or 12 ("01:05"
 static inline int fc_shown_hour(int h) {
   return fc_h24 ? h : h % 12 ? h % 12 : 12;
 }
+// "13:05", or on the 12-hour clock "01:05" (pad — the face's) / "1:05" (no pad — the world clock's)
+static void fc_hm(char *o, int n, int h, int m, bool pad = true) {
+  snprintf(o, n, fc_h24 || pad ? "%02d:%02d" : "%d:%02d", fc_shown_hour(h), m);
+}
 static int32_t fc_offset;       // shift of the clock, s (the demo, tick, day)
+// The time the face shows (the real one shifted by fc_offset), s; with it as the local date and time
+static inline time_t fc_wall() { return time(nullptr) + fc_offset; }
+static inline time_t fc_wall_tm(struct tm &t) {
+  const time_t now = fc_wall();
+  localtime_r(&now, &t);
+  return now;
+}
 static uint32_t fc_demo_until;  // the demo's clock goes back to real time then
 static bool fc_check;
 static bool fc_still;  // Always On (power.h): the clock and the date change without rolling — asleep there is no time
@@ -759,21 +777,16 @@ static void face_tick(float dt) {
   if (fc_demo_until && (int32_t)(halo_ms() - fc_demo_until) > 0) fc_offset = 0, fc_demo_until = 0, now_check = true;
   if (now_check && halo_clock_valid()) {
     checked = halo_ms();
-    const time_t now = time(nullptr) + fc_offset;
     struct tm t;
-    localtime_r(&now, &t);
+    fc_wall_tm(t);
     if (t.tm_min != fc_min || t.tm_hour != fc_hour) {
       fc_min = t.tm_min, fc_hour = t.tm_hour;
-      snprintf(fc_time, sizeof(fc_time), "%02d:%02d", fc_shown_hour(fc_hour), fc_min);
+      fc_hm(fc_time, sizeof(fc_time), fc_hour, fc_min);
       face_set_all(FL_CLOCK, fc_time, !fc_still);
     }
-    if (t.tm_yday != fc_yday) {  // "THU, 29 OCT" — the mockup's format
+    if (t.tm_yday != fc_yday) {
       fc_yday = t.tm_yday;
-#ifdef HALO_ROUND
-      snprintf(fc_date, sizeof(fc_date), "%s, %d %s", WEEKDAY[t.tm_wday], t.tm_mday, MONTH[t.tm_mon]);
-#else
-      snprintf(fc_date, sizeof(fc_date), "%s, %s %d", WEEKDAY[t.tm_wday], MONTH[t.tm_mon], t.tm_mday);
-#endif
+      fc_date_text(fc_date, sizeof(fc_date), t);
       face_set_all(FL_DATE, fc_date, !fc_still);
     }
   }
