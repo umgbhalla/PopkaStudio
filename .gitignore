@@ -27,3 +27,6 @@ PopkaStudio/app/
 firmware/PopkaWatch/src/scenes.cpp
 firmware/PopkaWatch/src/scenes.h
 .claude
+
+# Scratch engines (studio/engine/build.sh … build-x): renders while working, never shipped
+/studio/web/build-*/
