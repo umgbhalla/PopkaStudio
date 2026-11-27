@@ -23,6 +23,7 @@ python3 tools/watch/sheet.py /tmp/sheet.png /tmp/r/*.png   # side by side, cut t
 .venv/bin/python tools/watch/drive.py c:wake w:1 "c:tap 233 360" w:3 s:/tmp/wx.png   # the real panel
 ```
 - `upcheck` (serial or `cmd upcheck`) audits the paged app in front: overlapping ink, text near the rim.
+- `wxt` (serial, once Weather has opened) prints the forecast's start against the watch's clock — the hours shown hang on both.
 - Before committing firmware that the editor shows, rebuild `studio/web/build` (`studio/engine/build.sh`) and commit
   `PopkaWatch.js/.wasm` with `git add -f` (they are tracked under an ignore rule).
 - Compile all boards: `write_sketch` per board then arduino-cli — see `tools/watch/flash.py --build-only` for one;

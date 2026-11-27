@@ -153,8 +153,9 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
   } else if (p == 1) {  // Recordings
     up_title(P, "Recordings", a, v);
     if (!rc_has() && rc_state != RC_PLAY) {
-      up_text(P, gl_up_title, "No clips yet", up_mid_title, CX, 222, 1, UP_MUTED, a, v);
-      up_text(P, gl_up_lab, "TAP THE MICROPHONE TO RECORD", up_mid_lab, CX, 256, 1, UP_MUTED, a, v);
+      // (an empty state as the card language says it: a bold line, a grey one under it, sentence case)
+      up_text(P, gl_row_lab, "No clips yet", halo_text_mid(gl_row_lab, "Hxkdg"), CX, 218, 1, UP_WHITE, a, v);
+      up_text(P, gl_row_sub, "Tap the microphone to record", halo_text_mid(gl_row_sub, "Hxkdg"), CX, 250, 1, 0x9E9E9E, a, v);
       return;
     }
     const float y = 164;
@@ -168,8 +169,8 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     HaloItem &d = up_disc(P, 348, y, 25, RA_CTRL, a, v);
     up_text(P, gl_ra_ic19, UP_IC_PLAY, ra_mid_play19, 350, y, 1, RA_ACC, a, v, &d);
     // (a build without a clip store: say what happens to it)
-    up_text(P, gl_up_lab, "KEPT IN MEMORY ONLY", up_mid_lab, CX, 236, 1, UP_MUTED, a, v);
-    up_text(P, gl_up_lab, "RECORDING AGAIN REPLACES IT", up_mid_lab, CX, 258, 1, UP_MUTED, a, v);
+    up_text(P, gl_row_sub, "Kept in memory only", halo_text_mid(gl_row_sub, "Hxkdg"), CX, 236, 1, 0x9E9E9E, a, v);
+    up_text(P, gl_row_sub, "Recording again replaces it", halo_text_mid(gl_row_sub, "Hxkdg"), CX, 262, 1, 0x9E9E9E, a, v);
   }  // (2, Settings: a list — ra_lay_item)
 }
 // The Recorder's settings as Wear OS's settings list (upager.h list mode): the clip limit as a stepper pill (− and + at

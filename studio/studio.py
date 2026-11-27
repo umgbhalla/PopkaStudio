@@ -435,7 +435,7 @@ GALLERY_FONTS = [
     "font  gl_up_ic32 fa-solid-900.ttf    32  0xf2ea 0xf024 0xf00a 0xf00d   # secondary glyphs",
     "font  gl_up_ic24 fa-solid-900.ttf    24  0x2b 0xf185 0xf186   # small glyphs",
     # Weather (wxapp.h; design/SPEC_weather.md)
-    "font  gl_wx_hero GoogleSansFlex.ttf 154  digits \"°-\" @wght=880,wdth=97,ROND=58,opsz=128   # Weather: now",
+    "font  gl_wx_temp GoogleSansFlex.ttf  96  digits \"°-\" @wght=600,wdth=100,ROND=100,opsz=96   # Weather: now, as the weather tile (docs/references)",
     "font  gl_wx_line GoogleSansFlex.ttf  35  latin punct digits \"°·\" @wght=660,wdth=83,ROND=42,opsz=35   # the sky, feels",
     "font  gl_wx_val  GoogleSansFlex.ttf  35  digits \"°%:-CF\" @wght=830,wdth=91,ROND=55,opsz=35   # card readings",
     "font  gl_wx_week GoogleSansFlex.ttf  35  digits \"°-\" @wght=775,wdth=67,ROND=43,opsz=35   # a day's low, high",

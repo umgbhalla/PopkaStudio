@@ -30,7 +30,7 @@ static void wa_here() {
 // high), Details (Wear OS progress cards: humidity, wind, UV with a ring each; the sun's day as an arc), the source.
 // The house's tokens (the Apps list, gallery.h): cards 0x2E3034, full pills 410 wide, the Weather card's amber, warm
 // white and grey; the sky drawn in shapes (the face's pill: a yellow sun, a white cloud), no icon font.
-extern const HaloFont gl_wx_hero, gl_wx_line, gl_wx_val, gl_wx_week, gl_title, gl_t24;  // (studio.py GALLERY_FONTS; the cards'
+extern const HaloFont gl_wx_temp, gl_wx_line, gl_wx_val, gl_wx_week, gl_title, gl_t24;  // (studio.py GALLERY_FONTS; the cards'
 // names and lines in the rows' type: gl_row_lab, gl_row_sub — upager.h)
 #define WA_ACC 0xFFB030    // the Weather card's colour (the Apps list)
 #define WA_CARD 0x2E3034   // the house's card
@@ -126,7 +126,11 @@ struct WaItem {
 static WaItem wa_items[UP_PAGES][HALO_LIST_MAX];
 static int wa_ni[UP_PAGES];
 static const char *const WA_HEADS[] = {"Next 12 hours", "7 days", "Details", "Weather", "Units", "Location"};
-static int wa_hours_from(const WxCity &c) {  // the first hour strictly after now
+// An hour's label: its own minutes (in a half-hour zone — India — Open-Meteo's slots start at :30; "05:00" for a 05:30
+// slot was a lie)
+static void wa_clock(char *o, const struct tm &m) { snprintf(o, 8, "%02d:%02d", m.tm_hour, m.tm_min); }
+static int wa_hours_from(const WxCity &c) {  // the first hour strictly after now; −1 — the time not known yet (the
+  if (!halo_clock_valid()) return -1;          // seconds after a start: every hour looked ahead — 04:00 at 05:18)
   const uint32_t now = time(nullptr);
   int first = 0;
   while (first < WX_AHEAD && c.t0 && c.t0 + first * 3600 <= now) first++;
@@ -148,7 +152,7 @@ static int wa_build(int p) {
   add(WI_HERO);
   const int first = wa_hours_from(c);
   int hours = 0;
-  while (hours < 12 && first + hours < WX_AHEAD && c.ht[first + hours] != WX_NONE) hours++;
+  while (first >= 0 && hours < 12 && first + hours < WX_AHEAD && c.ht[first + hours] != WX_NONE) hours++;
   if (hours >= 4) {
     add(WI_HEAD, 0);
     for (int k = 0; k + 4 <= hours; k += 4) add(WI_HOURS, k);
@@ -169,7 +173,7 @@ static int wa_build(int p) {
 static int wa_n_items(int p) { return wa_build(p); }
 static float wa_item_h(int p, int k) {
   switch (wa_items[p][k].kind) {
-    case WI_HERO: return 410;
+    case WI_HERO: return 400;  // (the next header just under the rim at rest; no dead gap when scrolled)
     case WI_HEAD: return wa_items[p][k].arg == 3 ? 70 : 58;
     case WI_HOURS: return 150;
     case WI_DAY: return 84;
@@ -185,25 +189,49 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
   const WxCity &c = wx_city[p < wa_cities() ? p : 0];
   const float h = wa_item_h(p, k);
   switch (w.kind) {
-    case WI_HERO: {  // (its mass centred ~16 px over the screen's middle: the optical centre) one centre line, the whole circle at rest (nothing of the next item shows under it): the city
-                     // under the curved time, the sky, the temperature by its digits (the ° hangs past them), the sky's
-                     // word and feels-like, high and low
-      wa_txt(P, gl_title, c.name, CX, 34, 1, WA_TXT, ac, v, &halo_black, 300);
-      wa_sky_icon(P, wa_sky_now(c), CX, 84, 48, 0x000000, ac, v);
+    case WI_HERO: {  // the landing as Google's weather tile (docs/references/wear-os/surfaces/tiles/tiles-overview-relevant.png,
+                     // measured and scaled to 466 px): the city; one row — the sky, the temperature, high over low; the sky's
+                     // word under it with air; the next three hours in a pill. (Was a 154 px number stacked under a dot.)
+      wa_txt(P, gl_title, c.name, CX, 40, 1, WA_TXT, ac, v, &halo_black, 300);
       wx_deg(wa_now, sizeof(wa_now), c.now, "--");
-      char digits[8];
-      strlcpy(digits, wa_now, sizeof(digits));
-      if (char *deg = strstr(digits, "\xC2\xB0")) *deg = 0;
-      const float dw = halo_text_width(gl_wx_hero, digits);
-      wa_num(P, gl_wx_hero, wa_now, CX - dw / 2, 174, 0, WA_TXT, ac, v);
-      char f[8];
-      wx_deg(f, sizeof(f), c.feels, "--");
-      snprintf(wa_line, sizeof(wa_line), "%s \xC2\xB7 feels %s", wa_sky(wa_sky_now(c)), f);
-      wa_txt(P, gl_wx_line, wa_line, CX, 258, 1, WA_DIM, ac, v, &halo_black, 330);
       char hi[8], lo[8];
       wx_deg(hi, sizeof(hi), c.hi, "--"), wx_deg(lo, sizeof(lo), c.lo, "--");
-      snprintf(wa_hl, sizeof(wa_hl), "H %s  \xC2\xB7  L %s", hi, lo);
-      wa_txt(P, gl_wx_line, wa_hl, CX, 298, 1, WA_TXT, ac, v);
+      strlcpy(wa_hl, hi, sizeof(wa_hl)), strlcpy(wa_line, lo, sizeof(wa_line));
+      const float ry = 126, iw = 62, tw = halo_text_width(gl_wx_temp, wa_now);  // (the sky as tall as the digits' caps: the tile's)
+      const float hw = fmaxf(halo_text_width(gl_row_lab, wa_hl), halo_text_width(gl_row_lab, wa_line));
+      const float x0 = CX - (iw + 14 + tw + 18 + hw) / 2;  // (the row's ink centred: sky, 14 px, the number, 18 px, high/low)
+      wa_sky_icon(P, wa_sky_now(c), x0 + iw / 2, ry, iw, 0x000000, ac, v);
+      wa_num(P, gl_wx_temp, wa_now, x0 + iw + 14, ry, 0, WA_TXT, ac, v);
+      const float hx = x0 + iw + 14 + tw + 18;
+      wa_num(P, gl_row_lab, wa_hl, hx, ry - 17, 0, WA_TXT, ac, v);  // high over low, the low grey (the tile's)
+      wa_num(P, gl_row_lab, wa_line, hx, ry + 17, 0, WA_DIM, ac, v);
+      char f[8];
+      wx_deg(f, sizeof(f), c.feels, "--");
+      snprintf(wa_src, sizeof(wa_src), "%s \xC2\xB7 Feels like %s", wa_sky(wa_sky_now(c)), f);
+      wa_txt(P, gl_row_sub, wa_src, CX, 186, 1, UP_MUTED, ac, v, &halo_black, 320);
+      // the next three hours in a pill: the time, the sky, the degrees
+      const int first = wa_hours_from(c);
+      HaloItem &pill = up_item(P);
+      ui_rrect(pill, CX, 276, 300, 120, 60, 1, WA_CARD, first >= 0 ? ac : 0);  // (no time yet: no hours)
+      pill.on_black = true, up_commit(pill, v);
+      for (int j = 0; first >= 0 && j < 3; j++) {
+        const int hh = first + j;
+        if (hh >= WX_AHEAD || c.ht[hh] == WX_NONE) break;
+        const float x = CX + (j - 1) * 88;
+        const time_t t = c.t0 + hh * 3600;
+        struct tm m;
+        localtime_r(&t, &m);
+        wa_clock(wa_hour[j], m);
+        wa_txt(P, gl_row_sub, wa_hour[j], x, 238, 1, WA_DIM, ac, v, &pill);
+#if WX_MORE
+        const uint8_t sky = wx_sky_of(c.hk[hh], c.hsnow >> hh & 1);
+#else
+        const uint8_t sky = c.hk[hh] & 3;
+#endif
+        wa_sky_icon(P, sky, x, 274, 34, WA_CARD, ac, v);
+        wx_deg(wa_ht[j], 8, c.ht[hh], "--");
+        wa_num(P, gl_row_lab, wa_ht[j], x, 312, 1, WA_TXT, ac, v, &pill);
+      }
       break;
     }
     case WI_HEAD: {
@@ -221,9 +249,8 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
         struct tm m;
         localtime_r(&t, &m);
         char *hs = wa_hour[min(i, 11)], *ts = wa_ht[min(i, 11)];
-        if (i == 0) strlcpy(hs, "Now", 8);
-        else snprintf(hs, 8, "%02d:00", m.tm_hour);
-        wa_txt(P, gl_row_sub, hs, x, 32, 1, i == 0 ? WA_ACC : WA_DIM, ac, v, &card);
+        wa_clock(hs, m);  // (the first column is the next hour, not "Now": the landing says now)
+        wa_txt(P, gl_row_sub, hs, x, 32, 1, WA_DIM, ac, v, &card);
 #if WX_MORE
         const uint8_t sky = wx_sky_of(c.hk[hh], c.hsnow >> hh & 1);
 #else
@@ -363,7 +390,18 @@ static void wa_keep_location() {
 }
 
 // The screen (settings.h calls these)
-static void wxapp_enter() { up_open(&WA_APP); }
+static void wxapp_enter() {
+  static bool cmd;
+  if (!cmd) cmd = true, halo_command("wxt", [](const char *) {  // the forecast's clock against the watch's (serial: wxt)
+    const WxCity &c = wx_city[0];
+    const time_t now = time(nullptr), t0 = c.t0;
+    struct tm a, b;
+    localtime_r(&now, &a), localtime_r(&t0, &b);
+    LOG("wxt: now %lu (%02d:%02d), t0 %lu (%02d:%02d), first future slot %d\n", (unsigned long)now, a.tm_hour, a.tm_min,
+        (unsigned long)t0, b.tm_hour, b.tm_min, wa_hours_from(c));
+  });
+  up_open(&WA_APP);
+}
 static void wxapp_update(float dt) {
   wa_keep_location();
   up_update(dt);
