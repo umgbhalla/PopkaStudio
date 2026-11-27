@@ -197,6 +197,20 @@ or endorsed by any of them. Each broadcaster's own terms apply to your listening
 Broadcasters: to have your station taken out of the defaults (or put in), open an
 [issue](https://github.com/PopaSpinka/PopkaStudio/issues) or write to **lastmail.sk@gmail.com**.
 
+## Design references
+
+The round watch's interface is designed against Google's own: the Wear OS design guidelines (Material 3 Expressive)
+and every generation of Pixel Watch faces, kept in the repo in [docs/references](docs/references/README.md):
+
+- [`docs/references/wear-os/`](docs/references/wear-os) — images and GIFs from the 92 pages of the
+  [Wear OS design guides](https://developer.android.com/design/ui/wear/guides/get-started) (`sources.json` lists
+  them): app layouts, scrolling lists, tiles, colour, type.
+- [`docs/references/pixel-watch-faces/`](docs/references/pixel-watch-faces) — the Pixel Watch 1–5 faces.
+
+Scrolling lists, the Weather app and the face's widgets follow these; the [references' README](docs/references/README.md)
+says which picture each part follows. The pictures are Google's and their authors', kept for reference only — nothing
+from them goes into the firmware.
+
 ## Plans
 
 I'm going to keep developing PopkaStudio — I love ESP32 boards and devices like them, and making beautiful
