@@ -49,6 +49,9 @@ python3 tools/watch/sheet.py /tmp/sheet.png /tmp/r/*.png   # side by side, cut t
   step is a stepper/slider pill: − and + discs at the ends, the value between. Quick controls are round icon
   toggles (Pixel Watch's quick settings), not tiles. Ref: `docs/references/wear-os/surfaces/apps/layouts/scrolling/`
   (settings, toggle-buttons) and `m2-5/components/toggle-chips/`.
+- One card language: a card's name in `gl_row_lab` (28 px, 620), the line under it in `gl_row_sub` (22 px, 450,
+  `0x9E9E9E`), 32 px apart, the pair centred — settings rows, the Apps list, Weather's cards. Checked rows sit on the
+  accent's tonal container (Wear OS's primary container), never a bright accent fill.
 - Render every change, then check it on the device: `upcheck` for overlaps, `sheet.py --guides` for balance.
 
 ## Conventions

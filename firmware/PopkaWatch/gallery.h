@@ -122,6 +122,7 @@ static const char *gl_str(const char *s) {
 }
 
 // Text by the middle of its letters (mid — halo_text_mid) at (x, y), as WearKit places text; on — what it lies on
+extern const HaloFont gl_row_lab, gl_row_sub;  // (studio.py GALLERY_FONTS: the rows' type)
 static void gl_text_mid(HaloItem &it, const HaloFont &f, const char *s, float mid, float x, float y, float sc,
                         uint32_t color, float alpha, const HaloItem *on) {
   halo_item_text(it, f, s, mid, x, y, sc, 1, color, alpha, on);
@@ -329,8 +330,12 @@ static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       dc.kind = HI_CIRCLE, dc.x = ix, dc.y = iy, dc.r = 32, dc.scale = s, dc.color = L.color, dc.alpha = ac;
       dc.on_black = true;
       gl_text_mid(it[2], gl_ic24, gl_str(L.icon), gl_mid_icon, ix, iy, s, 0x1B1B1F, ac, &dc);
-      gl_text_base(it[3], gl_t24, gl_str(L.text), x0 + 104 * s, y0 + 46 * s, s, GL_TEXT, ac, &bg);
-      gl_text_base(it[4], gl_t20, gl_str(L.sub), x0 + 104 * s, y0 + 80 * s, s, GL_DIM, ac, &bg);
+      // the name and the line under it in the settings rows' type and spacing (upager.h up_row: one card language —
+      // a bold 28 px name, a lighter 22 px grey line, the pair centred on the card)
+      halo_item_text(it[3], gl_row_lab, gl_str(L.text), halo_text_mid(gl_row_lab, "Hxkdg"), x0 + 104 * s, y0 + (GL_ITEM_H / 2 - 15) * s, s, 0,
+                     GL_TEXT, ac, &bg);
+      halo_item_text(it[4], gl_row_sub, gl_str(L.sub), halo_text_mid(gl_row_sub, "Hxkdg"), x0 + 104 * s, y0 + (GL_ITEM_H / 2 + 17) * s, s, 0,
+                     GL_DIM, ac, &bg);
       // (Wear OS: a title or a line too long for the card is cut with an ellipsis, not run past the card's end)
       it[3].fit = it[4].fit = GL_ITEM_W - 104 - 28;
       for (int j = 0; j < 5; j++) halo_view_commit(it[j], v);

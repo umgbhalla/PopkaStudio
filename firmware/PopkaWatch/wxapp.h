@@ -30,7 +30,8 @@ static void wa_here() {
 // high), Details (Wear OS progress cards: humidity, wind, UV with a ring each; the sun's day as an arc), the source.
 // The house's tokens (the Apps list, gallery.h): cards 0x2E3034, full pills 410 wide, the Weather card's amber, warm
 // white and grey; the sky drawn in shapes (the face's pill: a yellow sun, a white cloud), no icon font.
-extern const HaloFont gl_wx_hero, gl_wx_line, gl_wx_val, gl_wx_week, gl_title, gl_t24, gl_t20;  // (studio.py GALLERY_FONTS)
+extern const HaloFont gl_wx_hero, gl_wx_line, gl_wx_val, gl_wx_week, gl_title, gl_t24;  // (studio.py GALLERY_FONTS; the cards'
+// names and lines in the rows' type: gl_row_lab, gl_row_sub — upager.h)
 #define WA_ACC 0xFFB030    // the Weather card's colour (the Apps list)
 #define WA_CARD 0x2E3034   // the house's card
 #define WA_TXT 0xFFF8EE    // warm white
@@ -222,7 +223,7 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
         char *hs = wa_hour[min(i, 11)], *ts = wa_ht[min(i, 11)];
         if (i == 0) strlcpy(hs, "Now", 8);
         else snprintf(hs, 8, "%02d:00", m.tm_hour);
-        wa_txt(P, gl_t20, hs, x, 32, 1, i == 0 ? WA_ACC : WA_DIM, ac, v, &card);
+        wa_txt(P, gl_row_sub, hs, x, 32, 1, i == 0 ? WA_ACC : WA_DIM, ac, v, &card);
 #if WX_MORE
         const uint8_t sky = wx_sky_of(c.hk[hh], c.hsnow >> hh & 1);
 #else
@@ -243,11 +244,11 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
       struct tm m;
       localtime_r(&t, &m);
       const float y = h / 2;
-      wa_txt(P, gl_t24, d ? WD[m.tm_wday] : "Today", WA_X0 + 38, y, 0, WA_TXT, ac, v, &card);
-      wa_sky_icon(P, wx_sky_of(c.dk[d], c.dsnow >> d & 1), WA_X0 + 150, y, 36, WA_CARD, ac, v);
+      wa_txt(P, gl_row_lab, d ? WD[m.tm_wday] : "Today", WA_X0 + 38, y, 0, WA_TXT, ac, v, &card);
+      wa_sky_icon(P, wx_sky_of(c.dk[d], c.dsnow >> d & 1), WA_X0 + 164, y, 36, WA_CARD, ac, v);  // (clear of "Today")
       int lo = 999, hi = -999;
       for (int j = 0; j < WX_DAYS && c.dhi[j] != WX_NONE; j++) lo = min(lo, (int)c.dlo[j]), hi = max(hi, (int)c.dhi[j]);
-      const float span = max(4, hi - lo), bx0 = 262, bx1 = 330;
+      const float span = max(4, hi - lo), bx0 = 272, bx1 = 334;
       wx_deg(wa_day[d][0], 8, c.dlo[d], "--"), wx_deg(wa_day[d][1], 8, c.dhi[d], "--");
       wa_num(P, gl_wx_week, wa_day[d][0], bx0 - 12, y, 2, WA_DIM, ac, v, &card);
       wa_bar(P, bx0, bx1, y, 8, WA_TRACK, ac, v);
@@ -269,9 +270,9 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
       else snprintf(wa_det[2], 8, "%d", (u + 5) / 10), fr = u / 110.0f,
            sub = u < 30 ? "Low" : u < 60 ? "Moderate" : u < 80 ? "High" : "Very high";
       const float lx = WA_X0 + 52;
-      wa_txt(P, gl_t20, LAB[w.arg], lx, 36, 0, WA_ACC, ac, v, &card);
+      wa_txt(P, gl_row_sub, LAB[w.arg], lx, 36, 0, WA_ACC, ac, v, &card);
       wa_num(P, gl_wx_val, wa_det[w.arg], lx, 78, 0, WA_TXT, ac, v, &card);
-      if (*sub) wa_txt(P, gl_t20, sub, lx + halo_text_width(gl_wx_val, wa_det[w.arg]) + 10, 82, 0, WA_DIM, ac, v, &card);
+      if (*sub) wa_txt(P, gl_row_sub, sub, lx + halo_text_width(gl_wx_val, wa_det[w.arg]) + 10, 82, 0, WA_DIM, ac, v, &card);
       HaloItem &ring = up_item(P);
       ring.kind = HI_RING, ring.x = WA_X1 - 82, ring.y = h / 2, ring.r = 30, ring.w = 9, ring.v = halo_clamp01(fr);
       ring.scale = 1, ring.color = WA_ACC, ring.color2 = WA_TRACK, ring.alpha = ac, ring.on_black = true, ring.on = nullptr;
@@ -292,11 +293,11 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
       }
       const float an = -HALO_PI / 2 + HALO_PI * fr;
       if (fr > 0 && fr < 1) wa_dot(P, CX + r * sinf(an), ay - r * cosf(an), 11, WA_SUNC, ac, v);
-      wa_txt(P, gl_t20, "Sunrise", WA_X0 + 70, 124, 1, WA_DIM, ac, v);
-      wa_txt(P, gl_t20, "Sunset", WA_X1 - 70, 124, 1, WA_DIM, ac, v);
+      wa_txt(P, gl_row_sub, "Sunrise", WA_X0 + 70, 124, 1, WA_DIM, ac, v);
+      wa_txt(P, gl_row_sub, "Sunset", WA_X1 - 70, 124, 1, WA_DIM, ac, v);
       wa_hhmm(wa_rise_s, 8, c.rise), wa_hhmm(wa_set_s, 8, c.set);
-      wa_txt(P, gl_t24, wa_rise_s, WA_X0 + 70, 92, 1, WA_TXT, ac, v);
-      wa_txt(P, gl_t24, wa_set_s, WA_X1 - 70, 92, 1, WA_TXT, ac, v);
+      wa_txt(P, gl_row_lab, wa_rise_s, WA_X0 + 70, 92, 1, WA_TXT, ac, v);
+      wa_txt(P, gl_row_lab, wa_set_s, WA_X1 - 70, 92, 1, WA_TXT, ac, v);
       break;
     }
 #endif
@@ -309,7 +310,7 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
       } else {
         strlcpy(wa_src, "Open-Meteo", sizeof(wa_src));
       }
-      wa_txt(P, gl_t20, wa_src, CX, h / 2, 1, WA_DIM, ac, v);
+      wa_txt(P, gl_row_sub, wa_src, CX, h / 2, 1, WA_DIM, ac, v);
       break;
     }
     case WI_UNIT: {
