@@ -96,7 +96,7 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_title(P, "Music", a, v);
     const bool have = mu_n > 0;
     const float fr = have ? halo_clamp01(pl_elapsed / pl_len[pl_cur]) : 0;
-    up_arc(P, UP_RING_R, UP_RING_W, UP_A0, UP_A0 + UP_SWEEP, MU_RING, a, v);
+    up_arc(P, UP_RING_R, UP_RING_W, UP_A0, UP_A0 + UP_SWEEP, MU_RING, fr > 0.001f ? a : 0, v);  // (the track only with progress)
     // the progress in fixed 12° pieces (same colour: their round ends meet unseen): as it grows only its last piece is
     // drawn again, and each piece's box keeps to the rim (one arc's box would cover the dial)
     const float end = UP_A0 + UP_SWEEP * fr;
@@ -107,12 +107,12 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
     if (have) {
       const MuTrack &t = mu_tracks[pl_cur];
       mmss(mu_el, sizeof(mu_el), pl_elapsed);
-      mu_text(P, gl_up_disp, mu_el, CX, 178, 1, UP_WHITE, a, v);
+      mu_text(P, gl_up_disp, mu_el, CX, 168, 1, UP_WHITE, a, v);
       char len[8];
       mmss(len, sizeof(len), pl_len[pl_cur]);
       snprintf(mu_of, sizeof(mu_of), "OF %s", len);
-      mu_text(P, gl_up_lab, mu_of, CX, 231, 1, MU_ACC, a, v);
-      mu_text(P, gl_mu_track, t.title, CX, 265, 1, UP_WHITE, a, v, &halo_black, 300);
+      mu_text(P, gl_up_lab, mu_of, CX, 233, 1, MU_ACC, a, v);  // (clear of the digits' feet)
+      mu_text(P, gl_mu_track, t.title, CX, 268, 1, UP_WHITE, a, v, &halo_black, 300);
       mu_text(P, gl_mu_lab, t.artist, CX, 297, 1, UP_MUTED, a, v, &halo_black, 250);
     } else {  // (no tracks: where they come from)
       mu_text(P, gl_mu_opt, "No music", CX, 209, 1, UP_WHITE, a, v);

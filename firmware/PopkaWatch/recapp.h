@@ -171,13 +171,13 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_text(P, gl_up_lab, "KEPT IN MEMORY ONLY", up_mid_lab, CX, 236, 1, UP_MUTED, a, v);
     up_text(P, gl_up_lab, "RECORDING AGAIN REPLACES IT", up_mid_lab, CX, 258, 1, UP_MUTED, a, v);
   } else {  // Recorder settings
-    up_title(P, "Recorder settings", a, v);
-    up_rrect(P, 74, 126, 392, 267, 28, RA_PANEL, a, v);
+    up_title(P, "Settings", a, v);  // (the app's name is the page before: a short title keeps clear of the rim)
+    up_rrect(P, 74, 126, 392, 274, 28, RA_PANEL, a, v);
     HaloItem &card = P.it[P.n - 1];
-    up_text(P, gl_up_title, "Clip limit", up_mid_title, CX, 146, 1, UP_WHITE, a, v, &card);
+    up_text(P, gl_up_lab, "CLIP LIMIT", up_mid_lab, CX, 146, 1, RA_ACC, a, v, &card);  // (a label, not a second title over the number)
     snprintf(ra_lim, sizeof(ra_lim), "%d", rc_limit_s);
     up_text(P, gl_up_disp, ra_lim, up_mid_disp, CX, 206, 1, UP_WHITE, a, v, &card);
-    up_text(P, gl_up_lab, "SECONDS", up_mid_lab, CX, 254, 1, UP_MUTED, a, v, &card);
+    up_text(P, gl_up_lab, "SECONDS", up_mid_lab, CX, 259, 1, UP_MUTED, a, v, &card);
     for (int k = 0; k < 2; k++) {  // − and +: quiet at the ends (no hit there)
       const float x = k ? 347 : 119;
       const bool on = k ? rc_limit_s < RA_LIMITS[2] : rc_limit_s > RA_LIMITS[0];
@@ -185,14 +185,14 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
       const char *ic = k ? RA_IC_PLUS : RA_IC_MINUS;
       up_text(P, gl_ra_ic26, ic, halo_text_mid(gl_ra_ic26, ic), x, 203, 1, on ? RA_ACC : RA_QUIET, a, v, &d);
     }
-    up_rrect(P, 80, 280, 386, 350, 24, RA_PANEL, a, v);
+    up_rrect(P, 80, 284, 386, 352, 24, RA_PANEL, a, v);
     HaloItem &lv = P.it[P.n - 1];
-    up_text(P, gl_up_title, "Level audio", up_mid_title, 104, 305, 0, UP_WHITE, a, v, &lv);
+    up_text(P, gl_t24, "Level audio", halo_text_mid(gl_t24, "Lvl"), 104, 305, 0, UP_WHITE, a, v, &lv);  // (the house's row type: clear of the switch)
     up_text(P, gl_up_lab, "EVEN OUT PLAYBACK", up_mid_lab, 104, 331, 0, UP_MUTED, a, v, &lv);
     const float s = halo_clamp01(ra_sw.x);  // the switch: off — the secondary fill, a muted thumb left; on — coral
     up_rrect(P, 303, 298, 366, 332, 17, ui_mix(RA_CTRL, RA_ACC, s), a, v);
     up_disc(P, 321 + 27 * s, 315, 12, ui_mix(UP_MUTED, RA_INK, s), a, v);
-    if (!rc_len) strlcpy(ra_sum, "NO CLIPS", sizeof(ra_sum));
+    if (!rc_len) ra_sum[0] = 0;  // (nothing to say: the Recordings page says it)
     else snprintf(ra_sum, sizeof(ra_sum), "1 CLIP  /  %.1f MB IN MEMORY", rc_len * 2 / 1e6f);
     up_text(P, gl_up_lab, ra_sum, up_mid_lab, CX, 381, 1, UP_MUTED, a, v);
   }
