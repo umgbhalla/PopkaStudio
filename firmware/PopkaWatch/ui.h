@@ -114,7 +114,7 @@ static float ur_height(const UiRow &r) {
 
 // ---------- A page on screen ----------
 #define UI_IT 9  // items a row: surface, chip, glyph, title, line, track, fill, and two at the end (chevron, −/+, thumb)
-extern const HaloFont gl_up_clock;  // (the time text: studio.py GALLERY_FONTS)
+extern const HaloFont gl_up_clock, gl_row_lab, gl_row_sub;  // (the time text, the rows' type: studio.py GALLERY_FONTS)
 struct UiRun {
   const UiPage *pg;
   HaloList list;
@@ -261,7 +261,7 @@ static void ui_layout(int k, const HaloView &v) {
   const UiPage &pg = *R.pg;
   const uint32_t pri = pg.accent;
   const HaloListFx &hf = R.list.fx[0];
-  ui_text(R.title, gl_t24, pg.title, ui_mid_t24, CX, hf.top + GL_HEAD_H * hf.s / 2, hf.s, 1, GL_TEXT, hf.a_bg, &halo_black, 300);
+  ui_text(R.title, gl_title, pg.title, ui_mid_title, CX, hf.top + GL_HEAD_H * hf.s / 2, hf.s, 1, GL_TEXT, hf.a_bg, &halo_black, 300);  // (every screen's title: the Apps list's 34 px)
   R.title.on_black = true;
   halo_view_commit(R.title, v);
   // The time along the top edge: over the first 36 dp of scrolling it goes up 24 dp and shrinks to 0.5, then is gone
@@ -330,9 +330,11 @@ static void ui_layout(int k, const HaloView &v) {
       else if (r.text) r.text(buf, 32);
       const bool two = buf[0] != 0;
       const float fit = GL_ITEM_W - (r.icon ? 78 : 32) - (r.kind == UR_TOGGLE ? 96 : 32);
-      ui_text(it[3], gl_t24, r.title, ui_mid_t24, tx, two ? y0 + 38 * s : cy, s, 0, GL_TEXT, ac, &it[0], fit);
+      // the card language (upager.h up_row, gallery.h): a bold name, a lighter grey line under it, the pair centred
+      static const float mid_l = halo_text_mid(gl_row_lab, "Hxkdg"), mid_s = halo_text_mid(gl_row_sub, "Hxkdg");
+      ui_text(it[3], gl_row_lab, r.title, mid_l, tx, two ? cy - 15 * s : cy, s, 0, on ? ui_on_container(acc) : GL_TEXT, ac, &it[0], fit);
       if (two)
-        ui_text(it[4], gl_t20, buf, ui_mid_t20, tx, y0 + 70 * s, s, 0, r.kind == UR_CHOICE ? acc : on ? ui_on_container(acc) : UI_DIM,
+        ui_text(it[4], gl_row_sub, buf, mid_s, tx, cy + 17 * s, s, 0, r.kind == UR_CHOICE ? acc : on ? ui_on_container(acc) : UI_DIM,
                 ac, &it[0], fit);
       if (radio) {  // the radio mark: a ring; picked — the primary's disc in it
         const float sx = x0 + w - 44 * s;

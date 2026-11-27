@@ -96,7 +96,7 @@ static void sy_set_vol(int v) { vol_set(v, false), sy_put("vol", vol_level); }
 // ---------- What the rows say ----------
 static void sy_display_line(char *o, int n) {
 #if HAS_DISPLAY
-  snprintf(o, n, "Brightness %d · Always On %s", dp_value, pw_aod_on ? "on" : "off");
+  snprintf(o, n, pw_aod_on ? "Brightness %d · Always On" : "Brightness %d", dp_value);  // (not "Always On on")
 #else
   snprintf(o, n, "Always On %s", pw_aod_on ? "on" : "off");
 #endif
