@@ -74,7 +74,7 @@ static const char *mu_source() {
 static float mu_m, mu_m0, mu_m1, mu_mt = 9;  // the morph now, from, to, s since it was asked
 static float mu_sw[2];                        // the switches' thumbs 0 (off) … 1 (on)
 static int mu_qn, mu_qi[3];                   // the queue's rows: how many, which tracks
-static char mu_el[8], mu_of[12], mu_vol_s[4], mu_q[3][2][8];
+static char mu_el[8], mu_of[12], mu_vol_s[4], mu_q[3][2][8], mu_q2[3][72];
 static float mu_away;  // s on an awake screen without the Music screen laid out
 static bool mu_watch;  // the Music screen was up: leaving it pauses (Background off)
 
@@ -156,15 +156,17 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
       const int i = (pl_cur + 1 + k) % mu_n;
       const float y = MU_ROW_Y[k];
       mu_qi[k] = i;
-      up_rrect(P, 77, y - 33, 389, y + 33, 22, k ? MU_PANEL : MU_TONE, a, v);
+      // (the card language: a full pill, the number in a disc concentric with its end, the title bold over a grey line
+      // — the composer and the length)
+      up_rrect(P, 58, y - 38, 408, y + 38, 38, k ? MU_PANEL : MU_TONE, a, v);
       HaloItem &card = P.it[P.n - 1];
-      HaloItem &badge = up_disc(P, 106, y, 18, k ? MU_RING : MU_ACC, a, v);
+      HaloItem &badge = up_disc(P, 96, y, 24, k ? MU_RING : MU_ACC, a, v);
       snprintf(mu_q[k][0], 8, "%02d", i + 1);
-      mu_text(P, gl_up_lab, mu_q[k][0], 106, y, 1, k ? MU_ACC : MU_INK, a, v, &badge);
-      mu_text(P, gl_mu_queue, mu_tracks[i].title, 137, y - 11, 0, UP_WHITE, a, v, &card, 227);
-      mu_text(P, gl_mu_lab, mu_tracks[i].artist, 137, y + 15.5f, 0, UP_MUTED, a, v, &card, 177);
+      mu_text(P, gl_up_lab, mu_q[k][0], 96, y, 1, k ? MU_ACC : MU_INK, a, v, &badge);
+      mu_text(P, gl_row_lab, mu_tracks[i].title, 132, y - 14, 0, UP_WHITE, a, v, &card, 246);
       mmss(mu_q[k][1], 8, pl_len[i]);
-      mu_text(P, gl_up_lab, mu_q[k][1], 364, y + 15.5f, 2, MU_ACC, a, v, &card);
+      snprintf(mu_q2[k], sizeof(mu_q2[k]), "%s \xC2\xB7 %s", mu_tracks[i].artist, mu_q[k][1]);
+      mu_text(P, gl_row_sub, mu_q2[k], 132, y + 16, 0, 0x9E9E9E, a, v, &card, 246);
     }
     if (!mu_qn) mu_text(P, gl_mu_opt, "No upcoming tracks", CX, 233, 1, UP_MUTED, a, v);
   }  // (3, Settings: a list — mu_lay_item)
@@ -191,7 +193,7 @@ static void mu_tap(int p, float x, float y) {
   } else if (p == 2) {
     for (int k = 0; k < mu_qn; k++) {
       const float cy = MU_ROW_Y[k];
-      if (up_in(x, y, 77, cy - 33, 389, cy + 33)) return mu_pick(mu_qi[k]), up_go(0);
+      if (up_in(x, y, 58, cy - 38, 408, cy + 38)) return mu_pick(mu_qi[k]), up_go(0);
     }
   } else {
     const int k = up_list_hit(3, y);  // (the settings list: 1 — repeat, 2 — background)

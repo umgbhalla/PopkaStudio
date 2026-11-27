@@ -40,7 +40,7 @@ static int ra_back_page = 1;  // the page Back returns to
 static HaloSpring ra_morph, ra_pmorph, ra_sw;  // the capture button's lobes; the playback's; Level audio's thumb
 static HaloSpringK K_RA;
 static float ra_ov[RA_BARS];  // the clip's overview (bar heights), made when the child opens
-static char ra_time[8], ra_cap[16], ra_dur[8], ra_stamp[24], ra_sum[40], ra_lim[4];
+static char ra_time[8], ra_cap[16], ra_dur[8], ra_stamp[24], ra_sum[40], ra_lim[8];  // (ra_lim: "120 s")
 static float ra_mid_mic, ra_mid_stop, ra_mid_list, ra_mid_back, ra_mid_pm, ra_mid_play19, ra_mid_dur;
 static Preferences ra_prefs;
 static int ra_owner;  // (the horizontal drag held while recording)
@@ -146,8 +146,8 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     }
     char lim[8];
     mmss(lim, sizeof(lim), rc_limit_s, true);
-    snprintf(ra_cap, sizeof(ra_cap), rec ? "RECORDING" : "UP TO %s", lim);
-    up_text(P, gl_up_lab, ra_cap, up_mid_lab, CX, 282, 1, rec ? RA_ACC : UP_MUTED, a, v, &card);
+    snprintf(ra_cap, sizeof(ra_cap), rec ? "Recording" : "Up to %s", lim);  // (the card language's grey line, sentence case)
+    up_text(P, gl_row_sub, ra_cap, halo_text_mid(gl_row_sub, "Hxkdg"), CX, 282, 1, rec ? RA_ACC : 0x9E9E9E, a, v, &card);
     ra_secondary(P, rec ? RA_PANEL : RA_CTRL, RA_IC_LIST, ra_mid_list, rec ? RA_QUIET : RA_ACC, a, v);
     ra_primary(P, ra_morph.x, rec ? gl_ra_ic38 : gl_ra_ic43, rec ? RA_IC_STOP : RA_IC_MIC, rec ? ra_mid_stop : ra_mid_mic, a, v);
   } else if (p == 1) {  // Recordings
