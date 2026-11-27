@@ -32,7 +32,7 @@ function fetchBlob(kind, key, body) {
 // A layer's font (null — it has none: the icon, the dots, the Steps chart — its letters are the board's own) and icons
 // (the face's pill, the big icon, the hourly pill's)
 const PILLS = new Set(['weather', 'hourly', 'steps']), WX_ICONS = new Set(['weather', 'wxicon', 'hourly']);
-const NO_FONT = new Set(['wxicon', 'dots', 'parrot', 'stchart', 'stepring', 'batring', 'dotclock', 'rline']);
+const NO_FONT = new Set(['wxicon', 'dots', 'parrot', 'stchart', 'stepring', 'batring', 'batpill', 'dotclock', 'rline']);
 // A clock of sclock.h: font n of its look (studio.py SC_LOOKS), at its size
 const scKey = (l, n) => (clockLook(l)[4] > n ? `font${n + 1}|sclock|${l.look}|${l.scale}` : null);
 export const fontKey = (l) => (l.type === 'sclock' ? scKey(l, 0) : NO_FONT.has(l.type) || KINDS[l.type].fixed ? null

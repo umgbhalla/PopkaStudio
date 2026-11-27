@@ -11,7 +11,7 @@
 extern const HaloFont gl_up_hero, gl_up_disp, gl_up_pick, gl_up_title, gl_up_clock, gl_up_num, gl_up_pre, gl_up_lab,
     gl_up_ic43, gl_up_ic32, gl_up_ic24;  // (studio.py GALLERY_FONTS)
 #define UP_PAGES 8
-#define UP_IT 128
+#define UP_IT 192
 #define UP_BLOBS 3
 #define UP_IC_PLAY "\xEF\x81\x8B"
 #define UP_IC_PAUSE "\xEF\x81\x8C"
@@ -59,6 +59,14 @@ struct UpApp {
   uint32_t accent;
   float (*height)(int p);  // a page taller than the screen scrolls up and down (nullptr, ≤ 466 — it does not)
   bool wrap;               // the pages go round: past the last — the first, before the first — the last
+  // A page as a Wear OS list (TransformingLazyColumn: lib/Halo's HaloList — the gallery's scroll): its items one under
+  // another, each shrinking to 0.6 and fading at the circle's edges, inertia and rubber, the scroll indicator at the
+  // right rim. items(p) > 0 — page p is a list; item k is item_h(p, k) px tall and laid out by lay_item in its own
+  // coordinates (x — the screen's, y — from its top), abg — its card's alpha, ac — its content's; item 0 — a header (does
+  // not shrink). The app's tap gets screen coordinates: up_list_hit says which item
+  int (*items)(int p) = nullptr;
+  float (*item_h)(int p, int k) = nullptr;
+  void (*lay_item)(int p, int k, UpPage &P, float abg, float ac, const HaloView &v) = nullptr;
 };
 static const UpApp *up_app;
 static UpPage *up_pg;  // [UP_PAGES], PSRAM
@@ -71,6 +79,28 @@ static float up_vy0, up_vg0;
 static int up_vowner;
 static float up_x0, up_g0;
 static HaloItem up_track, up_fill, up_clock, up_dot[UP_PAGES];
+// The list pages (UpApp.items): one HaloList a page, rebuilt when its items' heights change; the scroll indicator
+#define UP_LIST_TOP 64.0f
+#define UP_LIST_BOTTOM 420.0f
+static HaloList up_ls[UP_PAGES];
+static uint32_t up_ls_key[UP_PAGES];
+static HaloItem up_sc[3];
+static HaloSpring up_sc_pos, up_sc_vis;
+static uint32_t up_sc_idle;
+static inline bool up_is_list(int p) { return up_app && up_app->items && up_app->items(p) > 0; }
+static void up_list_sync(int p) {  // (heights from the app; a change — the list again, from the top)
+  const int n = min(up_app->items(p), HALO_LIST_MAX);
+  float h[HALO_LIST_MAX];
+  uint32_t key = 2166136261u ^ n;
+  for (int k = 0; k < n; k++) h[k] = up_app->item_h(p, k), key = (key ^ (uint32_t)(h[k] * 4)) * 16777619u;
+  if (key == up_ls_key[p]) return;
+  const bool fresh = !up_ls_key[p];
+  const float was = up_ls[p].scroll;
+  up_ls_key[p] = key;
+  halo_list_init(up_ls[p], h, n, UP_LIST_TOP, UP_LIST_BOTTOM, true);
+  if (!fresh) up_ls[p].scroll = constrain(was, halo_list_min(up_ls[p]), UP_LIST_TOP);  // (same place, if it still fits)
+}
+static int up_list_hit(int p, float y) { return up_is_list(p) ? halo_list_hit(up_ls[p], y) : -1; }
 static HaloMask up_clock_mask;
 static char up_clock_of[8];
 static float up_clock_x, up_clock_y;
@@ -100,6 +130,11 @@ static void up_open(const UpApp *app, int page = 0) {
   halo_spring_set(up_pos, page);
   up_vdrag = false;
   for (int p = 0; p < UP_PAGES; p++) up_vis[p] = true, halo_spring_set(up_sy[p], 0);  // (each hidden once below, if not seen)
+  if (app->items) {  // (a list app: its lists from the top, the indicator hidden; another app's pager leaves them be)
+    for (int p = 0; p < UP_PAGES; p++) up_ls_key[p] = 0;
+    halo_spring_set(up_sc_vis, 0), up_sc_idle = 0;
+  }
+  for (HaloItem &s : up_sc) s.alpha = 0, halo_item_commit(s);
 }
 static inline int up_count() { return up_app && up_app->count ? constrain(up_app->count(), 1, UP_PAGES) : 1; }
 static void up_go(int page) { up_page = constrain(page, 0, up_count() - 1), up_pos.target = up_page; }
@@ -247,7 +282,16 @@ static void up_update(float dt) {
   }
   // Scrolling the page in front up and down (a page taller than the screen): under the finger, rubber past the ends,
   // a fling carries on and settles on the spring
-  const float hmax = up_app->height ? fmaxf(0, up_app->height(up_page) - HALO_H) : 0;
+  const bool list = up_is_list(up_page);
+  if (list) {
+    up_list_sync(up_page);
+    HaloList &l = up_ls[up_page];
+    halo_list_update(l, dt, !up_drag);
+    if (l.flinging || f.owner == &l) up_sc_idle = halo_ms();
+    up_sc_pos.target = halo_list_progress(l), up_sc_vis.target = up_sc_idle && halo_ms() - up_sc_idle < 2000 ? 1 : 0;
+    halo_spring_run(up_sc_pos, K_UP, dt), halo_spring_run(up_sc_vis, K_UP, dt);
+  }
+  const float hmax = !list && up_app->height ? fmaxf(0, up_app->height(up_page) - HALO_H) : 0;
   HaloSpring &sy = up_sy[up_page];
   if (hmax > 0 && !up_drag && f.drag_start && !f.horiz && halo_finger_claim(&up_vowner)) up_vdrag = true, up_vy0 = f.y, up_vg0 = sy.x;
   if (up_vdrag) {
@@ -263,7 +307,7 @@ static void up_update(float dt) {
     halo_spring_run(sy, K_UP, dt);
   }
   if (!up_drag && !up_vdrag && f.tap && !f.owner && fabsf(up_pos.x - up_page) < 0.05f && up_app->tap)
-    up_app->tap(up_page, f.x, f.y + sy.x);  // (in the page's own coordinates: scrolled)
+    up_app->tap(up_page, f.x, f.y + (list ? 0 : sy.x));  // (in the page's own coordinates: scrolled; a list's — the screen's)
   if (up_app->update) up_app->update(up_page, dt);
 }
 
@@ -273,13 +317,19 @@ static void up_layout(const HaloView &v) {
   const uint32_t acc = up_app->accent;
   // The rim: the track, the progress over it (fixed: it does not move with the pages)
   const float fr = up_app->ring ? up_app->ring() : -2;
+  // How far the page in front is scrolled: the time (and on a list, the rim's ring) goes away over its first 60 px
+  const bool lst = up_is_list(up_page);
+  const float sc = up_page >= UP_PAGES ? 0 : lst ? up_ls[up_page].top - up_ls[up_page].scroll : up_sy[up_page].x;
+  // The rim's ring is the first page's, and only while it carries progress: no empty track framing an idle screen
+  // (the user, 28 Nov 2026: the arcs fought the dots and the titles); it fades as the pages swipe away from the first
+  const float gone = halo_clamp01(sc / 60), ring_a = (lst ? 1 - gone : 1) * halo_clamp01(1 - fabsf(up_pos.x));
   for (HaloItem *it : {&up_track, &up_fill}) {
-    it->kind = HI_ARC, it->x = CX, it->y = CY, it->r = UP_RING_R, it->w = UP_RING_W, it->scale = 1, it->on_black = true;
-    it->on = nullptr;
+    it->kind = HI_ARC, it->x = CX, it->y = CY, it->r = UP_RING_R, it->w = UP_RING_W, it->scale = 1;
+    it->on_black = true, it->on = nullptr;
   }
-  up_track.a0 = UP_A0, up_track.a1 = UP_A0 + UP_SWEEP, up_track.color = UP_TRACK, up_track.alpha = fr > -1.5f ? 1 : 0;
+  up_track.a0 = UP_A0, up_track.a1 = UP_A0 + UP_SWEEP, up_track.color = UP_TRACK, up_track.alpha = fr > 0.001f ? ring_a : 0;
   up_fill.a0 = UP_A0, up_fill.a1 = UP_A0 + UP_SWEEP * halo_clamp01(fr), up_fill.color = acc;
-  up_fill.alpha = fr > 0.001f ? 1 : 0;
+  up_fill.alpha = fr > 0.001f ? ring_a : 0;
   halo_view_commit(up_track, v), halo_view_commit(up_fill, v);
   for (int p = 0; p < UP_PAGES; p++) {
     UpPage &P = up_pg[p];
@@ -301,10 +351,24 @@ static void up_layout(const HaloView &v) {
     }
     up_vis[p] = true;
     HaloView pv = v;
-    pv.x += dx * v.s, pv.y -= up_sy[p].x * v.s;  // (moved by the swipe, and up by its scroll)
+    const bool list = up_is_list(p);
+    pv.x += dx * v.s, pv.y -= (list ? 0 : up_sy[p].x) * v.s;  // (moved by the swipe, and up by its scroll)
     const int was = P.n, wasb = P.nb;
     P.n = 0, P.nb = 0, P.edge = false;
-    up_app->lay(p, P, 1, pv);
+    if (list) {
+      up_list_sync(p);
+      const HaloList &l = up_ls[p];
+      for (int k = 0; k < l.n; k++) {
+        if (!halo_list_item_visible(l, k)) continue;
+        const HaloListFx &fx = l.fx[k];
+        // the item's own view: its top at fx.top, scaled by fx.s about the screen's middle line, through the page's
+        HaloView iv = pv;
+        iv.s = pv.s * fx.s, iv.y = pv.y + (fx.top - HALO_H / 2.0f) * pv.s + HALO_H / 2.0f * iv.s;
+        up_app->lay_item(p, k, P, fx.a_bg, fx.a_c, iv);
+      }
+    } else {
+      up_app->lay(p, P, 1, pv);
+    }
     for (int i = P.n; i < was; i++) P.it[i].alpha = 0, halo_view_commit(P.it[i], pv);  // (fewer than last frame)
     for (int k = P.nb; k < wasb; k++) {  // (a shape no longer there)
       UpBlob &b = P.b[k];
@@ -322,7 +386,19 @@ static void up_layout(const HaloView &v) {
   c.kind = HI_MASK, c.mask = &up_clock_mask, c.color = UP_MUTED, c.on_black = true, c.on = &halo_black, c.scale = 1;
   // (a page scrolled down: the time goes up and away with its first 60 px, as Wear OS's time text — the content never
   // runs under it)
-  const float sc = up_app && up_page < UP_PAGES ? up_sy[up_page].x : 0, gone = halo_clamp01(sc / 60);
+  if (lst) {  // (a list: the scroll indicator — ScrollIndicator, as the gallery's)
+    const HaloList &l = up_ls[up_page];
+    const float r = 226, len = 100 / r, gp = 18 / r, a0 = HALO_PI / 2 - len / 2;
+    const float size = len * constrain(halo_list_visible(l), 0.3f, 0.7f), t0 = a0 + (len - size) * halo_clamp01(up_sc_pos.x);
+    const float t1 = t0 + size, al = up_sc_vis.x > 0.01f ? fminf(1, up_sc_vis.x) : 0;
+    const float from[3] = {a0, t1 + gp, t0}, to[3] = {t0 - gp, a0 + len, t1};
+    for (int j = 0; j < 3; j++) {
+      HaloItem &s = up_sc[j];
+      s.kind = HI_ARC, s.x = CX, s.y = CY, s.r = r, s.w = 10, s.scale = 1, s.a0 = from[j], s.a1 = to[j];
+      s.color = j == 2 ? 0xC6C6C6 : 0x333333, s.on_black = true, s.on = nullptr, s.alpha = from[j] < to[j] ? al : 0;
+      halo_view_commit(s, v);
+    }
+  }
   c.x = CX, c.y = 38 - 50 * gone, c.alpha = up_clock_mask.bits ? 1 - gone : 0;
   halo_view_commit(c, v);
   // The page dots: the one in front r5 in the accent, the others r4 (none with one page)
@@ -351,6 +427,7 @@ static void up_draw() {
   }
   halo_item_draw(up_clock);
   for (HaloItem &d : up_dot) halo_item_draw(d);
+  for (HaloItem &s : up_sc) halo_item_draw(s);
 }
 
 // ---------- More than one pager at once (the launcher under an app, the quick settings over one) ----------

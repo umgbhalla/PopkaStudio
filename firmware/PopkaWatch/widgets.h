@@ -7,6 +7,9 @@
 //   Steps ring (FL_STEPRING)     — today's steps to the goal (p) along the bezel: radius p2, thickness 6·k, the accent
 //                                (color — the Steps pill's ring too), the track (color2);
 //   Battery ring (FL_BATRING)    — the same ring, the battery's charge (the power chip's percent): radius p;
+//   Battery pill (FL_BATPILL)    — a small battery: a pill (color2) with its nub, the charge filling it from the left
+//                                (color; charging — green, 15 % and under — red), the percent inside without "%";
+//                                its size k, centred over the date;
 //   Week (FL_WEEKARC)             — the days' letters along an arc (radius p; its middle at angle p3, degrees from 12
 //                                o'clock; the letters upright, on the bottom half left to right, as curved text's),
 //                                today in a circle (color3), the days gone — color, the days ahead — color2;
@@ -22,6 +25,17 @@
 // (wg_tick: one a frame, as Battery's words), the rest are plain items.
 // Included from face.h after stepscreen.h (wx_day, wx_deg, wx_city; fc_time, fc_h24, fc_steps — HAS_STEPS).
 
+// The battery pill's middle: just over the date (round: its capitals' middle at FACE_DATE_Y; a rectangle: the status line)
+#ifdef HALO_ROUND
+#define BP_Y (FACE_DATE_Y - 46 * FACE_SCALE * 0.83f)
+#else
+#define BP_Y (RH_LINE_Y + 40)
+#endif
+extern const HaloFont gl_t20, gl_ic24;
+static inline uint32_t wg_mix(uint32_t a, uint32_t b, float t) {  // a → b by t
+  auto ch = [&](int sh) { return (uint32_t)((a >> sh & 255) + ((int)(b >> sh & 255) - (int)(a >> sh & 255)) * t) << sh; };
+  return ch(16) | ch(8) | ch(0);
+}
 static const char *const WEEKDAY_FULL[7] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY",
                                             "SATURDAY"};
 static const char *const MONTH_FULL[12] = {"JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST",
@@ -152,6 +166,7 @@ static void wg_layer_build(const FaceScreen &S, int i) {
       wg_curve_bake(L, R, s);
       break;
     }
+    case FL_BATPILL: R.txt = (char *)calloc(WG_ROWS, 24), R.g = new HaloItem[5](); break;
 #ifdef HALO_ROUND
     case FL_WEEKARC: R.g = new HaloItem[8](); break;
     case FL_INFOLINE: R.g = new HaloItem[4](); break;
@@ -227,7 +242,7 @@ static void wg_layout(const FaceScreen &S, int i, float a, const HaloView &v0) {
   if (!wg_s) return;
   // (curved text and the rings need neither the time nor the weather: localtime_r is ~70 µs — five curved texts a frame
   // were ~0.4 ms of every frame's layout)
-  const bool when = L.kind != FL_CURVE && L.kind != FL_STEPRING && L.kind != FL_BATRING;
+  const bool when = L.kind != FL_CURVE && L.kind != FL_STEPRING && L.kind != FL_BATRING && L.kind != FL_BATPILL;
   const WxDay d = when ? wx_day(0) : WxDay{};
   struct tm t = {};
   const bool ok = when && wg_now(t);
@@ -276,6 +291,34 @@ static void wg_layout(const FaceScreen &S, int i, float a, const HaloView &v0) {
       c.color = L.color, c.color2 = L.color2, c.alpha = a, c.on_black = true;
       halo_view_commit(c, v);
       ay = CX - c.r;
+      break;
+    }
+    case FL_BATPILL: {  // a battery: the pill, the charge in it, the nub, the percent (gl_t20: the house's type)
+      if (!R.g) break;
+      const HaloBattery b = wg_battery();
+      const int pc = b.ok && b.percent >= 0 ? min(100, (int)b.percent) : -1;
+      const float k = L.k > 0 ? L.k : 1, w = 58 * k, h = 28 * k, x = CX, y = BP_Y;
+      const float x0 = x - w / 2, in = 3 * k, fw = (w - 2 * in) * (pc > 0 ? pc / 100.0f : 0);
+      const uint32_t fill = b.charging ? 0x6DD58C : pc >= 0 && pc <= 15 ? 0xF28B82 : L.color;
+      HaloItem &body = R.g[0], &lvl = R.g[1], &nub = R.g[2], &num = R.g[3];
+      halo_item_rrect(body, x, y, w, h, h / 2, 1, L.color2, a), body.on_black = true, halo_view_commit(body, v);
+      halo_item_rrect(lvl, x0 + in + fw / 2, y, fmaxf(fw, 0.1f), h - 2 * in, (h - 2 * in) / 2, 1, wg_mix(fill, L.color2, 0.55f),
+               pc > 0 ? a : 0);
+      lvl.on_black = false, halo_view_commit(lvl, v);
+      halo_item_rrect(nub, x + w / 2 + 3 * k, y, 6 * k, 11 * k, 3 * k, 1, L.color2, a), nub.on_black = true, halo_view_commit(nub, v);
+      if (pc >= 0) snprintf(wg_s[0], 24, "%d", pc);
+      else strlcpy(wg_s[0], "--", 24);
+      // charging: a bolt before the number, both centred as one (Font Awesome's bolt, gl_ic24 — the gallery's icons)
+      HaloItem &bolt = R.g[4];
+      const bool chg = b.charging && pc >= 0;
+      const float bs = 0.58f * k, bw = chg ? 12 * k : 0, nx = x + bw / 2 + (chg ? 1 * k : 0);
+      halo_item_text(bolt, gl_ic24, "\xEF\x83\xA7", halo_text_mid(gl_ic24, "\xEF\x83\xA7"), nx - halo_text_width(gl_t20, wg_s[0]) * k / 2 - 7 * k,
+                     y, bs, 1, 0xF8F7F9, chg ? a : 0, nullptr);
+      bolt.on_black = false, halo_view_commit(bolt, v);
+      halo_item_text(num, gl_t20, wg_s[0], halo_text_mid(gl_t20, "0123456789"), nx, y, k, 1,
+                     pc >= 0 && pc <= 15 && !b.charging ? 0xF28B82 : 0xF8F7F9, a, nullptr);
+      num.on_black = false, halo_view_commit(num, v);
+      ax = x, ay = y;
       break;
     }
     case FL_WEEKARC: {
@@ -409,7 +452,7 @@ static void wg_layout(const FaceScreen &S, int i, float a, const HaloView &v0) {
   R.box[0] = R.box[1] = 0, R.box[2] = R.box[3] = -1;
   if (L.kind == FL_CURVE || L.kind == FL_STEPRING || L.kind == FL_BATRING) box_add(R.box, R.pill);
   if (R.g) {
-    const int n = L.kind == FL_WEEKARC ? 8 : L.kind == FL_FORECAST ? 15 : L.kind == FL_DOTCLOCK ? WG_DOTS : 4;
+    const int n = L.kind == FL_WEEKARC ? 8 : L.kind == FL_FORECAST ? 15 : L.kind == FL_DOTCLOCK ? WG_DOTS : L.kind == FL_BATPILL ? 5 : 4;
     for (int j = 0; j < n; j++) box_add(R.box, R.g[j]);
   }
   R.ax = ax + L.dx, R.ay = ay + L.dy;
@@ -423,10 +466,10 @@ static void wg_draw(const FaceScreen &S, int i) {
 #endif
   if (L.kind == FL_CURVE || L.kind == FL_STEPRING || L.kind == FL_BATRING) return halo_item_draw(R.pill);
 #ifndef HALO_ROUND
-  if (wgr_draw(L, R)) return;
+  if (L.kind != FL_BATPILL && wgr_draw(L, R)) return;
 #endif
   if (!R.g) return;
   if (L.kind == FL_WEEKARC) halo_item_draw(R.g[7]);  // (the circle under today's letter)
-  const int n = L.kind == FL_WEEKARC ? 7 : L.kind == FL_FORECAST ? 15 : L.kind == FL_DOTCLOCK ? WG_DOTS : 4;
+  const int n = L.kind == FL_WEEKARC ? 7 : L.kind == FL_FORECAST ? 15 : L.kind == FL_DOTCLOCK ? WG_DOTS : L.kind == FL_BATPILL ? 5 : 4;
   for (int j = 0; j < n; j++) halo_item_draw(R.g[j]);
 }

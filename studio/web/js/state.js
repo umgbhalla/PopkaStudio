@@ -83,6 +83,8 @@ export const KINDS = {
   stepring: { group: 'widget', name: 'Steps ring', sub: 'Today\'s steps to the goal along the edge', scale: 1, radius: 224, color: '#FF8A80', color2: '#2A2B2E', goal: 10000 },
   // As Steps ring, the battery's charge (the power chip's percent; widgets.h FL_BATRING)
   batring: { group: 'widget', name: 'Battery ring', sub: 'The battery\'s charge along the edge', scale: 1, radius: 224, color: '#6DD58C', color2: '#2A2B2E' },
+  // A small battery over the date: the percent inside, the charge as its fill (widgets.h FL_BATPILL)
+  batpill: { group: 'widget', name: 'Battery pill', sub: 'A small battery over the date', scale: 1, color: '#C2C3CB', color2: '#2D2F2F' },
   weekarc: { group: 'widget', name: 'Week', sub: 'The days along the edge, today in a circle', angle: 0, radius: 190, size: 18, weight: 650, width: 100, spacing: 0, color: '#9E9E9E', color2: '#5E5F64', color3: '#FF8A80' },
   infoline: { group: 'widget', name: 'Info line', sub: 'The weather and the steps in a line', format: 'words', size: 18, weight: 620, width: 100, spacing: 0, color: '#9E9E9E', color3: '#FF8A80' },
   forecast: { group: 'widget', name: 'Forecast', sub: 'The next five hours along the edge', angle: 0, scale: 0.5, radius: 168, size: 15, weight: 700, width: 100, spacing: 0, color: '#FFF8EE', color2: '#5E5F64' },
@@ -159,7 +161,7 @@ export const clockLook = (l) => CLOCK_LOOKS.find(([k]) => k === l.look) || CLOCK
 export const DEVS = [['cpu', 'Processor'], ['mem', 'Memory'], ['bat', 'Battery'], ['temp', 'Temperature'], ['snd', 'Sound'], ['mot', 'Motion']];
 export const KIND_INDEX = { date: 0, clock: 1, weather: 2, arc: 3, city: 4, wxicon: 5, wxtemp: 6, wxhilo: 7, hourly: 8, dots: 9, title: 10, card: 11, edge: 12, scroll: 13, steps: 14, stars: 15, feels: 17, display: 18, battery: 19, stnum: 20, stcap: 21, stfoot: 22, stchart: 23, curve: 24, stepring: 25, weekarc: 26, infoline: 27, forecast: 28, dateframe: 29, dotclock: 30, music: 31, recorder: 32, snkdots: 33, snkspace: 34, snkiso: 35, batring: 36, parrot: 37, devcard: 38, device: 39, charge: 40, video: 41, shade: 42, sclock: 43, radio: 44,
   rtime: 45, rname: 46, rsong: 47, rbtn: 48, rline: 49, rrays: 50, rplay: 51, rbrowse: 52, rfolder: 53, rvolume: 54,
-  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62, settings: 63, wxapp: 64, stopwatch: 65, timer: 66, world: 67, scene: 68 };
+  wxdigits: 55, wxcurve: 56, wxbaro: 57, wxwear: 58, wxbuddy: 59, wxpixel: 60, wxweek: 61, pomodoro: 62, settings: 63, wxapp: 64, stopwatch: 65, timer: 66, world: 67, scene: 68, batpill: 69 };
 export const WXW = ['wxdigits', 'wxcurve', 'wxbaro', 'wxwear', 'wxbuddy', 'wxpixel', 'wxweek'];  // the weather widgets
 // Their layouts on the 7-inch board (studio.py WXLOOKS — the same names, in the same order: wxwidgets.h p3;
 // web/mockups/weather-widgets-rect.html 1A; 2A, 2B; 3A, 3B; 4A, 4B; 5A, 5B; 6A, 6B; 7A, 7B). A third element true — a

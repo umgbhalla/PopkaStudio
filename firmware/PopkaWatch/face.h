@@ -112,7 +112,8 @@ enum : uint8_t {
   FL_SETTINGS,  // Settings: the watch's settings, many levels — the UI kit's first app (sysset.h, ui.h)
   FL_WXAPP,     // Weather: one long page on the UI kit — hero, 12 hours, 7 days, details, location (wxapp.h)
   FL_STOPWATCH, FL_TIMER, FL_WORLD,  // Wear OS's clock apps on the kit: Stopwatch, Timer, World clock (clocks.h)
-  FL_SCENE  // a flat illustration behind the face (scene.h)
+  FL_SCENE,  // a flat illustration behind the face (scene.h)
+  FL_BATPILL  // the battery as a small battery-shaped pill: its percent inside, the charge as its fill (widgets.h)
 };
 static inline bool fl_wxw(uint8_t k) {  // a weather widget (wxwidgets.h)
   return k >= FL_WXDIGITS && k <= FL_WXWEEK;
@@ -135,7 +136,7 @@ static inline bool fl_pixels(uint8_t k) {  // pixel art drawn cell by cell (pixe
       ;
 }
 static inline bool fl_widget(uint8_t k) {  // a widget from the face mockups (and the battery ring, as Steps ring)
-  return (k >= FL_CURVE && k <= FL_DOTCLOCK) || k == FL_BATRING;
+  return (k >= FL_CURVE && k <= FL_DOTCLOCK) || k == FL_BATRING || k == FL_BATPILL;
 }
 static inline bool fl_wx(uint8_t k) {  // a part of the Weather screen
   return (k >= FL_ARC && k <= FL_DOTS) || k == FL_FEELS;

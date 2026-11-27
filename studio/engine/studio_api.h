@@ -27,7 +27,7 @@ static std::vector<const HaloFont *> st_fonts;
 static std::vector<const HaloImage *const *> st_icons;
 static char st_text[ST_SCREENS][ST_LAYERS][3][40];  // the gallery's text: the title, the line under it, the icon
 static char st_name[ST_SCREENS][40];                // the screens' names (an empty one shows its name)
-static float st_boxes[ST_LAYERS * 4], st_places[ST_LAYERS * 2], st_bases[FL_POMODORO * 2 + 2], st_radii[ST_LAYERS * 2];
+static float st_boxes[ST_LAYERS * 4], st_places[ST_LAYERS * 2], st_bases[FL_BATPILL * 2 + 2], st_radii[ST_LAYERS * 2];
 static int st_pin = -1, st_page = 0;
 
 void web_loop(HaloUpdate update, HaloDraw draw);  // halo_web.cpp
@@ -223,7 +223,7 @@ EMSCRIPTEN_KEEPALIVE const char *studio_city(int p) {
 
 // The weather (the editor's cities and what studio.py got from Open-Meteo — the same the board gets):
 // {"c": [{"n": name, "now", "feels", "hi", "lo", "k": kind, "t0", "hk": [kinds an hour], "ht": [degrees an hour], "p": hPa,
-// "hp": [hPa an hour], "s": snow now, "hs": snow an hour (bits), "dk", "dhi", "dlo": the days, "ds": their snow (bits)}]} —
+// "hp": [hPa an hour], "s": snow now, "hs": snow an hour (bits), "dk", "dhi", "dlo": the days, "ds": their snow (bits), "hum", "wind", "uv" (× 10), "rise", "set" (unix)}]} —
 // a city without numbers
 // yet ("now" missing) shows "--"
 EMSCRIPTEN_KEEPALIVE void studio_weather(const char *json) {
@@ -251,6 +251,9 @@ EMSCRIPTEN_KEEPALIVE void studio_weather(const char *json) {
       w.dhi[j] = j < (int)dhi.size() && !dhi[j].isNull() ? (int16_t)(dhi[j] | 0) : WX_NONE;
       w.dlo[j] = j < (int)dlo.size() && !dlo[j].isNull() ? (int16_t)(dlo[j] | 0) : WX_NONE;
     }
+#endif
+#if WX_APP  // (the Weather app's: humidity, wind, UV × 10, sunrise and sunset)
+    w.hum = c["hum"] | 0, w.wind = c["wind"] | 0, w.uv10 = c["uv"] | 0, w.rise = c["rise"] | 0u, w.set = c["set"] | 0u;
 #endif
   }
   wx_pages = n ? n : 1;
@@ -367,6 +370,7 @@ EMSCRIPTEN_KEEPALIVE float *studio_bases() {
   const float wg[7][2] = {{CX, CX}, {CX, CX}, {CX, CX - 190}, {CX, 372}, {CX, CX}, {CX, 226}, {CX, 189}};
   for (int k = 0; k < 7; k++) st_bases[(FL_CURVE + k) * 2] = wg[k][0], st_bases[(FL_CURVE + k) * 2 + 1] = wg[k][1];
   st_bases[FL_BATRING * 2] = st_bases[FL_BATRING * 2 + 1] = CX;
+  st_bases[FL_BATPILL * 2] = CX, st_bases[FL_BATPILL * 2 + 1] = BP_Y;  // (over the date)
   st_bases[FL_PARROT * 2] = CX, st_bases[FL_PARROT * 2 + 1] = CX;
 #ifndef HALO_ROUND
   // A rectangle's places (widgets_rect.h, wxscreen_rect.h): where each stands before it is moved

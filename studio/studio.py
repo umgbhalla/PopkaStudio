@@ -109,7 +109,7 @@ KINDS = {"date": 0, "clock": 1, "weather": 2,                                   
          "rtime": 45, "rname": 46, "rsong": 47, "rbtn": 48, "rline": 49, "rrays": 50, "rplay": 51,
          "rbrowse": 52, "rfolder": 53, "rvolume": 54,
          "wxdigits": 55, "wxcurve": 56, "wxbaro": 57, "wxwear": 58, "wxbuddy": 59, "wxpixel": 60, "wxweek": 61,
-         "pomodoro": 62, "settings": 63, "wxapp": 64, "stopwatch": 65, "timer": 66, "world": 67, "scene": 68}
+         "pomodoro": 62, "settings": 63, "wxapp": 64, "stopwatch": 65, "timer": 66, "world": 67, "scene": 68, "batpill": 69}
 # The weather widgets (wxwidgets.h; web/mockups/weather-widgets.html, the variants the user kept on 14 Nov 2026): the
 # round board's; only those a project has go into its firmware (FN_WXW: a bit a widget, from wxdigits)
 WXW = ("wxdigits", "wxcurve", "wxbaro", "wxwear", "wxbuddy", "wxpixel", "wxweek")
@@ -338,6 +338,8 @@ DEFAULTS = {
     "stepring": {"name": "Steps ring", "scale": 1, "radius": 224, "color": "#FF8A80", "color2": "#2A2B2E", "goal": 10000},
     # the battery's charge as Steps ring's (FL_BATRING): the radius goes in p
     "batring": {"name": "Battery ring", "scale": 1, "radius": 224, "color": "#6DD58C", "color2": "#2A2B2E"},
+    # the battery as a small battery-shaped pill over the date (FL_BATPILL): the percent inside, the charge as its fill
+    "batpill": {"name": "Battery pill", "scale": 1, "color": "#C2C3CB", "color2": "#2D2F2F"},
     "weekarc": {"name": "Week", "angle": 0, "radius": 190, "size": 18, "weight": 650, "width": 100, "spacing": 0,
                 "color": "#9E9E9E", "color2": "#5E5F64", "color3": "#FF8A80"},
     "infoline": {"name": "Info line", "format": "words", "size": 18, "weight": 620, "width": 100, "spacing": 0,
