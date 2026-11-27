@@ -299,7 +299,7 @@ static void tm_column(UpPage &P, UpPicker &k, int col, float cx, float a, const 
   const int val = up_picker_value(k);
   const float frac = k.pos.x - roundf(k.pos.x);  // (sliding while dragged)
   for (int j = -2; j <= 2; j++) {
-    const int vv = val + j;
+    const int vv = k.wrap ? up_picker_wrap(k, val + j) : val + j;  // (round: 59 over 00)
     const float d = j - frac, ad = fabsf(d);
     const bool ok = vv >= k.lo && vv <= k.hi && ad < 1.9f;
     snprintf(tm_pv[col][j + 2], 4, "%02d", ok ? vv : 0);
@@ -324,7 +324,7 @@ static void tm_lay(int p, UpPage &P, float a, const HaloView &v) {
     if (tm_state != TM_IDLE) up_title(P, "Timer", a, v);
     if (tm_state == TM_IDLE) {
       // (Google's time picker: the focused field's name on top, the two columns, the confirm at the bottom edge)
-      up_text(P, gl_up_lab, tm_focus ? "SECONDS" : "MINUTES", up_mid_lab, CX, 108, 1, UP_MUTED, a, v);
+      up_text(P, gl_up_lab, tm_focus ? "SECONDS" : "MINUTES", up_mid_lab, tm_focus ? 306 : 160, 108, 1, UP_MUTED, a, v);  // (over its column)
       tm_column(P, tm_pm, 0, 160, a, v);
       up_text(P, gl_up_disp, ":", up_mid_disp, CX, 200, 1, UP_DIM, a, v);
       tm_column(P, tm_ps, 1, 306, a, v);
@@ -385,7 +385,7 @@ static void tm_tap(int p, float x, float y) {
 static void tm_upd(int p, float dt) {
   static bool init;
   if (!init) {
-    init = true, tm_pm.hi = 99, tm_ps.hi = 59;
+    init = true, tm_pm.hi = 99, tm_ps.hi = 59, tm_pm.wrap = tm_ps.wrap = true;
     halo_spring_set(tm_pm.pos, 5), halo_spring_set(tm_ps.pos, 0);
   }
   ck_morph(tm_morph, tm_state == TM_RUN, dt);

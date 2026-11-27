@@ -420,7 +420,7 @@ static void up_layout(const HaloView &v) {
     }
   }
   // (no time yet — "--:--" before the first sync: the clock's font has no "-", only the colon showed, a "⋮": nothing)
-  const bool known = !strchr(fc_time, '-');
+  const bool known = halo_clock_valid();
   c.x = CX, c.y = 38 - 50 * gone, c.alpha = up_clock_mask.bits && known ? 1 - gone : 0;
   halo_view_commit(c, v);
   // The page dots along the rim at 6 o'clock (Wear OS's HorizontalPageIndicator): 6 dp dots 4 dp apart, the one in front
@@ -556,22 +556,35 @@ struct UpPicker {
   int lo, hi, owner;
   float y0, g0;
   bool drag;
+  bool wrap;  // round (Wear OS's time pickers: 59 sits over 00): past the last — the first
 };
+static inline int up_picker_wrap(const UpPicker &k, int v) {
+  const int n = k.hi - k.lo + 1;
+  return k.lo + ((v - k.lo) % n + n) % n;
+}
 static void up_picker_update(UpPicker &k, float cx, float half_w, float dt) {
   const HaloFinger &f = halo_finger;
   if (f.drag_start && !f.horiz && fabsf(f.x0 - cx) < half_w && halo_finger_claim(&k.owner)) k.drag = true, k.y0 = f.y, k.g0 = k.pos.x;
   if (k.drag) {
     if (f.down && f.owner == &k.owner) {
-      k.pos.x = constrain(k.g0 + (k.y0 - f.y) / 62, (float)k.lo, (float)k.hi), k.pos.target = k.pos.x;
+      const float x = k.g0 + (k.y0 - f.y) / 62;
+      k.pos.x = k.wrap ? x : constrain(x, (float)k.lo, (float)k.hi), k.pos.target = k.pos.x;
     } else {
-      k.drag = false, k.pos.target = constrain(roundf(k.pos.x), (float)k.lo, (float)k.hi);
+      k.drag = false, k.pos.target = k.wrap ? roundf(k.pos.x) : constrain(roundf(k.pos.x), (float)k.lo, (float)k.hi);
     }
   } else {
     halo_spring_run(k.pos, K_UP, dt);
+    if (k.wrap && fabsf(k.pos.x - k.pos.target) < 0.002f && fabsf(k.pos.v) < 0.01f) {  // (settled: back into lo … hi)
+      const float t = (float)up_picker_wrap(k, (int)roundf(k.pos.target));
+      k.pos.x += t - k.pos.target, k.pos.target = t;
+    }
   }
 }
-static inline int up_picker_value(const UpPicker &k) { return constrain((int)roundf(k.pos.target), k.lo, k.hi); }
+static inline int up_picker_value(const UpPicker &k) {
+  const int v = (int)roundf(k.pos.target);
+  return k.wrap ? up_picker_wrap(k, v) : constrain(v, k.lo, k.hi);
+}
 static inline void up_picker_step(UpPicker &k, int d) {
-  k.pos.target = constrain(up_picker_value(k) + d, k.lo, k.hi);
+  k.pos.target = k.wrap ? roundf(k.pos.target) + d : constrain(up_picker_value(k) + d, k.lo, k.hi);
 }
 #endif

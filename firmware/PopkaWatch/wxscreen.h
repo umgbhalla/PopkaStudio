@@ -366,7 +366,7 @@ static void wx_layout_static(const FaceScreen &S, int i, float a, const HaloView
     HaloItem &c = R.pill;  // (the arc clock uses the run's first item)
     c.kind = HI_MASK, c.mask = &R.arc, c.color = L.color, c.on_black = true, c.on = &halo_black;
     c.x = R.tx + R.arc.w / 2.0f, c.y = R.ty + R.arc.h / 2.0f;
-    c.scale = 1, c.alpha = R.arc.bits ? a : 0;
+    c.scale = 1, c.alpha = R.arc.bits && halo_clock_valid() ? a : 0;  // (no time yet: nothing)
     R.ax = c.x + L.dx, R.ay = c.y + L.dy;
     halo_view_commit(c, v);
     return;

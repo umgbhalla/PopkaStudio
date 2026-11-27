@@ -399,6 +399,6 @@ static void gal_arc(const GalRun &g, FaceRun &R, uint32_t color, float a, const 
   const float tt_k = g.tt_k, k = 0.5f + 0.5f * tt_k, top = R.ty - 24 * DP * (1 - tt_k), left = CX - (CX - R.tx) * k;
   c.kind = HI_MASK, c.mask = &R.arc, c.color = color, c.on_black = true, c.on = &halo_black;
   c.x = left + R.arc.w * k / 2, c.y = top + R.arc.h * k / 2, c.scale = k;
-  c.alpha = tt_k > 0.02f && R.arc.bits ? k * a : 0;
+  c.alpha = tt_k > 0.02f && R.arc.bits && halo_clock_valid() ? k * a : 0;  // (no time yet: not "--:--", whose font shows only ⋮)
   halo_view_commit(c, v);
 }

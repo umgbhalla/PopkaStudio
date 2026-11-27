@@ -276,7 +276,7 @@ static void ui_layout(int k, const HaloView &v) {
     HaloItem &c = R.clock;
     c.kind = HI_MASK, c.mask = &ui_clock_mask, c.color = 0xB7B5C1, c.on_black = true, c.on = &halo_black, c.scale = kk;
     c.x = CX - (CX - ui_clock_x) * kk + ui_clock_mask.w * kk / 2, c.y = ui_clock_y - 24 * DP * (1 - tt) + ui_clock_mask.h * kk / 2;
-    c.alpha = tt > 0.02f && ui_clock_mask.bits ? kk : 0;
+    c.alpha = tt > 0.02f && ui_clock_mask.bits && halo_clock_valid() ? kk : 0;  // (no time yet: nothing)
     halo_view_commit(c, v);
   }
   for (int i = 0; i < pg.n; i++) {
