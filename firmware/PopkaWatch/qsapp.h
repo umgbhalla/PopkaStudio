@@ -87,13 +87,16 @@ static void qs_lay(int p, UpPage &P, float a, const HaloView &v) {
     qs_level(P, 160, QS_IC_TILE[1], qs_lbright_s, b, 8, a, v);
     qs_level(P, 272, vol ? QS_IC_TILE[3] : QS_IC_MUTED, qs_lvol_s, vol, 10, a, v);
     up_secondary(P, CX, 368, 28, QS_IC_POWER, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
-  } else {  // Shade settings: Wear OS's radio and switch buttons, one a row
-    up_title(P, "Shade", a, v);
-    up_row(P, UP_ROW_X0, UP_ROW_X1, 164, UP_ROW_H, "Open on Controls", nullptr, UP_ROW_RADIO, qs_on_levels ? 0 : 1, QS_MINT, QS_INK, a, v);
-    up_row(P, UP_ROW_X0, UP_ROW_X1, 242, UP_ROW_H, "Open on Levels", nullptr, UP_ROW_RADIO, qs_on_levels ? 1 : 0, QS_MINT, QS_INK, a, v);
-    up_row(P, UP_ROW_X0, UP_ROW_X1, 320, UP_ROW_H, "Show battery", nullptr, UP_ROW_SWITCH, qs_sw.x, QS_MINT, QS_INK, a, v);
-    // (one line a row: the panel's pager lives beside the app's, so this page stays fixed — no list of its own)
-  }
+  }  // (2, Shade settings: a list — qs_lay_item)
+}
+// Shade settings as Wear OS's settings list (upager.h list mode: the panel's pager has lists of its own)
+static int qs_items(int p) { return p == 2 ? 4 : 0; }
+static float qs_item_h(int, int k) { return up_set_h(k); }
+static void qs_lay_item(int, int k, UpPage &P, float, float ac, const HaloView &v) {
+  if (k == 0) return up_set_title(P, "Shade", ac, v);
+  if (k == 1) up_set_row(P, "Controls", "Open on this page", UP_ROW_RADIO, qs_on_levels ? 0 : 1, QS_MINT, QS_INK, ac, v);
+  else if (k == 2) up_set_row(P, "Levels", "Open on this page", UP_ROW_RADIO, qs_on_levels ? 1 : 0, QS_MINT, QS_INK, ac, v);
+  else up_set_row(P, "Battery", "Show on Controls", UP_ROW_SWITCH, qs_sw.x, QS_MINT, QS_INK, ac, v);
 }
 
 static void qs_tap(int p, float x, float y) {
@@ -111,16 +114,17 @@ static void qs_tap(int p, float x, float y) {
     }
     if (up_hit(x, y, CX, 368, 28)) sh_act(SI_OFF);
   } else {
-    if (up_in(x, y, UP_ROW_X0, 128, UP_ROW_X1, 200) && qs_on_levels) qs_on_levels = false, qs_prefs.putUChar("open", 0);
-    else if (up_in(x, y, UP_ROW_X0, 206, UP_ROW_X1, 278) && !qs_on_levels) qs_on_levels = true, qs_prefs.putUChar("open", 1);
-    else if (up_in(x, y, UP_ROW_X0, 284, UP_ROW_X1, 356)) qs_battery = !qs_battery, qs_prefs.putUChar("bat", qs_battery);
+    const int k = up_list_hit(2, y);
+    if (k == 1 && qs_on_levels) qs_on_levels = false, qs_prefs.putUChar("open", 0);
+    else if (k == 2 && !qs_on_levels) qs_on_levels = true, qs_prefs.putUChar("open", 1);
+    else if (k == 3) qs_battery = !qs_battery, qs_prefs.putUChar("bat", qs_battery);
   }
 }
 static void qs_upd(int, float dt) {
   qs_sw.target = qs_battery ? 1 : 0;
   halo_spring_run(qs_sw, K_QS_SW, dt);
 }
-static const UpApp QS_APP = {qs_count, qs_lay, nullptr, qs_upd, nullptr, QS_MINT};  // (taps: shade_round.h hands them to qs_tap)
+static const UpApp QS_APP = {qs_count, qs_lay, nullptr, qs_upd, nullptr, QS_MINT, nullptr, false, qs_items, qs_item_h, qs_lay_item};  // (taps: shade_round.h hands them to qs_tap)
 
 // ---------- shade_round.h calls these ----------
 static void qs_begin() {  // (face_build: the two settings back from flash)

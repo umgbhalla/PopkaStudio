@@ -82,12 +82,18 @@ static HaloItem up_track, up_fill, up_track2, up_fill2, up_clock, up_dot[UP_PAGE
 // The list pages (UpApp.items): one HaloList a page, rebuilt when its items' heights change; the scroll indicator
 #define UP_LIST_TOP 64.0f
 #define UP_LIST_BOTTOM 420.0f
-static HaloList up_ls[UP_PAGES];
-static uint32_t up_ls_key[UP_PAGES];
+// (each pager its own: the quick settings' pager lives beside the app's — upager.h's swap carries the pointer)
+struct UpLists {
+  HaloList l[UP_PAGES];
+  uint32_t key[UP_PAGES];
+};
+static UpLists *up_lsx;
+#define up_ls (up_lsx->l)
+#define up_ls_key (up_lsx->key)
 static HaloItem up_sc[3];
 static HaloSpring up_sc_pos, up_sc_vis;
 static uint32_t up_sc_idle;
-static inline bool up_is_list(int p) { return up_app && up_app->items && up_app->items(p) > 0; }
+static inline bool up_is_list(int p) { return up_app && up_lsx && up_app->items && up_app->items(p) > 0; }
 static void up_list_sync(int p) {  // (heights from the app; a change — the list again, from the top)
   const int n = min(up_app->items(p), HALO_LIST_MAX);
   float h[HALO_LIST_MAX];
@@ -109,13 +115,15 @@ static float up_mid_hero, up_mid_disp, up_mid_pick, up_mid_title, up_mid_num, up
 static void up_commands();
 static bool up_begin() {
   up_commands();
-  if (up_pg) return true;
+  if (up_pg && up_lsx) return true;
 #ifdef __EMSCRIPTEN__
-  up_pg = (UpPage *)calloc(UP_PAGES, sizeof(UpPage));
+  if (!up_pg) up_pg = (UpPage *)calloc(UP_PAGES, sizeof(UpPage));
+  if (!up_lsx) up_lsx = (UpLists *)calloc(1, sizeof(UpLists));
 #else
-  up_pg = (UpPage *)heap_caps_calloc(UP_PAGES, sizeof(UpPage), MALLOC_CAP_SPIRAM);
+  if (!up_pg) up_pg = (UpPage *)heap_caps_calloc(UP_PAGES, sizeof(UpPage), MALLOC_CAP_SPIRAM);
+  if (!up_lsx) up_lsx = (UpLists *)heap_caps_calloc(1, sizeof(UpLists), MALLOC_CAP_SPIRAM);
 #endif
-  if (!up_pg) return false;
+  if (!up_pg || !up_lsx) return false;
   K_UP = halo_spring(HALO_M3X_DEFAULT);
   const char *D = "0123456789";
   up_mid_hero = halo_text_mid(gl_up_hero, D), up_mid_disp = halo_text_mid(gl_up_disp, D);
@@ -535,6 +543,10 @@ struct UpState {
   bool drag = false, vis[UP_PAGES] = {};
   float x0 = 0, g0 = 0;
   HaloItem track, fill, track2, fill2, clock, dot[UP_PAGES];
+  UpLists *ls = nullptr;  // (its lists, its scroll indicator)
+  HaloItem sc[3];
+  HaloSpring sc_pos = {0, 0, 0}, sc_vis = {0, 0, 0};
+  uint32_t sc_idle = 0;
 };
 static void up_swap(UpState &s) {
   std::swap(s.app, up_app), std::swap(s.pg, up_pg), std::swap(s.pos, up_pos), std::swap(s.page, up_page);
@@ -542,6 +554,8 @@ static void up_swap(UpState &s) {
   for (int p = 0; p < UP_PAGES; p++) std::swap(s.vis[p], up_vis[p]), std::swap(s.dot[p], up_dot[p]);
   std::swap(s.track, up_track), std::swap(s.fill, up_fill), std::swap(s.clock, up_clock);
   std::swap(s.track2, up_track2), std::swap(s.fill2, up_fill2);
+  std::swap(s.ls, up_lsx), std::swap(s.sc_pos, up_sc_pos), std::swap(s.sc_vis, up_sc_vis), std::swap(s.sc_idle, up_sc_idle);
+  for (int j = 0; j < 3; j++) std::swap(s.sc[j], up_sc[j]);
 }
 // fn with s as the pager's state (up_open, up_update, up_layout, up_audit of a pager kept aside)
 template <class F> static inline void up_with(UpState &s, F fn) {
@@ -562,6 +576,7 @@ static void up_draw_of(const UpState &s) {  // (up_draw of a state kept aside)
   }
   halo_item_draw(s.clock);
   for (const HaloItem &d : s.dot) halo_item_draw(d);
+  for (const HaloItem &c : s.sc) halo_item_draw(c);
 }
 
 // ---------- The audit (serial: upcheck) — what overlaps on the page in front, what comes near the rim ----------

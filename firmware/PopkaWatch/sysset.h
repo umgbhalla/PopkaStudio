@@ -202,7 +202,7 @@ static void sy_build() {
   sy_add(sy_display, ur_toggle(SS_IC_SUN, "Always On", sy_aod, sy_set_aod));
   static const char *const *idle = SS_IDLE_NAMES;
   sy_add(sy_display, ur_choice(SS_IC_CLOCK, "Screen timeout", idle, 4, sy_idle, sy_set_idle));
-  sy_add(sy_display, ur_choice(SS_IC_CONTRAST, "Always On brightness", SS_DIM_NAMES, 3, sy_dim, sy_set_dim));
+  sy_add(sy_display, ur_choice(SS_IC_CONTRAST, "Brightness", SS_DIM_NAMES, 3, sy_dim, sy_set_dim));  // (under the Always On header: it says whose)
   sy_add(sy_display, ur_toggle(SS_IC_CONTRAST, "Burn-in shift", sy_shift, sy_set_shift));
   sy_add(sy_display, ur_head("Wake up"));
   sy_add(sy_display, ur_toggle(SS_IC_SUN, "Tap to wake", sy_tap, sy_set_tap));
