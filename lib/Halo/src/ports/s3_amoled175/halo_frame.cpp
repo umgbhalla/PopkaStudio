@@ -50,6 +50,7 @@ static float hf_us_per_px() {  // передача пикселя по шине:
 static bool boot_swallow;  // BOOT разбудила плату (halo_power.cpp): это нажатие уже «засчитано»
 static bool boot_down, boot_long_done = true, boot_report_release, boot_release_long;
 static uint32_t boot_down_ms;
+static uint8_t boot_edges;
 
 void hf_swallow_boot() {
   boot_swallow = true;
@@ -57,6 +58,7 @@ void hf_swallow_boot() {
 
 static bool boot_poll(bool on_release, bool count_wake) {
   static uint8_t hist = 0xFF;
+  boot_edges = 0;
   hist = hist << 1 | (gpio_get_level(GPIO_NUM_0) ? 1 : 0);
   bool click = boot_cmd;
   boot_cmd = false;
@@ -64,11 +66,13 @@ static bool boot_poll(bool on_release, bool count_wake) {
     boot_report_release = on_release && (!boot_swallow || count_wake);
     click |= !on_release && !boot_swallow;
     boot_swallow = false;
+    if (!boot_down) boot_edges |= HALO_KEY_DOWN;
     boot_down = true;
     boot_down_ms = millis();
     boot_long_done = false;
   }
   if (boot_down && (hist & 3) == 3) {
+    boot_edges |= HALO_KEY_UP;
     if (!boot_long_done && on_release) {
       boot_release_long = millis() - boot_down_ms >= HALO_BOOT_LONG_MS;
       click |= boot_report_release && !boot_release_long;
@@ -87,11 +91,14 @@ bool halo_boot_short(bool count_wake) {
   return boot_poll(true, count_wake);
 }
 
-bool halo_boot_long() {
+uint8_t halo_boot_edges() { return boot_edges; }
+
+bool halo_boot_long(bool physical) {
   if (boot_long_cmd) return boot_long_cmd = false, true;
-  if (boot_release_long) return boot_release_long = false, true;
+  if (boot_release_long) return boot_release_long = false, physical;
   if (boot_long_done || !boot_down || millis() - boot_down_ms < HALO_BOOT_LONG_MS) return false;
-  return boot_long_done = true;
+  boot_long_done = true;
+  return physical;
 }
 
 bool halo_begin(HaloUpdate update, HaloDraw draw, const HaloConfig &c) {

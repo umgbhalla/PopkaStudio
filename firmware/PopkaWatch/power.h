@@ -16,11 +16,11 @@
 //
 // The buttons (FN_BOOT, FN_PWR): FN_SCREEN_OFF — the same move to fully dark, the panel off; a touch, a button or
 // picking it up — back. FN_AMBIENT — into Always On at once, as when idle (also with Always On off): the same button
-// again, a touch or picking it up — back. FN_LOCK — dim and shrink toward the center with touch off. On round boards, a short BOOT
-// toggles the display while locked, a long BOOT unlocks, and FN_PALM_LOCK locks and turns off the panel. FN_HOME
+// again, a touch or picking it up — back. FN_LOCK — dim and shrink toward the center with touch off. On round boards,
+// a short BOOT or PWR press toggles the display while locked, a hold unlocks, and FN_PALM_LOCK enters locked Always On. FN_HOME
 // returns to the home screen. PWR can't wake the round board from light sleep (its
-// chip's interrupt is not wired: boards/amoled175/hardware.md) — on battery its long press is read at the next wake-up (pick the
-// watch up). On USB the board does not really sleep (Halo) — the same screens, the frames just go on.
+// chip's interrupt is not wired) — on battery PWR is read when the board runs again (for example, when picked up).
+// On USB the board does not really sleep (Halo) — the same screens, the frames just go on.
 //
 // Waking up (FN_WAKE_TAP, FN_WAKE_RAISE, FN_WAKE_BTN — the editor's Always On → Wake up): what brings the screen back
 // from Always On or dark — a touch, picking the watch up (the motion sensor; off — the sensor is not even started,
@@ -76,7 +76,9 @@ static uint32_t pw_motion;
 static int pw_sent = -1;      // the brightness last sent to the panel
 static bool pw_locked;
 static int pw_lock_btn;       // what locked: 0 — palm, 1 — BOOT or shade, 2 — PWR
+#ifndef HALO_ROUND
 static uint32_t pw_lock_ms;   // locked then: a long press of that same press does not unlock
+#endif
 static HaloSpring pw_shift_amount = {1, 0, 1};  // 0 during lock and its wake-up, 1 for regular Always On
 static volatile bool pw_cmd_sleep, pw_cmd_wake;
 static volatile bool pw_debug;  // debug on: never idle into Always On or dark, no palm lock (testing; not kept)
@@ -86,7 +88,16 @@ static volatile int pw_boot = FN_BOOT, pw_pwr = FN_PWR;
 #ifdef HALO_ROUND
 static volatile bool pw_palm_lock = FN_PALM_LOCK;
 static constexpr int64_t PW_LOCK_DIM_US = 120000000;
+static constexpr int64_t PW_TAP_US = 100000, PW_UNLOCK_US = 500000, PW_UNLOCK_FADE_US = 150000;
+static constexpr int64_t PW_RING_US = PW_TAP_US + (PW_UNLOCK_US - PW_TAP_US) / 4;
 static int64_t pw_dim_until;
+static uint8_t pw_unlock_keys, pw_unlock_btn;  // captured through release, even after unlocking
+static int64_t pw_unlock_down_us, pw_unlock_exit_us;
+static bool pw_unlock_was_dark;
+static bool pw_pwr_release_captured;  // a PMIC click may arrive separately from the release edge
+static float pw_unlock_progress, pw_unlock_fade;
+static HaloSpring pw_unlock_in;
+static HaloSpringK K_PW_UNLOCK;
 static int pw_shutdown;
 #endif
 static int pw_boot_fn() {  // (settings.h: Display's hint)
@@ -138,9 +149,18 @@ static void pw_wake(uint8_t w) {  // the screen where it was: back along the sam
 }
 
 static void pw_lock_set(bool on, int btn) {
-  pw_locked = on, pw_lock_btn = btn, pw_lock_ms = halo_ms();
+  pw_locked = on, pw_lock_btn = btn;
 #ifdef HALO_ROUND
   pw_dim_until = on ? esp_timer_get_time() + PW_LOCK_DIM_US : 0;
+  pw_unlock_btn = 0;
+  if (on) {
+    pw_unlock_exit_us = 0;
+    pw_unlock_was_dark = false;
+    pw_unlock_progress = pw_unlock_fade = 0;
+    halo_spring_set(pw_unlock_in, 0);
+  } else if (pw_unlock_in.target > 0 && !pw_unlock_exit_us) pw_unlock_exit_us = esp_timer_get_time();
+#else
+  pw_lock_ms = halo_ms();
 #endif
   if (on) {
     if (pw_amb.x == 0 || !pw_aod_way || !halo_display_is_on()) halo_spring_set(pw_shift_amount, 0);
@@ -205,7 +225,12 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
   // held — unlocked and awake
   if (pw_locked) {
     if (held) {
+#ifdef HALO_ROUND
+      // Serial/preview commands can request a complete hold directly.
+      pw_lock_set(false, 0), pw_wake(0);
+#else
       if (halo_ms() - pw_lock_ms > HALO_BOOT_LONG_MS + 300) pw_lock_set(false, 0), pw_wake(0);  // (not the hold that locked)
+#endif
       return;
     }
     pw_listen_us = now + PW_LISTEN_S * 1000000ll;
@@ -240,6 +265,100 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
   }
 }
 
+#ifdef HALO_ROUND
+static void pw_unlock_hide() {
+  if (pw_locked && pw_unlock_was_dark) pw_locked_display(false);
+  pw_unlock_was_dark = false;
+  pw_unlock_exit_us = 0;
+  pw_unlock_progress = pw_unlock_fade = 0;
+  halo_spring_set(pw_unlock_in, 0);
+}
+
+// The first key down owns the gesture. Absorb the release and any legacy click/hold for captured keys.
+static bool pw_unlock_key(int btn, uint8_t events, int64_t now) {
+  const uint8_t edges = events & (HALO_KEY_DOWN | HALO_KEY_UP);
+  bool captured = pw_unlock_keys & btn;
+  if (!captured && edges == (HALO_KEY_DOWN | HALO_KEY_UP)) return false;
+  if (pw_locked && (edges & HALO_KEY_DOWN) && !captured) {
+    pw_unlock_keys |= btn;
+    captured = true;
+    if (!pw_unlock_btn) {
+      pw_unlock_btn = btn;
+      pw_unlock_down_us = now;
+      pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+      halo_wake();
+    }
+  }
+  if (!(edges & HALO_KEY_UP) || !captured) return captured;
+  pw_unlock_keys &= ~btn;
+  if (pw_unlock_btn != btn) return true;
+  const int64_t held = now - pw_unlock_down_us;
+  if (held >= PW_UNLOCK_US) return true;  // complete in tick even if release and deadline share this frame
+  pw_unlock_btn = 0;
+  if (held < PW_RING_US) {
+    if (pw_unlock_exit_us) pw_unlock_hide();
+    pw_button(btn, FN_NOTHING, false, now);
+  } else if (pw_unlock_in.target > 0 && !pw_unlock_exit_us) {
+    pw_unlock_exit_us = now;
+  }
+  return true;
+}
+
+static void pw_unlock_tick(float dt, int64_t now) {
+  if (pw_unlock_exit_us) {
+    const float t = halo_clamp01((now - pw_unlock_exit_us) / (float)PW_UNLOCK_FADE_US);
+    pw_unlock_fade = t * t * (3 - 2 * t);
+    if (t < 1) return;
+    pw_unlock_hide();
+  }
+  if (!pw_unlock_btn) return;
+  const int64_t held = now - pw_unlock_down_us;
+  if (held < PW_RING_US) return;
+  if (pw_unlock_in.target == 0) {
+    pw_unlock_was_dark = !halo_display_is_on();
+    if (pw_unlock_was_dark) pw_locked_display(true);
+    pw_unlock_in.target = 1;
+  }
+  pw_unlock_progress = halo_clamp01((held - PW_RING_US) / (float)(PW_UNLOCK_US - PW_RING_US));
+  halo_spring_run(pw_unlock_in, K_PW_UNLOCK, dt);
+  if (held < PW_UNLOCK_US) return;
+  halo_spring_set(pw_unlock_in, 1);
+  pw_unlock_exit_us = now;
+  pw_lock_set(false, 0);
+  pw_wake(0);
+}
+
+static float pw_unlock_alpha() { return halo_clamp01(pw_unlock_in.x) * (1 - pw_unlock_fade); }
+
+static float pw_unlock_radius() { return 210 * (0.94f + 0.06f * pw_unlock_in.x - 0.06f * pw_unlock_fade); }
+
+// Redraw the old and new ring spans so the retained framebuffer clears the moving and fading edges.
+static void pw_unlock_damage() {
+  static float previous;
+  const float radius = pw_unlock_alpha() > 0 ? pw_unlock_radius() : 0;
+  if (!previous && !radius) return;
+  const float outer = fmaxf(previous, radius) + 5;
+  const float inner = (previous && radius ? fminf(previous, radius) : fmaxf(previous, radius)) - 5;
+  previous = radius;
+  for (int y = (int)(CY - outer) / HALO_ROWS * HALO_ROWS; y <= CY + outer; y += HALO_ROWS) {
+    const int bottom = min(y + HALO_ROWS - 1, HALO_H - 1);
+    const float near = fmaxf(0, fmaxf(y - CY, CY - bottom - 1));
+    const float far = fmaxf(fabsf(y - CY), fabsf(bottom + 1 - CY));
+    const float outside = sqrtf(fmaxf(0, outer * outer - near * near));
+    const float inside = sqrtf(fmaxf(0, inner * inner - far * far));
+    halo_damage((int)(CX - outside), y, (int)ceilf(CX - inside), bottom);
+    halo_damage((int)(CX + inside), y, (int)ceilf(CX + outside), bottom);
+  }
+}
+
+static void power_draw() {
+  const float alpha = pw_unlock_alpha();
+  if (alpha <= 0) return;
+  const float radius = pw_unlock_radius();
+  halo_ring(CX, CY, radius, radius / 35, pw_unlock_progress, 0xE5D7FF, 0x40374D, alpha);
+}
+#endif
+
 // Every frame, first (before the face: Always On wants its digits without rolling)
 static void power_tick(float dt) {
   const HaloFinger &f = halo_finger;
@@ -251,20 +370,24 @@ static void power_tick(float dt) {
 #ifdef HALO_ROUND
   const bool boot_locks = pw_boot == FN_LOCK;
   const bool boot = halo_boot_short(pw_locked || boot_locks);
+  const bool boot_held = halo_boot_long(!pw_locked);
   if (w == HALO_WAKE_BOOT && (pw_locked || boot_locks)) {
     pw_listen_us = now + PW_LISTEN_S * 1000000ll;
     w = 0;  // wait for the short or long press before changing display state
   }
 #else
   const bool boot = halo_boot_click();
-#endif
   const bool boot_held = halo_boot_long();
+#endif
 #ifdef HALO_ROUND
   if (halo_take_palm() && pw_palm_lock && !pw_locked && !pw_debug) {
     halo_finger = {};
     pw_lock_set(true, 0);
     pw_locked_display(true);  // (the locked Always On screen, not black: the user's call, 23 Nov 2026)
-    return;  // the cover takes priority over other input in the same frame
+    // Drain a release for a previously captured button before the palm consumes this frame.
+    if (halo_boot_edges() & HALO_KEY_UP) pw_unlock_keys &= ~1;
+    if (halo_pwr_key_event(true) & HALO_KEY_UP) pw_unlock_keys &= ~2;
+    return;
   }
 #endif
   if (pw_cmd_wake) {  // as a touch: asleep — wake, fading out — back, awake — idle from now
@@ -278,12 +401,28 @@ static void power_tick(float dt) {
     if (pw_locked) pw_listen_us = now + PW_LISTEN_S * 1000000ll;
     else pw_wake(4), w = 0;
   }
-  const uint8_t pwr = halo_pwr_event();
   if (halo_finger_blocked() && pw_locked) pw_listen_us = now + PW_LISTEN_S * 1000000ll;
+#ifdef HALO_ROUND
+  const uint8_t pwr = halo_pwr_key_event(pw_locked || (pw_unlock_keys & 2));
+  const uint8_t boot_edges = halo_boot_edges();
+  const bool boot_captured = pw_unlock_key(1, boot_edges, now);
+  const bool pwr_captured = pw_unlock_key(2, pwr, now);
+  if (pwr & HALO_KEY_DOWN) pw_pwr_release_captured = false;
+  if (pwr & HALO_KEY_UP) pw_pwr_release_captured = pwr_captured;
+  const bool boot_click = boot && (!pw_locked || !(boot_edges & HALO_KEY_UP));
+  if (!boot_captured && (boot_click || boot_held)) pw_button(1, pw_boot, boot_held, now);
+  const bool pwr_command = pwr & HALO_KEY_COMMAND;
+  const bool pwr_held = (pwr & HALO_PWR_LONG) && (pwr_command || (!pw_locked && !pw_pwr_release_captured));
+  // If both PMIC edges arrived between two polls, its short flag is the tap classification.
+  const bool pwr_tap = (pwr & (HALO_KEY_DOWN | HALO_KEY_UP)) == (HALO_KEY_DOWN | HALO_KEY_UP);
+  const bool pwr_click = (pwr & HALO_PWR_CLICK) && (pwr_command || (pw_locked ? pwr_tap : !pw_pwr_release_captured));
+  if (!pwr_captured && (pwr_click || pwr_held)) pw_button(2, pw_pwr, pwr_held, now);
+  pw_unlock_tick(dt, now);
+  if (pw_locked && !pw_unlock_btn && !pw_unlock_exit_us && pw_dim_until && now >= pw_dim_until) pw_locked_display(false);
+#else
+  const uint8_t pwr = halo_pwr_event();
   if (boot || boot_held) pw_button(1, pw_boot, boot_held, now);
   if (pwr) pw_button(2, pw_pwr, pwr & HALO_PWR_LONG, now);
-#ifdef HALO_ROUND
-  if (pw_locked && pw_dim_until && now >= pw_dim_until) pw_locked_display(false);
 #endif
   switch (pw_mode) {
     case PW_ACTIVE:
@@ -342,6 +481,9 @@ static void power_tick(float dt) {
 // smaller, and in Always On a few pixels elsewhere every minute (where — kept while the spring moves: a minute that
 // turns on the way would make the face jump)
 static void power_view() {
+#ifdef HALO_ROUND
+  pw_unlock_damage();
+#endif
   static const int8_t SX[8] = {0, 5, 7, 5, 0, -5, -7, -5}, SY[8] = {-7, -5, 0, 5, 7, 5, 0, -5};
   static int spot;
   if (fc_min >= 0 && (pw_amb.x == 0 || (pw_mode == PW_AOD && !pw_locked))) spot = fc_min & 7;
@@ -377,6 +519,9 @@ static void power_build() {  // after halo_begin: the motion sensor is on its I2
   K_PW_IN = halo_spring(0.8f, 1);   // to Always On — calm: ~0.5 s most of the way
   K_PW_OUT = halo_spring(0.5f, 1);  // awake — quicker: ~0.3 s
   K_PW_SHIFT = halo_spring(0.3f, 1);
+#ifdef HALO_ROUND
+  K_PW_UNLOCK = halo_spring(0.20f, 0.8f);
+#endif
 #if FN_WAKE_RAISE || FN_STEPS || defined(__EMSCRIPTEN__)
   halo_motion_begin(150);  // (Raise off and no Steps — the motion sensor stays off)
 #endif

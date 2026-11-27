@@ -109,6 +109,9 @@ static void draw() {  // both cores, each its part of a band
 #else
   halo_nav_draw();
 #endif
+#ifdef HALO_ROUND
+  power_draw();
+#endif
 }
 
 void setup() {

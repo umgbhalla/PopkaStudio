@@ -26,3 +26,4 @@ PopkaStudio/app/
 # Generated from sources by the build (tools/scene_pack.py: tools/scenes/*.svg)
 firmware/PopkaWatch/src/scenes.cpp
 firmware/PopkaWatch/src/scenes.h
+.claude

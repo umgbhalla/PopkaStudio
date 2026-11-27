@@ -180,20 +180,32 @@ static void release(const char *why) {
   reports = 0;
 }
 
-// Кнопка PWR: флаги чипа питания — раз в 100 мс (из задачи тача: она просыпается не реже чем через 60 мс)
-static void pmu_poll() {
-  if (!pmu || millis() - pmu_at < 100) return;
+// AXP2101 IRQ1, write-one-to-clear: short, long, falling (down), rising (up).
+static constexpr uint8_t PMU_KEY_IRQS = 0x0F;
+static void pmu_poll(bool prompt = false) {
+  if (!pmu || (!prompt && millis() - pmu_at < 100)) return;
   pmu_at = millis();
   uint8_t reg = 0x49, st = 0;
-  if (i2c_master_transmit_receive(pmu, &reg, 1, &st, 1, 20) != ESP_OK || !(st &= 0x0C)) return;
+  if (i2c_master_transmit_receive(pmu, &reg, 1, &st, 1, 20) != ESP_OK || !(st &= PMU_KEY_IRQS)) return;
   const uint8_t clr[2] = {0x49, st};
-  i2c_master_transmit(pmu, clr, 2, 20);
-  const uint8_t ev = (st & 0x08 ? HALO_PWR_CLICK : 0) | (st & 0x04 ? HALO_PWR_LONG : 0);
+  if (i2c_master_transmit(pmu, clr, 2, 20) != ESP_OK) return;
+  const uint8_t ev = (st & 0x08 ? HALO_PWR_CLICK : 0) | (st & 0x04 ? HALO_PWR_LONG : 0) |
+                     (st & 0x02 ? HALO_KEY_DOWN : 0) | (st & 0x01 ? HALO_KEY_UP : 0);
   __atomic_fetch_or(&pwr_ev, ev, __ATOMIC_RELAXED);
-  LOG("pwr:%s%s\n", ev & HALO_PWR_CLICK ? " click" : "", ev & HALO_PWR_LONG ? " long" : "");
+  if (ev & (HALO_PWR_CLICK | HALO_PWR_LONG))
+    LOG("pwr:%s%s\n", ev & HALO_PWR_CLICK ? " click" : "", ev & HALO_PWR_LONG ? " long" : "");
 }
 
 uint8_t halo_pwr_event() {
+  return halo_pwr_key_event(false) & (HALO_PWR_CLICK | HALO_PWR_LONG);
+}
+
+uint8_t halo_pwr_key_event(bool prompt) {
+  if (prompt && pmu) {
+    ht_bus_lock();
+    pmu_poll(true);
+    ht_bus_unlock();
+  }
   return __atomic_exchange_n(&pwr_ev, 0, __ATOMIC_RELAXED);
 }
 
@@ -306,12 +318,12 @@ bool ht_begin() {
   gpio_set_level((gpio_num_t)HALO_PIN_TP_RST, 1);
   delay(50);
   const bool found = i2c_master_probe(bus, 0x5A, 50) == ESP_OK;
-  // Чип питания: прерывания короткого и долгого нажатия PWR (регистр 0x41, биты 3 и 2), старые флаги — сбросить
+  // Enable the PWR key IRQs and clear any flags left over from power-on.
   dc.device_address = 0x34;
   if (i2c_master_probe(bus, 0x34, 50) == ESP_OK && i2c_master_bus_add_device(bus, &dc, &pmu) == ESP_OK) {
     uint8_t reg = 0x41, en = 0;
     i2c_master_transmit_receive(pmu, &reg, 1, &en, 1, 20);
-    const uint8_t w[2] = {0x41, (uint8_t)(en | 0x0C)}, c[2] = {0x49, 0x0F};
+    const uint8_t w[2] = {0x41, (uint8_t)(en | PMU_KEY_IRQS)}, c[2] = {0x49, PMU_KEY_IRQS};
     i2c_master_transmit(pmu, w, 2, 20);
     i2c_master_transmit(pmu, c, 2, 20);
     pmu_set_bits(0x30, 0x1D), pmu_set_bits(0x68, 0x01), pmu_set_bits(CHARGER_CONTROL, 0x08);  // АЦП: батарея, USB, система,
@@ -328,7 +340,8 @@ bool ht_begin() {
       LOG("charge limit: %d%%, resume at %d%%, pause %s\n", limit, limit - HALO_CHARGE_GAP, b.charge_limited ? "active" : "inactive");
   });
   halo_command("pwr", [](const char *a) {  // pwr / pwr long — то же, что нажатие кнопки PWR
-    __atomic_fetch_or(&pwr_ev, strstr(a, "long") ? HALO_PWR_LONG : HALO_PWR_CLICK, __ATOMIC_RELAXED);
+    const uint8_t ev = HALO_KEY_COMMAND | (strstr(a, "long") ? HALO_PWR_LONG : HALO_PWR_CLICK);
+    __atomic_fetch_or(&pwr_ev, ev, __ATOMIC_RELAXED);
   });
 
   xTaskCreatePinnedToCore(touch_task, "halo_touch", 3072, nullptr, 12, &task, 0);

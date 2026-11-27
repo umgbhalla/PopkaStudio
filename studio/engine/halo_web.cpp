@@ -263,8 +263,14 @@ bool halo_boot_click() {
 }
 #ifdef HALO_ROUND
 static bool palm_cmd;
+static uint8_t boot_edges;
 bool halo_boot_short(bool count_wake) {
   return halo_boot_click() || (count_wake && woke == HALO_WAKE_BOOT);
+}
+uint8_t halo_boot_edges() {
+  const uint8_t e = boot_edges;
+  boot_edges = 0;
+  return e;
 }
 bool halo_take_palm() {
   const bool detected = palm_cmd;
@@ -272,14 +278,25 @@ bool halo_take_palm() {
   return detected;
 }
 #endif
+#ifdef HALO_ROUND
+bool halo_boot_long(bool) {
+#else
 bool halo_boot_long() {
+#endif
   return boot_long_cmd ? (boot_long_cmd = false, true) : false;
 }
 uint8_t halo_pwr_event() {
   const uint8_t e = pwr_cmd;
   pwr_cmd = 0;
+  return e & (HALO_PWR_CLICK | HALO_PWR_LONG);
+}
+#ifdef HALO_ROUND
+uint8_t halo_pwr_key_event(bool) {
+  const uint8_t e = pwr_cmd;
+  pwr_cmd = 0;
   return e;
 }
+#endif
 HaloBattery halo_battery() {
   return {true, true, true, false, 100, 4140, 5040, 4980, 384};  // on USB, full — as the board on the desk
 }
@@ -381,11 +398,30 @@ bool halo_begin(HaloUpdate update, HaloDraw draw, const HaloConfig &c) {
   halo_command("step", [](const char *a) { vt_steps += max(1, atoi(a)), vt_paused = true; });
   halo_command("slow", [](const char *a) { slowmo = 1 / constrain((float)atof(a), 1.0f, 100.0f); });
   halo_command("bright", [](const char *a) { halo_brightness(atoi(a)); });
-  halo_command("boot", [](const char *a) { (strstr(a, "long") ? boot_long_cmd : boot_cmd) = true; });
+  halo_command("boot", [](const char *a) {
+#ifdef HALO_ROUND
+    if (!strcmp(a, "down") || !strcmp(a, "up")) {
+      boot_edges |= *a == 'd' ? HALO_KEY_DOWN : HALO_KEY_UP;
+      return;
+    }
+#endif
+    (strstr(a, "long") ? boot_long_cmd : boot_cmd) = true;
+  });
 #ifdef HALO_ROUND
   halo_command("palm", [](const char *) { palm_cmd = true; });
 #endif
-  halo_command("pwr", [](const char *a) { pwr_cmd = strstr(a, "long") ? HALO_PWR_LONG : HALO_PWR_CLICK; });
+  halo_command("pwr", [](const char *a) {
+    const uint8_t press = strstr(a, "long") ? HALO_PWR_LONG : HALO_PWR_CLICK;
+#ifdef HALO_ROUND
+    if (!strcmp(a, "down") || !strcmp(a, "up")) {
+      pwr_cmd |= *a == 'd' ? HALO_KEY_DOWN : HALO_KEY_UP;
+      return;
+    }
+    pwr_cmd = HALO_KEY_COMMAND | press;
+#else
+    pwr_cmd = press;
+#endif
+  });
   halo_command("shake", [](const char *) { motion_count++, woke_motion = true; });
   halo_command("redraw", [](const char *) { halo_damage_all(); });
   halo_command("help", [](const char *) {
