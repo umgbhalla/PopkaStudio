@@ -183,25 +183,25 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
   const WxCity &c = wx_city[p < wa_cities() ? p : 0];
   const float h = wa_item_h(p, k);
   switch (w.kind) {
-    case WI_HERO: {  // one centre line, the whole circle at rest (nothing of the next item shows under it): the city
+    case WI_HERO: {  // (its mass centred ~16 px over the screen's middle: the optical centre) one centre line, the whole circle at rest (nothing of the next item shows under it): the city
                      // under the curved time, the sky, the temperature by its digits (the ° hangs past them), the sky's
                      // word and feels-like, high and low
       wa_txt(P, gl_title, c.name, CX, 34, 1, WA_TXT, ac, v, &halo_black, 300);
-      wa_sky_icon(P, wa_sky_now(c), CX, 98, 54, 0x000000, ac, v);
+      wa_sky_icon(P, wa_sky_now(c), CX, 84, 48, 0x000000, ac, v);
       wx_deg(wa_now, sizeof(wa_now), c.now, "--");
       char digits[8];
       strlcpy(digits, wa_now, sizeof(digits));
       if (char *deg = strstr(digits, "\xC2\xB0")) *deg = 0;
       const float dw = halo_text_width(gl_wx_hero, digits);
-      wa_num(P, gl_wx_hero, wa_now, CX - dw / 2, 196, 0, WA_TXT, ac, v);
+      wa_num(P, gl_wx_hero, wa_now, CX - dw / 2, 174, 0, WA_TXT, ac, v);
       char f[8];
       wx_deg(f, sizeof(f), c.feels, "--");
       snprintf(wa_line, sizeof(wa_line), "%s \xC2\xB7 feels %s", wa_sky(wa_sky_now(c)), f);
-      wa_txt(P, gl_wx_line, wa_line, CX, 284, 1, WA_DIM, ac, v, &halo_black, 330);
+      wa_txt(P, gl_wx_line, wa_line, CX, 258, 1, WA_DIM, ac, v, &halo_black, 330);
       char hi[8], lo[8];
       wx_deg(hi, sizeof(hi), c.hi, "--"), wx_deg(lo, sizeof(lo), c.lo, "--");
       snprintf(wa_hl, sizeof(wa_hl), "H %s  \xC2\xB7  L %s", hi, lo);
-      wa_txt(P, gl_wx_line, wa_hl, CX, 326, 1, WA_TXT, ac, v);
+      wa_txt(P, gl_wx_line, wa_hl, CX, 298, 1, WA_TXT, ac, v);
       break;
     }
     case WI_HEAD: {

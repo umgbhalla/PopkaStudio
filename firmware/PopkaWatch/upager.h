@@ -78,7 +78,7 @@ static HaloSpring up_sy[UP_PAGES];  // each page's scroll (px; 0 — its top)
 static float up_vy0, up_vg0;
 static int up_vowner;
 static float up_x0, up_g0;
-static HaloItem up_track, up_fill, up_clock, up_dot[UP_PAGES];
+static HaloItem up_track, up_fill, up_track2, up_fill2, up_clock, up_dot[UP_PAGES];
 // The list pages (UpApp.items): one HaloList a page, rebuilt when its items' heights change; the scroll indicator
 #define UP_LIST_TOP 64.0f
 #define UP_LIST_BOTTOM 420.0f
@@ -165,11 +165,24 @@ static HaloItem &up_disc(UpPage &P, float x, float y, float r, uint32_t c, float
   up_commit(b, v);
   return b;
 }
-static void up_arc(UpPage &P, float r, float w, float a0, float a1, uint32_t c, float a, const HaloView &v) {
+// The page dots live at 6 o'clock on the rim (Wear OS's HorizontalPageIndicator): with more than one page, the rim's
+// arcs leave them a gap there (up_gap: its half-angle, radians; 0 — one page, no gap) — an arc never runs through them
+#define UP_DOT_R 222.0f   // the dots' radius: 2 dp in from the edge, 6 dp dots (Wear OS: PageIndicator.kt)
+#define UP_DOT_PITCH 20.0f  // centre to centre, px along the rim (6 dp dots, 4 dp apart)
+static float up_gap;
+static void up_arc_seg(UpPage &P, float r, float w, float a0, float a1, uint32_t c, float a, const HaloView &v) {
   HaloItem &it = up_item(P);
   it.kind = HI_ARC, it.x = CX, it.y = CY, it.r = r, it.w = w, it.a0 = a0, it.a1 = a1, it.scale = 1, it.color = c;
   it.alpha = a1 > a0 ? a : 0, it.on_black = true, it.on = nullptr;
   up_commit(it, v);
+}
+// An arc along the rim (radians from 12 o'clock, clockwise), cut round the dots' gap at 6 o'clock: two items, always
+// (the second hidden when it is not needed — the page's items keep their order frame to frame)
+static void up_arc(UpPage &P, float r, float w, float a0, float a1, uint32_t c, float a, const HaloView &v) {
+  const float g0 = HALO_PI - up_gap, g1 = HALO_PI + up_gap;
+  if (up_gap <= 0 || a1 <= g0 || a0 >= g1) return up_arc_seg(P, r, w, a0, a1, c, a, v), up_arc_seg(P, r, w, 0, 0, c, 0, v);
+  up_arc_seg(P, r, w, a0, fminf(a1, g0), c, a0 < g0 ? a : 0, v);
+  up_arc_seg(P, r, w, fmaxf(a0, g1), a1, c, a1 > g1 ? a : 0, v);
 }
 // The primary: a filled shape (circle → four lobes by t) and its glyph in the dark ink (f — an app's own glyph size;
 // nullptr — the study's 43 px)
@@ -323,14 +336,21 @@ static void up_layout(const HaloView &v) {
   // The rim's ring is the first page's, and only while it carries progress: no empty track framing an idle screen
   // (the user, 28 Nov 2026: the arcs fought the dots and the titles); it fades as the pages swipe away from the first
   const float gone = halo_clamp01(sc / 60), ring_a = (lst ? 1 - gone : 1) * halo_clamp01(1 - fabsf(up_pos.x));
-  for (HaloItem *it : {&up_track, &up_fill}) {
+  // (the dots' gap at 6 o'clock with more than one page: the half-angle the dots and a margin take — up_arc cuts round it)
+  up_gap = n > 1 ? ((n - 1) * UP_DOT_PITCH / 2 + 22) / UP_DOT_R : 0;
+  const float g0 = HALO_PI - up_gap, g1 = HALO_PI + up_gap, end = UP_A0 + UP_SWEEP * halo_clamp01(fr);
+  for (HaloItem *it : {&up_track, &up_fill, &up_track2, &up_fill2}) {
     it->kind = HI_ARC, it->x = CX, it->y = CY, it->r = UP_RING_R, it->w = UP_RING_W, it->scale = 1;
     it->on_black = true, it->on = nullptr;
   }
-  up_track.a0 = UP_A0, up_track.a1 = UP_A0 + UP_SWEEP, up_track.color = UP_TRACK, up_track.alpha = fr > 0.001f ? ring_a : 0;
-  up_fill.a0 = UP_A0, up_fill.a1 = UP_A0 + UP_SWEEP * halo_clamp01(fr), up_fill.color = acc;
-  up_fill.alpha = fr > 0.001f ? ring_a : 0;
-  halo_view_commit(up_track, v), halo_view_commit(up_fill, v);
+  const bool cut = up_gap > 0;
+  up_track.a0 = UP_A0, up_track.a1 = cut ? g0 : UP_A0 + UP_SWEEP, up_track2.a0 = g1, up_track2.a1 = UP_A0 + UP_SWEEP;
+  up_track.color = up_track2.color = UP_TRACK;
+  up_track.alpha = fr > 0.001f ? ring_a : 0, up_track2.alpha = cut ? up_track.alpha : 0;
+  up_fill.a0 = UP_A0, up_fill.a1 = cut ? fminf(end, g0) : end, up_fill2.a0 = g1, up_fill2.a1 = end;
+  up_fill.color = up_fill2.color = acc;
+  up_fill.alpha = fr > 0.001f ? ring_a : 0, up_fill2.alpha = cut && end > g1 ? up_fill.alpha : 0;
+  for (HaloItem *it : {&up_track, &up_fill, &up_track2, &up_fill2}) halo_view_commit(*it, v);
   for (int p = 0; p < UP_PAGES; p++) {
     UpPage &P = up_pg[p];
     float d = p - up_pos.x;
@@ -399,22 +419,25 @@ static void up_layout(const HaloView &v) {
       halo_view_commit(s, v);
     }
   }
-  c.x = CX, c.y = 38 - 50 * gone, c.alpha = up_clock_mask.bits ? 1 - gone : 0;
+  // (no time yet — "--:--" before the first sync: the clock's font has no "-", only the colon showed, a "⋮": nothing)
+  const bool known = !strchr(fc_time, '-');
+  c.x = CX, c.y = 38 - 50 * gone, c.alpha = up_clock_mask.bits && known ? 1 - gone : 0;
   halo_view_commit(c, v);
-  // The page dots: the one in front r5 in the accent, the others r4 (none with one page)
+  // The page dots along the rim at 6 o'clock (Wear OS's HorizontalPageIndicator): 6 dp dots 4 dp apart, the one in front
+  // in the accent, the others white at 30 %, the first page on the left (none with one page)
   for (int p = 0; p < UP_PAGES; p++) {
     HaloItem &d = up_dot[p];
-    const float on = halo_clamp01(1 - fabsf(up_pos.x - p));
-    d.kind = HI_CIRCLE, d.x = CX + (p - (n - 1) / 2.0f) * 19, d.y = UP_DOTS_Y, d.r = 4 + on, d.scale = 1;
+    const float on = halo_clamp01(1 - fabsf(up_pos.x - p)), th = HALO_PI + ((n - 1) / 2.0f - p) * (UP_DOT_PITCH / UP_DOT_R);
+    d.kind = HI_CIRCLE, d.x = CX + UP_DOT_R * sinf(th), d.y = CY - UP_DOT_R * cosf(th), d.r = 5 + on, d.scale = 1;
     const bool edge = up_pg[up_page].edge;
-    d.color = ui_mix(UP_DOT, acc, on), d.alpha = n > 1 && p < n && !edge ? 1 - gone : 0, d.on_black = true, d.on = nullptr;  // (scrolled, an edge button: away)
+    d.color = ui_mix(0x4D4D4D, acc, on), d.alpha = n > 1 && p < n && !edge ? 1 - gone : 0, d.on_black = true, d.on = nullptr;  // (scrolled, an edge button: away)
     halo_view_commit(d, v);
   }
 }
 
 static void up_draw() {
   if (!up_app || !up_pg) return;
-  halo_item_draw(up_track), halo_item_draw(up_fill);
+  halo_item_draw(up_track), halo_item_draw(up_fill), halo_item_draw(up_track2), halo_item_draw(up_fill2);
   for (int p = 0; p < UP_PAGES; p++) {
     if (!up_vis[p]) continue;
     const UpPage &P = up_pg[p];
@@ -441,13 +464,14 @@ struct UpState {
   int page = 0;
   bool drag = false, vis[UP_PAGES] = {};
   float x0 = 0, g0 = 0;
-  HaloItem track, fill, clock, dot[UP_PAGES];
+  HaloItem track, fill, track2, fill2, clock, dot[UP_PAGES];
 };
 static void up_swap(UpState &s) {
   std::swap(s.app, up_app), std::swap(s.pg, up_pg), std::swap(s.pos, up_pos), std::swap(s.page, up_page);
   std::swap(s.drag, up_drag), std::swap(s.x0, up_x0), std::swap(s.g0, up_g0);
   for (int p = 0; p < UP_PAGES; p++) std::swap(s.vis[p], up_vis[p]), std::swap(s.dot[p], up_dot[p]);
   std::swap(s.track, up_track), std::swap(s.fill, up_fill), std::swap(s.clock, up_clock);
+  std::swap(s.track2, up_track2), std::swap(s.fill2, up_fill2);
 }
 // fn with s as the pager's state (up_open, up_update, up_layout, up_audit of a pager kept aside)
 template <class F> static inline void up_with(UpState &s, F fn) {
@@ -455,7 +479,7 @@ template <class F> static inline void up_with(UpState &s, F fn) {
 }
 static void up_draw_of(const UpState &s) {  // (up_draw of a state kept aside)
   if (!s.app || !s.pg) return;
-  halo_item_draw(s.track), halo_item_draw(s.fill);
+  halo_item_draw(s.track), halo_item_draw(s.fill), halo_item_draw(s.track2), halo_item_draw(s.fill2);
   for (int p = 0; p < UP_PAGES; p++) {
     if (!s.vis[p]) continue;
     const UpPage &P = s.pg[p];

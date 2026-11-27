@@ -219,7 +219,10 @@ static void sw_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_title(P, "Stopwatch", a, v);
     ck_hms(sw_main, sizeof(sw_main), sw_elapsed(), true, sw_tail, sizeof(sw_tail));
     const float w1 = halo_text_width(gl_up_disp, sw_main), w2 = halo_text_width(gl_up_num, sw_tail);
-    const float x0 = CX - (w1 + 8 + w2) / 2;
+    // optically centred (Kairevicius: halfway between the box's middle and the ink's centroid — the small hundredths
+    // carry little ink, so the group sits a little right of the box's centring, the big digits nearer the middle)
+    const float bw = w1 + 8 + w2, m1 = w1 * 103, m2 = w2 * 35, ink = (m1 * w1 / 2 + m2 * (w1 + 8 + w2 / 2)) / (m1 + m2);
+    const float x0 = CX - bw / 2 + (bw / 2 - ink) / 2;
     up_text(P, gl_up_disp, sw_main, up_mid_disp, x0, 209, 0, UP_WHITE, a, v);
     // (bottoms aligned: the small digits' baseline on the big ones')
     const float base = 209 - up_mid_disp + gl_up_disp.ascent, y2 = base - gl_up_num.ascent + up_mid_num;

@@ -133,7 +133,7 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
   if (p == 0) {  // Capture: ready or recording
     up_title(P, "Recorder", a, v);
     mmss(ra_time, sizeof(ra_time), rec ? rc_t : 0, true);
-    up_text(P, gl_up_hero, ra_time, up_mid_hero, CX, 181, 1, UP_WHITE, a, v);
+    up_text(P, gl_up_disp, ra_time, up_mid_disp, CX, 190, 1, UP_WHITE, a, v);  // (the Stopwatch's size: one type for time)
     HaloItem &card = ra_wave_card(P, rec ? RA_HOT : RA_PANEL, a, v);
     for (int i = 0; i < RA_BARS; i++) {  // the last 23 slices, the newest (in progress) at the right
       float h = 2;
