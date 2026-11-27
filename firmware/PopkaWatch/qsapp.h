@@ -34,111 +34,92 @@ static char qs_bright_s[8], qs_vol_s[8], qs_bat_s[8], qs_lbright_s[8], qs_lvol_s
 
 static int qs_count() { return 3; }
 
-// A tile of Controls: 152 × 106, its icon 28 px over the middle, its value, its label; on (k) — mint, less rounded
-static void qs_tile(UpPage &P, float x, float y, int ic, const char *icon, const char *value, const char *label, float k,
-                    bool dim, float a, const HaloView &v) {
-  up_rrect(P, x - 76, y - 53, x + 76, y + 53, 38 + (29 - 38) * k, ui_mix(QS_CARD, QS_MINT, k), a, v);
-  HaloItem &t = P.it[P.n - 1];
-  const uint32_t acc = dim ? UP_MUTED : ui_mix(QS_MINT, QS_INK, k);
-  // (the icon says what it is, the value its state — no label: the user's rule, 23 Nov 2026)
-  (void)label;
-  ln_text(P, gl_qs_ic24, icon ? icon : QS_IC_TILE[ic], x, y - 20, 1, acc, a, v, &t);
-  ln_text(P, gl_qs_val, value, x, y + 15, 1, ui_mix(UP_WHITE, QS_INK, k), a, v, &t);
+// A round toggle of Controls (Pixel Watch's quick settings: icon buttons, no tiles): on — filled mint, the dark ink;
+// off — the tonal fill, the icon in mint
+#define QS_BTN_R 44.0f
+static const float QS_BX[3] = {125, 233, 341}, QS_BY[2] = {214, 318};
+static void qs_btn(UpPage &P, int k, const HaloFont &f, const char *icon, float on, float a, const HaloView &v) {
+  const float x = QS_BX[k % 3], y = QS_BY[k / 3];
+  HaloItem &d = up_disc(P, x, y, QS_BTN_R, ui_mix(QS_CARD, QS_MINT, on), a, v);
+  ln_text(P, f, icon, x, y, 1, ui_mix(QS_MINT, QS_INK, on), a, v, &d);
 }
-// A level: its card, − and +, the value, the marks (the first `n` of `cap` lit)
+// A level as Wear OS's slider: a full pill, − and + at its ends, the icon and value between them over its marks
 static void qs_level(UpPage &P, float y, const char *icon, const char *value, int n, int cap, float a, const HaloView &v) {
-  up_rrect(P, 65, y - 51, 401, y + 51, 36, QS_CARD, a, v);
+  up_rrect(P, UP_ROW_X0, y - 48, UP_ROW_X1, y + 48, 48, QS_CARD, a, v);
   HaloItem &c = P.it[P.n - 1];
-  ln_text(P, gl_qs_ic24, icon, CX, y - 29, 0.75f, QS_MINT, a, v, &c);  // (its icon, not its name)
-  ln_text(P, gl_qs_lvl, value, CX, y + 1, 1, UP_WHITE, a, v, &c);
-  up_secondary(P, 108, y, 28, QS_IC_MINUS, QS_TONAL, QS_MINT, a, v, gl_qs_ic24);
-  up_secondary(P, 358, y, 28, QS_IC_PLUS, QS_MINT, QS_INK, a, v, gl_qs_ic24);
+  // the icon and the value as one group, centred: the icon (its 24 px glyph), 10 px, the value
+  const float vw = halo_text_width(gl_qs_lvl, value), gx = CX - (26 + 10 + vw) / 2;
+  ln_text(P, gl_qs_ic24, icon, gx + 13, y - 8, 1, QS_MINT, a, v, &c);
+  ln_text(P, gl_qs_lvl, value, gx + 36, y - 8, 0, UP_WHITE, a, v, &c);
+  up_secondary(P, UP_ROW_X0 + 46, y, 30, QS_IC_MINUS, QS_TONAL, QS_MINT, a, v, gl_qs_ic24);
+  up_secondary(P, UP_ROW_X1 - 46, y, 30, QS_IC_PLUS, QS_MINT, QS_INK, a, v, gl_qs_ic24);
   for (int i = 0; i < cap; i++) {
     const float x = CX - (cap - 1) * 7 + 14 * i;
-    up_rrect(P, x - 5, y + 28, x + 5, y + 35, 3.5f, i < n ? QS_MINT : QS_MARK, a, v);
+    up_rrect(P, x - 5, y + 24, x + 5, y + 31, 3.5f, i < n ? QS_MINT : QS_MARK, a, v);
   }
 }
 
 static void qs_lay(int p, UpPage &P, float a, const HaloView &v) {
   const int b = sh_bright(), vol = vol_level;
-  if (p == 0) {  // Controls
-    snprintf(qs_bright_s, sizeof(qs_bright_s), "%d/8", b);
-    snprintf(qs_vol_s, sizeof(qs_vol_s), "%d%%", vol * 10);
-    // (no heading: the tiles say it — the grid moves up into the room)
-    qs_tile(P, 151, 155, 0, nullptr, sh_wifi ? "Sync" : "Off", "WI-FI", 0, !sh_wifi, a, v);
-    qs_tile(P, 315, 155, 1, nullptr, qs_bright_s, "BRIGHTNESS", 0, false, a, v);
-    qs_tile(P, 151, 269, 2, nullptr, shade_aod_is_on() ? "On" : "Off", "ALWAYS ON", halo_clamp01(sh_on[SI_AOD].x), false, a, v);
-    qs_tile(P, 315, 269, 3, vol ? nullptr : QS_IC_MUTED, vol ? qs_vol_s : "Muted", "VOLUME", 0, false, a, v);
-    const bool bat = qs_battery && sh_bat >= 0;  // (the chip: only with a reading, and when the setting keeps it)
+  if (p == 0) {  // Controls: the battery, then two rows of three round toggles
+    const bool bat = qs_battery && sh_bat >= 0;  // (only with a reading, and when the setting keeps it)
     const int pct = constrain((int)sh_bat, 0, 100);
-    snprintf(qs_bat_s, sizeof(qs_bat_s), "%d%%", pct);
-    up_rrect(P, 129, 341, 267, 377, 18, QS_TONAL, bat ? a : 0, v);
-    HaloItem &chip = P.it[P.n - 1];
-    const int lv = pct >= 88 ? 4 : pct >= 63 ? 3 : pct >= 38 ? 2 : pct >= 13 ? 1 : 0;
-    ln_text(P, gl_qs_ic19, QS_IC_BAT[lv], 181, 359, 1, QS_MINT, bat ? a : 0, v, &chip);
-    // the percent from where the study's "78%" (centred at 216) starts: a wider one grows to the right, off the icon
-    static const float left = 216 - halo_text_width(gl_up_lab, "78%") / 2.0f;
-    ln_text(P, gl_up_lab, qs_bat_s, left, 359, 0, UP_WHITE, bat ? a : 0, v, &chip);
-    up_secondary(P, 310, 359, 25, QS_IC_GEAR, QS_CARD, QS_MINT, a, v, gl_qs_ic24);
-  } else if (p == 1) {  // Levels
+    // the battery as the face's pill (widgets.h FL_BATPILL): one battery look on the watch
+    snprintf(qs_bat_s, sizeof(qs_bat_s), "%d", pct);
+    const float bx = CX - 4, by = 122, bw = 92, bh = 36, in = 4, fw = (bw - 2 * in) * pct / 100.0f, ba = bat ? a : 0;
+    const uint32_t fill = sh_chg ? 0x6DD58C : pct <= 15 ? 0xF28B82 : QS_MINT;
+    up_rrect(P, bx - bw / 2, by - bh / 2, bx + bw / 2, by + bh / 2, bh / 2, QS_TONAL, ba, v);
+    up_rrect(P, bx - bw / 2 + in, by - bh / 2 + in, bx - bw / 2 + in + fmaxf(fw, bh - 2 * in), by + bh / 2 - in, bh / 2 - in,
+             ui_mix(fill, QS_TONAL, 0.55f), pct > 0 ? ba : 0, v);
+    up_rrect(P, bx + bw / 2 + 2, by - 7, bx + bw / 2 + 8, by + 7, 3, QS_TONAL, ba, v);  // (the nub)
+    const float tw = halo_text_width(gl_up_lab, qs_bat_s), gx = bx + (sh_chg ? 9 : 0);
+    ln_text(P, gl_qs_ic19, "\xEF\x83\xA7", gx - tw / 2 - 12, by, 1, UP_WHITE, sh_chg ? ba : 0, v, nullptr);
+    ln_text(P, gl_up_lab, qs_bat_s, gx - tw / 2, by, 0, pct <= 15 && !sh_chg ? 0xF28B82 : UP_WHITE, ba, v, nullptr);
+    qs_btn(P, 0, gl_qs_ic24, QS_IC_TILE[0], sh_wifi ? 1 : 0, a, v);                           // Wi-Fi: sync now
+    qs_btn(P, 1, gl_qs_ic24, QS_IC_TILE[2], halo_clamp01(sh_on[SI_AOD].x), a, v);             // Always On
+    qs_btn(P, 2, gl_qs_ic24, vol ? QS_IC_TILE[3] : QS_IC_MUTED, vol ? 1 : 0, a, v);           // sound: mute, restore
+    qs_btn(P, 3, gl_qs_ic24, QS_IC_TILE[1], b >= 5 ? 1 : 0, a, v);                            // brightness: 2 → 5 → 8
+    qs_btn(P, 4, gl_qs_ic23, QS_IC_LOCK, 0, a, v);                                            // lock
+    qs_btn(P, 5, gl_qs_ic24, QS_IC_GEAR, 0, a, v);                                            // the panel's settings
+  } else if (p == 1) {  // Levels: two sliders, screen off under them
     snprintf(qs_lbright_s, sizeof(qs_lbright_s), "%d/8", b);
     snprintf(qs_lvol_s, sizeof(qs_lvol_s), "%d%%", vol * 10);
-    qs_level(P, 151, QS_IC_TILE[1], qs_lbright_s, b, 8, a, v);
-    qs_level(P, 262, vol ? QS_IC_TILE[3] : QS_IC_MUTED, qs_lvol_s, vol, 10, a, v);
-    up_secondary(P, 170, 357, 26, QS_IC_LOCK, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
-    up_secondary(P, 296, 357, 26, QS_IC_POWER, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
-  } else {  // Shade settings
-    up_title(P, "Shade settings", a, v);
-    up_rrect(P, 72, 132, 394, 246, 34, QS_CARD, a, v);
-    HaloItem &open = P.it[P.n - 1];
-    ln_text(P, gl_qs_head, "Open on", CX, 156, 1, UP_WHITE, a, v, &open);
-    for (int k = 0; k < 2; k++) {
-      const bool on = (k == 1) == qs_on_levels;
-      const float x = k ? 310 : 156;
-      up_rrect(P, x - 71, 181, x + 71, 232, 25.5f, on ? QS_MINT : QS_CHOICE, a, v);
-      ln_text(P, gl_up_lab, k ? "Levels" : "Controls", x, 206.5f, 1, on ? QS_INK : UP_WHITE, a, v, &P.it[P.n - 1]);
-    }
-    up_rrect(P, 72, 261, 394, 345, 34, QS_CARD, a, v);
-    HaloItem &card = P.it[P.n - 1];
-    ln_text(P, gl_qs_head, "Battery", 190, 293, 1, UP_WHITE, a, v, &card);
-    ln_text(P, gl_up_lab, "SHOW ON CONTROLS", 190, 322, 1, QS_MINT, a, v, &card);
-    const float s = halo_clamp01(qs_sw.x), kx = 325.5f + 25.5f * qs_sw.x;  // the thumb: 325.5 off, 351 on
-    up_rrect(P, 306, 284, 371, 323, 19.5f, ui_mix(QS_CHOICE, QS_MINT, s), a, v);
-    HaloItem &thumb = up_disc(P, kx, 303.5f, 14.5f, ui_mix(UP_MUTED, QS_INK, s), a, v);
-    ln_text(P, gl_ln_ic15, LN_IC_CHECK, kx, 303.5f, 1, QS_MINT, a * s, v, &thumb);
-    up_secondary(P, CX, 386, 29, QS_IC_BACK, QS_TONAL, QS_MINT, a, v, gl_qs_ic25);
+    qs_level(P, 160, QS_IC_TILE[1], qs_lbright_s, b, 8, a, v);
+    qs_level(P, 272, vol ? QS_IC_TILE[3] : QS_IC_MUTED, qs_lvol_s, vol, 10, a, v);
+    up_secondary(P, CX, 368, 28, QS_IC_POWER, QS_TONAL, QS_MINT, a, v, gl_qs_ic23);
+  } else {  // Shade settings: Wear OS's radio and switch buttons, one a row
+    up_title(P, "Shade", a, v);
+    up_row(P, UP_ROW_X0, UP_ROW_X1, 164, UP_ROW_H, "Open on Controls", nullptr, UP_ROW_RADIO, qs_on_levels ? 0 : 1, QS_MINT, QS_INK, a, v);
+    up_row(P, UP_ROW_X0, UP_ROW_X1, 242, UP_ROW_H, "Open on Levels", nullptr, UP_ROW_RADIO, qs_on_levels ? 1 : 0, QS_MINT, QS_INK, a, v);
+    up_row(P, UP_ROW_X0, UP_ROW_X1, 320, UP_ROW_H, "Battery", "Show on Controls", UP_ROW_SWITCH, qs_sw.x, QS_MINT, QS_INK, a, v);
   }
 }
 
 static void qs_tap(int p, float x, float y) {
   if (p == 0) {
-    if (up_in(x, y, 75, 102, 227, 208)) sh_act(SI_WIFI);  // (the grid 30 px up: no heading)
-    else if (up_in(x, y, 239, 102, 391, 208)) sh_act(SI_BRIGHT);
-    else if (up_in(x, y, 75, 216, 227, 322)) sh_act(SI_AOD);
-    else if (up_in(x, y, 239, 216, 391, 322)) sh_act(SI_VOL);
-    else if (up_in(x, y, 285, 334, 335, 384)) up_go(2);
+    static const uint8_t ACT[5] = {SI_WIFI, SI_AOD, SI_VOL, SI_BRIGHT, SI_LOCK};
+    for (int k = 0; k < 6; k++)
+      if (up_hit(x, y, QS_BX[k % 3], QS_BY[k / 3], QS_BTN_R)) return k < 5 ? sh_act(ACT[k]) : up_go(2);
   } else if (p == 1) {
     for (int k = 0; k < 2; k++) {
-      const float y0 = k ? 234 : 123;
-      const int d = up_in(x, y, 80, y0, 136, y0 + 56) ? -1 : up_in(x, y, 330, y0, 386, y0 + 56) ? 1 : 0;
+      const float cy = k ? 272 : 160;
+      const int d = up_hit(x, y, UP_ROW_X0 + 46, cy, 30) ? -1 : up_hit(x, y, UP_ROW_X1 - 46, cy, 30) ? 1 : 0;
       if (!d) continue;
       if (k) sh_volume(vol_level + d);
       else sh_bright_set(constrain(sh_bright() + d, 0, SH_SEGS));
     }
-    if (up_in(x, y, 144, 331, 196, 383)) sh_act(SI_LOCK);
-    else if (up_in(x, y, 270, 331, 322, 383)) sh_act(SI_OFF);
+    if (up_hit(x, y, CX, 368, 28)) sh_act(SI_OFF);
   } else {
-    if (up_in(x, y, 85, 181, 227, 232) && qs_on_levels) qs_on_levels = false, qs_prefs.putUChar("open", 0);
-    else if (up_in(x, y, 239, 181, 381, 232) && !qs_on_levels) qs_on_levels = true, qs_prefs.putUChar("open", 1);
-    else if (up_in(x, y, 72, 261, 394, 345)) qs_battery = !qs_battery, qs_prefs.putUChar("bat", qs_battery);
-    else if (up_in(x, y, 204, 357, 262, 415)) up_go(0);
+    if (up_in(x, y, UP_ROW_X0, 128, UP_ROW_X1, 200) && qs_on_levels) qs_on_levels = false, qs_prefs.putUChar("open", 0);
+    else if (up_in(x, y, UP_ROW_X0, 206, UP_ROW_X1, 278) && !qs_on_levels) qs_on_levels = true, qs_prefs.putUChar("open", 1);
+    else if (up_in(x, y, UP_ROW_X0, 284, UP_ROW_X1, 356)) qs_battery = !qs_battery, qs_prefs.putUChar("bat", qs_battery);
   }
 }
 static void qs_upd(int, float dt) {
   qs_sw.target = qs_battery ? 1 : 0;
   halo_spring_run(qs_sw, K_QS_SW, dt);
 }
-static const UpApp QS_APP = {qs_count, qs_lay, nullptr, qs_upd, nullptr, QS_MINT};
+static const UpApp QS_APP = {qs_count, qs_lay, nullptr, qs_upd, nullptr, QS_MINT};  // (taps: shade_round.h hands them to qs_tap)
 
 // ---------- shade_round.h calls these ----------
 static void qs_begin() {  // (face_build: the two settings back from flash)

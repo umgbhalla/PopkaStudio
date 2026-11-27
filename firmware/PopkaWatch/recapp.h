@@ -172,29 +172,24 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_text(P, gl_up_lab, "RECORDING AGAIN REPLACES IT", up_mid_lab, CX, 258, 1, UP_MUTED, a, v);
   } else {  // Recorder settings
     up_title(P, "Settings", a, v);  // (the app's name is the page before: a short title keeps clear of the rim)
-    up_rrect(P, 74, 126, 392, 274, 28, RA_PANEL, a, v);
+    // the clip limit as Wear OS's stepper: its name over a pill with − and + at its ends, the value between them
+    up_text(P, gl_t20, "Clip limit", halo_text_mid(gl_t20, "Clp"), CX, 142, 1, RA_ACC, a, v);
+    up_rrect(P, UP_ROW_X0, 154, UP_ROW_X1, 238, 42, UP_ROW_OFF, a, v);
     HaloItem &card = P.it[P.n - 1];
-    up_text(P, gl_up_lab, "CLIP LIMIT", up_mid_lab, CX, 146, 1, RA_ACC, a, v, &card);  // (a label, not a second title over the number)
     snprintf(ra_lim, sizeof(ra_lim), "%d", rc_limit_s);
-    up_text(P, gl_up_disp, ra_lim, up_mid_disp, CX, 206, 1, UP_WHITE, a, v, &card);
-    up_text(P, gl_up_lab, "SECONDS", up_mid_lab, CX, 259, 1, UP_MUTED, a, v, &card);
+    up_text(P, gl_up_num, ra_lim, up_mid_num, CX, 188, 1, UP_WHITE, a, v, &card);
+    up_text(P, gl_t20, "seconds", halo_text_mid(gl_t20, "sec"), CX, 217, 1, UP_MUTED, a, v, &card);
     for (int k = 0; k < 2; k++) {  // − and +: quiet at the ends (no hit there)
-      const float x = k ? 347 : 119;
+      const float x = k ? UP_ROW_X1 - 42 : UP_ROW_X0 + 42;
       const bool on = k ? rc_limit_s < RA_LIMITS[2] : rc_limit_s > RA_LIMITS[0];
-      HaloItem &d = up_disc(P, x, 203, 27, RA_CTRL, a, v);
+      HaloItem &d = up_disc(P, x, 196, 30, RA_CTRL, a, v);
       const char *ic = k ? RA_IC_PLUS : RA_IC_MINUS;
-      up_text(P, gl_ra_ic26, ic, halo_text_mid(gl_ra_ic26, ic), x, 203, 1, on ? RA_ACC : RA_QUIET, a, v, &d);
+      up_text(P, gl_ra_ic26, ic, halo_text_mid(gl_ra_ic26, ic), x, 196, 1, on ? RA_ACC : RA_QUIET, a, v, &d);
     }
-    up_rrect(P, 80, 284, 386, 352, 24, RA_PANEL, a, v);
-    HaloItem &lv = P.it[P.n - 1];
-    up_text(P, gl_t24, "Level audio", halo_text_mid(gl_t24, "Lvl"), 104, 305, 0, UP_WHITE, a, v, &lv);  // (the house's row type: clear of the switch)
-    up_text(P, gl_up_lab, "EVEN OUT PLAYBACK", up_mid_lab, 104, 331, 0, UP_MUTED, a, v, &lv);
-    const float s = halo_clamp01(ra_sw.x);  // the switch: off — the secondary fill, a muted thumb left; on — coral
-    up_rrect(P, 303, 298, 366, 332, 17, ui_mix(RA_CTRL, RA_ACC, s), a, v);
-    up_disc(P, 321 + 27 * s, 315, 12, ui_mix(UP_MUTED, RA_INK, s), a, v);
+    up_row(P, UP_ROW_X0, UP_ROW_X1, 292, UP_ROW_H, "Level audio", "Even out playback", UP_ROW_SWITCH, ra_sw.x, RA_ACC, RA_INK, a, v);
     if (!rc_len) ra_sum[0] = 0;  // (nothing to say: the Recordings page says it)
     else snprintf(ra_sum, sizeof(ra_sum), "1 CLIP  /  %.1f MB IN MEMORY", rc_len * 2 / 1e6f);
-    up_text(P, gl_up_lab, ra_sum, up_mid_lab, CX, 381, 1, UP_MUTED, a, v);
+    up_text(P, gl_up_lab, ra_sum, up_mid_lab, CX, 360, 1, UP_MUTED, a, v);
   }
 }
 static void ra_tap(int p, float x, float y) {
@@ -204,9 +199,9 @@ static void ra_tap(int p, float x, float y) {
   } else if (p == 1) {
     if (up_in(x, y, 80, 128, 386, 200)) ra_open_clip();
   } else {
-    if (up_in(x, y, 92, 176, 146, 230)) ra_step_limit(-1);
-    else if (up_in(x, y, 320, 176, 374, 230)) ra_step_limit(1);
-    else if (up_in(x, y, 80, 280, 386, 350)) rc_level_on = !rc_level_on, ra_keep();
+    if (up_in(x, y, UP_ROW_X0 + 6, 160, UP_ROW_X0 + 78, 232)) ra_step_limit(-1);
+    else if (up_in(x, y, UP_ROW_X1 - 78, 160, UP_ROW_X1 - 6, 232)) ra_step_limit(1);
+    else if (up_in(x, y, UP_ROW_X0, 256, UP_ROW_X1, 328)) rc_level_on = !rc_level_on, ra_keep();
   }
 }
 static void ra_springs(float dt) {

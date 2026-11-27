@@ -350,21 +350,10 @@ static void rpg_lay_volume(UpPage &P, float a, const HaloView &v) {
 
 // ---------- 4 Radio settings ----------
 static void rpg_lay_settings(UpPage &P, float a, const HaloView &v) {
-  up_title(P, "Radio settings", a, v);
-  static const char *const LAB[2] = {"Auto-retry", "Track info"}, *const SUB[2] = {"Reconnect on drop", "Show song titles"};
-  for (int k = 0; k < 2; k++) {
-    const float y = k ? 242 : 164;
-    const bool on = k ? rpg_tinfo : rpg_retry;
-    HaloItem &card = rpg_card(P, 69, y - 32, 397, y + 32, 23, RPG_CARD, a, v);
-    rpg_text(P, gl_rpg_row, LAB[k], 94, y - 9, 0, UP_WHITE, a, v, &card);
-    rpg_text(P, gl_rpg_meta, SUB[k], 94, y + 15, 0, RPG_SOFT, a, v, &card);
-    up_rrect(P, 312, y - 16, 374, y + 16, 16, on ? RPG_ACC : RPG_RING, a, v);
-    up_disc(P, on ? 357 : 329, y, 11, on ? RPG_INK : RPG_SOFT, a, v);
-  }
-  HaloItem &src = rpg_card(P, 69, 288, 397, 352, 23, RPG_PANEL, a, v);
-  rpg_button(P, 107, 320, 21, RPG_IC_GLOBE, gl_rpg_ic20, RPG_CARD, RPG_ACC, a, v);
-  rpg_text(P, gl_rpg_row, "Radio Browser", 143, 311, 0, UP_WHITE, a, v, &src);
-  rpg_text(P, gl_rpg_meta, "STATION CATALOG", 143, 335, 0, RPG_SOFT, a, v, &src);
+  up_title(P, "Settings", a, v);  // (the app's name is on its first page; Wear OS's switch buttons, one a row)
+  up_row(P, UP_ROW_X0, UP_ROW_X1, 164, UP_ROW_H, "Auto-retry", "Reconnect on drop", UP_ROW_SWITCH, rpg_retry, RPG_ACC, RPG_INK, a, v);
+  up_row(P, UP_ROW_X0, UP_ROW_X1, 242, UP_ROW_H, "Track info", "Show song titles", UP_ROW_SWITCH, rpg_tinfo, RPG_ACC, RPG_INK, a, v);
+  up_row(P, UP_ROW_X0, UP_ROW_X1, 320, UP_ROW_H, "Radio Browser", "Station catalog", UP_ROW_BUTTON, 0, RPG_ACC, RPG_INK, a, v);
 }
 
 // ---------- The app ----------

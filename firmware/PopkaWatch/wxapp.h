@@ -13,7 +13,6 @@ static void wa_hhmm(char *o, int n, uint32_t t) {
 }
 
 // ---------- The days, the details, refresh ----------
-static void wa_city(char *o, int n) { strlcpy(o, wx_city[0].name, n); }
 static void wa_refresh() {
 #if SS_WIFI
   xTaskNotifyGive(hclk_handle);
@@ -45,7 +44,6 @@ extern const HaloFont gl_wx_hero, gl_wx_line, gl_wx_val, gl_wx_week, gl_title, g
 #define WA_X1 (CX + WA_W / 2)
 static char wa_now[8], wa_line[40], wa_hl[32], wa_hour[12][8], wa_ht[12][8], wa_day[7][2][8], wa_det[3][8], wa_src[40];
 static char wa_rise_s[8], wa_set_s[8];
-static UiPage wa_locs;
 static int wa_cities();
 static int wa_count() { return wa_cities() + 1; }
 static float wa_mid(const HaloFont &f) { return halo_text_mid(f, "0123456789"); }
@@ -120,13 +118,13 @@ static inline uint8_t wa_sky_now(const WxCity &c) {
 }
 
 // ---------- A city's items ----------
-enum : uint8_t { WI_HERO, WI_HEAD, WI_HOURS, WI_DAY, WI_DET, WI_SUN, WI_FOOT, WI_SET_UNITS, WI_SET_LOC };
+enum : uint8_t { WI_HERO, WI_HEAD, WI_HOURS, WI_DAY, WI_DET, WI_SUN, WI_FOOT, WI_UNIT, WI_PLACE, WI_HERE, WI_REFRESH };
 struct WaItem {
   uint8_t kind, arg;
 };
 static WaItem wa_items[UP_PAGES][HALO_LIST_MAX];
 static int wa_ni[UP_PAGES];
-static const char *const WA_HEADS[] = {"Next 12 hours", "7 days", "Details", "Weather"};
+static const char *const WA_HEADS[] = {"Next 12 hours", "7 days", "Details", "Weather", "Units", "Location"};
 static int wa_hours_from(const WxCity &c) {  // the first hour strictly after now
   const uint32_t now = time(nullptr);
   int first = 0;
@@ -138,7 +136,11 @@ static int wa_build(int p) {
   WaItem *it = wa_items[p];
   auto add = [&](uint8_t k, uint8_t a = 0) { if (n < HALO_LIST_MAX) it[n++] = {k, a}; };
   if (p >= wa_cities()) {  // Settings
-    add(WI_HEAD, 3), add(WI_SET_UNITS), add(WI_SET_LOC);
+    // (Wear OS's settings: a list of pill rows — radio buttons for the units, plain buttons for the place)
+    add(WI_HEAD, 3), add(WI_HEAD, 4), add(WI_UNIT, 0), add(WI_UNIT, 1), add(WI_HEAD, 5), add(WI_PLACE);
+#if SS_WIFI
+    add(WI_HERE), add(WI_REFRESH);
+#endif
     return wa_ni[p] = n;
   }
   const WxCity &c = wx_city[p];
@@ -167,13 +169,12 @@ static int wa_n_items(int p) { return wa_build(p); }
 static float wa_item_h(int p, int k) {
   switch (wa_items[p][k].kind) {
     case WI_HERO: return 410;
-    case WI_HEAD: return p >= wa_cities() ? 70 : 58;
+    case WI_HEAD: return wa_items[p][k].arg == 3 ? 70 : 58;
     case WI_HOURS: return 150;
     case WI_DAY: return 84;
     case WI_DET: return 120;
     case WI_SUN: return 170;
-    case WI_SET_UNITS: return 156;
-    case WI_SET_LOC: return 104;
+    case WI_UNIT: case WI_PLACE: case WI_HERE: case WI_REFRESH: return 80;
     default: return 64;
   }
 }
@@ -205,7 +206,7 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
       break;
     }
     case WI_HEAD: {
-      const bool big = p >= wa_cities();
+      const bool big = w.arg == 3;  // (Settings' own title; the others — list headers in the accent)
       wa_txt(P, big ? gl_title : gl_t24, WA_HEADS[w.arg], CX, big ? 34 : h / 2 + 4, 1, big ? WA_TXT : WA_ACC, ac, v);
       break;
     }
@@ -311,31 +312,21 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
       wa_txt(P, gl_t20, wa_src, CX, h / 2, 1, WA_DIM, ac, v);
       break;
     }
-    case WI_SET_UNITS: {  // a card: Units, and the two choices as pills (the picked one filled in the accent)
-      HaloItem &card = wa_card(P, 0, h, abg, v, 48);
-      wa_txt(P, gl_t20, "Units", CX, 34, 1, WA_DIM, ac, v, &card);
-      for (int j = 0; j < 2; j++) {
-        const bool on = (j == 1) == wx_fahr;
-        const float x0 = j ? CX + 6 : WA_X0 + 34, x1 = j ? WA_X1 - 34 : CX - 6;
-        HaloItem &pill = up_item(P);
-        ui_rrect(pill, (x0 + x1) / 2, 98, x1 - x0, 72, 36, 1, on ? WA_ACC : WA_TRACK, ac);
-        pill.on_black = true;
-        up_commit(pill, v);
-        wa_txt(P, gl_wx_val, j ? "\xC2\xB0""F" : "\xC2\xB0""C", (x0 + x1) / 2, 98, 1, on ? 0x2A1A00 : WA_TXT, ac, v, &pill);
-      }
+    case WI_UNIT: {
+      const bool on = (w.arg == 1) == wx_fahr;
+      up_row(P, WA_X0, WA_X1, h / 2, h, w.arg ? "Fahrenheit" : "Celsius", w.arg ? "\xC2\xB0""F, mph" : "\xC2\xB0""C, km/h",
+             UP_ROW_RADIO, on ? 1 : 0, WA_ACC, 0x2A1A00, ac, v);
       break;
     }
-    case WI_SET_LOC: {  // the Apps list's card: a tonal disc, the title, the line under it
-      HaloItem &card = wa_card(P, 0, h, abg, v);
-      const float ix = WA_X0 + 56;
-      wa_dot(P, ix, h / 2, 32, WA_ACC, ac, v);
-      HaloItem &pin = P.it[P.n - 1];
-      HaloItem &g = up_item(P);
-      ui_text(g, gl_ic24, WA_IC_LOC, halo_text_mid(gl_ic24, WA_IC_LOC), ix, h / 2, 1, 1, 0x1B1B1F, ac, &pin), up_commit(g, v);
-      wa_txt(P, gl_t24, "Location", WA_X0 + 104, 38, 0, WA_TXT, ac, v, &card);
-      wa_txt(P, gl_t20, wx_city[0].name, WA_X0 + 104, 72, 0, WA_DIM, ac, v, &card, WA_W - 104 - 40);
+    case WI_PLACE:
+      up_row(P, WA_X0, WA_X1, h / 2, h, wx_city[0].name, "Showing", UP_ROW_BUTTON, 0, WA_ACC, 0x2A1A00, ac, v);
       break;
-    }
+    case WI_HERE:
+      up_row(P, WA_X0, WA_X1, h / 2, h, "Use my location", "By this watch's internet", UP_ROW_BUTTON, 0, WA_ACC, 0x2A1A00, ac, v);
+      break;
+    case WI_REFRESH:
+      up_row(P, WA_X0, WA_X1, h / 2, h, "Refresh now", "Open-Meteo", UP_ROW_BUTTON, 0, WA_ACC, 0x2A1A00, ac, v);
+      break;
   }
 }
 static void wa_lay(int, UpPage &, float, const HaloView &) {}
@@ -343,30 +334,17 @@ static void wa_tap(int p, float x, float y) {
   const int k = up_list_hit(p, y);
   if (k < 0 || fabsf(x - CX) > WA_W / 2) return;
   const WaItem &w = wa_items[p][k];
-  if (w.kind == WI_SET_UNITS) {
-    const float top = up_ls[p].fx[k].top, s = up_ls[p].fx[k].s;
-    if ((y - top) / s < 56) return;  // (the label row)
-    if (x < CX && wx_fahr) sy_set_units(0);
-    else if (x >= CX && !wx_fahr) sy_set_units(1);
-  } else if (w.kind == WI_SET_LOC) {
-    ui_cur = 0, ui_open(&wa_locs);
-  }
+  if (w.kind == WI_UNIT) sy_set_units(w.arg);
+#if SS_WIFI
+  else if (w.kind == WI_HERE) wa_here();
+  else if (w.kind == WI_REFRESH) wa_refresh();
+#endif
 }
 static void wa_upd(int, float) {
   static uint32_t seen = 1;
   if (wx_fetched_ms != seen) seen = wx_fetched_ms, halo_damage_all();  // (fresh weather: every page again)
 }
 static const UpApp WA_APP = {wa_count, wa_lay, wa_tap, wa_upd, nullptr, WA_ACC, nullptr, true, wa_n_items, wa_item_h, wa_lay_item};
-static void wa_build_locs() {
-  wa_locs = {"Location", {}, 0, WA_ACC};
-  UiPage &l = wa_locs;
-  l.rows[l.n++] = ur_info(WA_IC_LOC, "Showing", wa_city);
-#if SS_WIFI
-  l.rows[l.n++] = ur_action("Use my location", wa_here, WA_ACC);
-  l.rows[l.n++] = ur_action("Refresh now", wa_refresh, WA_ACC);
-#endif
-}
-
 // The location kept (Use my location): the first city at start
 static Preferences wa_prefs;
 static void wxapp_begin() {
@@ -384,7 +362,7 @@ static void wa_keep_location() {
 }
 
 // The screen (settings.h calls these)
-static void wxapp_enter() { wa_build_locs(), up_open(&WA_APP); }
+static void wxapp_enter() { up_open(&WA_APP); }
 static void wxapp_update(float dt) {
   wa_keep_location();
   up_update(dt);

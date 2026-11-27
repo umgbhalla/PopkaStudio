@@ -56,6 +56,7 @@ static HaloSpringK K_SH_MORPH;
 static HaloSpring sh_on[SI_N];    // a tile's shape: 0 — off, 1 — on (Always On: mint, less rounded)
 static volatile int sh_cmd = -1;  // shade open|close (1, 0), shade alone (2)
 static volatile int sh_bat = -1;  // the battery's percent (−1 — not known)
+static volatile bool sh_chg;      // charging (the quick settings' battery shows its bolt)
 
 // Brightness: Display's steps when the firmware has Display, else the panel's own (the same table and flash key)
 #if HAS_DISPLAY
@@ -101,7 +102,7 @@ static void shade_poll() {  // loop(): the panel's own brightness into flash; th
   if (sh_bat >= 0 && halo_ms() - last < 5000) return;
   last = halo_ms();
   const HaloBattery b = halo_battery();
-  sh_bat = b.ok && b.present ? b.percent : -1;
+  sh_bat = b.ok && b.present ? b.percent : -1, sh_chg = b.ok && b.charging;
 }
 
 // ---------- The pool: the disc, through its move and the screen's view ----------

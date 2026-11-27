@@ -592,7 +592,7 @@ ROUND_APP_FONTS = {
               "font  gl_qs_head GoogleSansFlex.ttf  35  \"Open onBattery\" @wght=775,wdth=86,ROND=45,opsz=35   # Shade settings: a card's heading",
               "font  gl_qs_ic24 fa-solid-900.ttf    24  0xf1eb 0xf185 0xf017 0xf028 0xf6a9 0xf013 0xf068 0xf067   # Quick settings: tiles, steppers",
               "font  gl_qs_ic23 fa-solid-900.ttf    23  0xf023 0xf011   # Quick settings: Lock, Screen off",
-              "font  gl_qs_ic19 fa-solid-900.ttf    19  0xf240 0xf241 0xf242 0xf243 0xf244   # Quick settings: the battery",
+              "font  gl_qs_ic19 fa-solid-900.ttf    19  0xf240 0xf241 0xf242 0xf243 0xf244 0xf0e7   # Quick settings: the battery, its bolt",
               "font  gl_qs_ic25 fa-solid-900.ttf    25  0xf060   # Shade settings: back to Controls"],
 }
 RADIO_LETTERS = 'latin cyrillic punct "àáâãäåæçèéêëìíîïñòóôõöøùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßœŒšŠžŽłŁńśźżąęćőűĞğİıŞşŢţ’‘€£¥©®™"'

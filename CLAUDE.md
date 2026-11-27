@@ -44,6 +44,12 @@ python3 tools/watch/sheet.py /tmp/sheet.png /tmp/r/*.png   # side by side, cut t
 - Optical centre ≈ 16 px above the middle; centre lopsided marks halfway between box centre and ink centroid
   (hang a ° outside the digits). One type cut per role (time: the 103 px display cut; heroes 154 px).
 - House tokens: cards `0x2E3034`, text `0xFFF8EE`, secondary `0x9E9E9E`, each app its accent + a tonal container.
+- Settings and choices are rows, never a card holding blocks: `up_row()` in `upager.h` (a full pill per control —
+  plain button, switch or radio, filled with the accent when picked; `UP_ROW_X0/X1/H` on fixed pages). A number to
+  step is a stepper/slider pill: − and + discs at the ends, the value between. Quick controls are round icon
+  toggles (Pixel Watch's quick settings), not tiles. Ref: `docs/references/wear-os/surfaces/apps/layouts/scrolling/`
+  (settings, toggle-buttons) and `m2-5/components/toggle-chips/`.
+- Render every change, then check it on the device: `upcheck` for overlaps, `sheet.py --guides` for balance.
 
 ## Conventions
 - Comments explain *why*, in the codebase's voice (parenthetical asides, dates of user decisions).

@@ -168,20 +168,10 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
     }
     if (!mu_qn) mu_text(P, gl_mu_opt, "No upcoming tracks", CX, 233, 1, UP_MUTED, a, v);
   } else {  // Music settings
-    up_title(P, "Music settings", a, v);
-    for (int k = 0; k < 2; k++) {
-      const float y = MU_ROW_Y[k], s = halo_clamp01(mu_sw[k]);
-      up_rrect(P, 77, y - 33, 389, y + 33, 22, MU_PANEL, a, v);
-      HaloItem &row = P.it[P.n - 1];
-      mu_text(P, gl_mu_opt, k ? "Background" : "Repeat track", 101, y, 0, UP_WHITE, a, v, &row);
-      up_rrect(P, 305, y - 17, 365, y + 17, 17, ui_mix(MU_RAIL, MU_ACC, s), a, v);
-      up_disc(P, 323 + 24 * s, y, 11, ui_mix(UP_MUTED, MU_INK, s), a, v);
-    }
-    up_rrect(P, 91, 296, 375, 362, 22, MU_PANEL, a, v);
-    HaloItem &card = P.it[P.n - 1];
-    mu_text(P, gl_mu_ic26, MU_IC_DRIVE, 121, 329, 1, MU_ACC, a, v, &card);
-    mu_text(P, gl_mu_opt, "Library source", 149, 317, 0, UP_WHITE, a, v, &card);
-    mu_text(P, gl_mu_lab, mu_source(), 149, 344.5f, 0, UP_MUTED, a, v, &card);
+    up_title(P, "Settings", a, v);  // (Wear OS's switch buttons, one a row; the library a plain row)
+    up_row(P, UP_ROW_X0, UP_ROW_X1, MU_ROW_Y[0], UP_ROW_H, "Repeat track", nullptr, UP_ROW_SWITCH, mu_sw[0], MU_ACC, MU_INK, a, v);
+    up_row(P, UP_ROW_X0, UP_ROW_X1, MU_ROW_Y[1], UP_ROW_H, "Background", "Keep playing off this screen", UP_ROW_SWITCH, mu_sw[1], MU_ACC, MU_INK, a, v);
+    up_row(P, UP_ROW_X0, UP_ROW_X1, MU_ROW_Y[2], UP_ROW_H, "Library", mu_source(), UP_ROW_BUTTON, 0, MU_ACC, MU_INK, a, v);
   }
 }
 // Taps by the design's hit boxes (each at least 66 px both ways)
