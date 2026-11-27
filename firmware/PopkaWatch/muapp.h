@@ -167,12 +167,16 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
       mu_text(P, gl_up_lab, mu_q[k][1], 364, y + 15.5f, 2, MU_ACC, a, v, &card);
     }
     if (!mu_qn) mu_text(P, gl_mu_opt, "No upcoming tracks", CX, 233, 1, UP_MUTED, a, v);
-  } else {  // Music settings
-    up_title(P, "Settings", a, v);  // (Wear OS's switch buttons, one a row; the library a plain row)
-    up_row(P, UP_ROW_X0, UP_ROW_X1, MU_ROW_Y[0], UP_ROW_H, "Repeat track", nullptr, UP_ROW_SWITCH, mu_sw[0], MU_ACC, MU_INK, a, v);
-    up_row(P, UP_ROW_X0, UP_ROW_X1, MU_ROW_Y[1], UP_ROW_H, "Background", "Keep playing off this screen", UP_ROW_SWITCH, mu_sw[1], MU_ACC, MU_INK, a, v);
-    up_row(P, UP_ROW_X0, UP_ROW_X1, MU_ROW_Y[2], UP_ROW_H, "Library", mu_source(), UP_ROW_BUTTON, 0, MU_ACC, MU_INK, a, v);
-  }
+  }  // (3, Settings: a list — mu_lay_item)
+}
+// Music settings as Wear OS's settings list (upager.h list mode)
+static int mu_items(int p) { return p == 3 ? 4 : 0; }
+static float mu_item_h(int, int k) { return up_set_h(k); }
+static void mu_lay_item(int, int k, UpPage &P, float, float ac, const HaloView &v) {
+  if (k == 0) return up_set_title(P, "Settings", ac, v);
+  if (k == 1) up_set_row(P, "Repeat track", nullptr, UP_ROW_SWITCH, mu_sw[0], MU_ACC, MU_INK, ac, v);
+  else if (k == 2) up_set_row(P, "Background", "Keep playing off this screen", UP_ROW_SWITCH, mu_sw[1], MU_ACC, MU_INK, ac, v);
+  else up_set_row(P, "Library", mu_source(), UP_ROW_BUTTON, 0, MU_ACC, MU_INK, ac, v);
 }
 // Taps by the design's hit boxes (each at least 66 px both ways)
 static void mu_tap(int p, float x, float y) {
@@ -190,10 +194,8 @@ static void mu_tap(int p, float x, float y) {
       if (up_in(x, y, 77, cy - 33, 389, cy + 33)) return mu_pick(mu_qi[k]), up_go(0);
     }
   } else {
-    for (int k = 0; k < 2; k++) {
-      const float cy = MU_ROW_Y[k];
-      if (up_in(x, y, 77, cy - 33, 389, cy + 33)) mu_keep(k);
-    }
+    const int k = up_list_hit(3, y);  // (the settings list: 1 — repeat, 2 — background)
+    if (k == 1 || k == 2) mu_keep(k - 1);
   }
 }
 // Every frame: the primary's morph eases to the state in 180 ms (1 − (1 − u)³); the switches' thumbs slide
@@ -209,7 +211,7 @@ static void mu_upd(int, float dt) {
     mu_sw[k] += mu_sw[k] < to ? fminf(step, to - mu_sw[k]) : -fminf(step, mu_sw[k] - to);
   }
 }
-static const UpApp MU_APP = {mu_count, mu_lay, mu_tap, mu_upd, nullptr, MU_ACC};
+static const UpApp MU_APP = {mu_count, mu_lay, mu_tap, mu_upd, nullptr, MU_ACC, nullptr, false, mu_items, mu_item_h, mu_lay_item};
 
 // Every frame, whatever is on screen (player_tick): Background off — the Music screen gone from an awake screen for
 // half a second pauses it. The page has no sound: its position runs by the clock instead, so the pages move as on the

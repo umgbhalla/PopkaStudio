@@ -63,8 +63,11 @@ def main(steps):
         e = buf.index(b"\n", i)
         w, h = map(int, buf[i + 5:e].split())
         d = buf[e + 1:e + 1 + w * h * 2]
-        while len(d) < w * h * 2:
+        t1 = time.time()
+        while len(d) < w * h * 2 and time.time() - t1 < 20:  # (a stalled transfer: fail, don't hang)
             d += s.read(w * h * 2 - len(d))
+        if len(d) < w * h * 2:
+            sys.exit(f"drive.py: the picture stopped at {len(d)} of {w * h * 2} bytes")
         px = struct.unpack("<%dH" % (w * h), d)
         im = Image.new("RGB", (w, h))
         im.putdata([((p >> 11 & 31) * 255 // 31, (p >> 5 & 63) * 255 // 63, (p & 31) * 255 // 31) for p in px])

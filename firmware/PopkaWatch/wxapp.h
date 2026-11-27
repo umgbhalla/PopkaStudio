@@ -174,7 +174,7 @@ static float wa_item_h(int p, int k) {
     case WI_DAY: return 84;
     case WI_DET: return 120;
     case WI_SUN: return 170;
-    case WI_UNIT: case WI_PLACE: case WI_HERE: case WI_REFRESH: return 80;
+    case WI_UNIT: case WI_PLACE: case WI_HERE: case WI_REFRESH: return 104;  // (Wear OS: a two-line button is 52 dp)
     default: return 64;
   }
 }

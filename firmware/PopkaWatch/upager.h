@@ -221,42 +221,63 @@ enum : uint8_t { UP_ROW_BUTTON, UP_ROW_SWITCH, UP_ROW_RADIO };
 #define UP_ROW_X1 419.0f
 #define UP_ROW_H 72.0f
 #define UP_ROW_OFF 0x2E3034  // the house's card (gallery.h's)
-extern const HaloFont gl_t24, gl_t20;
+extern const HaloFont gl_row_lab, gl_row_sub;  // (Wear OS M3's LabelMedium / LabelSmall: 30 / 26 px, weight 500, width 110;
+                                              // on the panel, 28 Nov 2026: clearer than the gallery's t24 / t20 at 620)
 static HaloItem &up_row(UpPage &P, float x0, float x1, float y, float h, const char *label, const char *sub,
                         uint8_t kind, float on, uint32_t acc, uint32_t ink, float a, const HaloView &v) {
+  // Wear OS M3's tokens (SwitchButtonTokens, FilledTonalButtonTokens): unchecked — the surface container, the label
+  // on-surface, the second line on-surface-variant; checked — the PRIMARY CONTAINER (the accent dark and tonal, not the
+  // accent itself), the label on-primary-container (the accent light), the second line the same, dimmer. The type is
+  // the Apps list's contrast (the user, 28 Nov 2026): a bold name, a smaller lighter grey line under it
+  (void)ink;
   on = halo_clamp01(on);
   const bool fills = kind != UP_ROW_BUTTON;
+  const uint32_t box = ui_mix(UP_ROW_OFF, ui_mix(acc, 0x000000, 0.68f), fills ? on : 0);  // (the primary container)
   HaloItem &pill = up_item(P);
-  ui_rrect(pill, (x0 + x1) / 2, y, x1 - x0, h, h / 2, 1, fills ? ui_mix(UP_ROW_OFF, acc, on) : UP_ROW_OFF, a);
+  ui_rrect(pill, (x0 + x1) / 2, y, x1 - x0, h, h / 2, 1, box, a);
   pill.on_black = true;
   up_commit(pill, v);
-  const uint32_t txt = fills ? ui_mix(UP_WHITE, ink, on) : UP_WHITE, txt2 = fills ? ui_mix(UP_MUTED, ink, on) : UP_MUTED;
-  const float lx = x0 + 30, room = x1 - x0 - 30 - (kind == UP_ROW_BUTTON ? 30 : 96);
+  const uint32_t lab_on = ui_mix(acc, 0xFFFFFF, 0.55f);  // (on-primary-container)
+  const uint32_t txt = ui_mix(0xFFF8EE, lab_on, fills ? on : 0), txt2 = ui_mix(0x9E9E9E, ui_mix(lab_on, box, 0.25f), fills ? on : 0);
+  const float lx = x0 + 32, room = x1 - x0 - 32 - (kind == UP_ROW_BUTTON ? 32 : 98);
   auto text = [&](const HaloFont &f, const char *s, float ty, uint32_t c) {
     HaloItem &t = up_item(P);
     ui_text(t, f, s, halo_text_mid(f, "Hxkdg"), lx, ty, 1, 0, c, a, &pill, room);
     up_commit(t, v);
   };
-  if (sub && *sub) text(gl_t24, label, y - 13, txt), text(gl_t20, sub, y + 15, txt2);
-  else text(gl_t24, label, y, txt);
-  const float cx = x1 - 30 - 26;
-  if (kind == UP_ROW_SWITCH) {  // the track and its thumb: off — grey thumb left; on — the dark track, the accent's thumb right
+  if (sub && *sub) text(gl_row_lab, label, y - 15, txt), text(gl_row_sub, sub, y + 17, txt2);
+  else text(gl_row_lab, label, y, txt);
+  const float cx = x1 - 32 - 26;
+  if (kind == UP_ROW_SWITCH) {  // off — a grey track, the thumb left; on — the accent's track, a dark thumb right
     HaloItem &tr = up_item(P);
-    ui_rrect(tr, cx, y, 52, 32, 16, 1, ui_mix(0x45474C, ink, on), a);
+    ui_rrect(tr, cx, y, 52, 32, 16, 1, ui_mix(0x45474C, acc, on), a);
     tr.on_black = true, up_commit(tr, v);
     HaloItem &th = up_item(P);
-    ui_circle(th, cx - 10 + 20 * on, y, 11 + 2 * on, 1, ui_mix(UP_MUTED, acc, on), a);
+    ui_circle(th, cx - 10 + 20 * on, y, 10 + 2 * on, 1, ui_mix(0x9E9E9E, ui_mix(acc, 0x000000, 0.75f), on), a);
     th.on_black = true, up_commit(th, v);
-  } else if (kind == UP_ROW_RADIO) {  // a ring, filled at its middle when picked
+  } else if (kind == UP_ROW_RADIO) {  // a ring, its middle filled when picked — in the accent
     HaloItem &rg = up_item(P);
     rg.kind = HI_RING, rg.x = cx + 14, rg.y = y, rg.r = 11, rg.w = 2.5f, rg.v = 1, rg.scale = 1;
-    rg.color = ui_mix(UP_MUTED, ink, on), rg.color2 = rg.color, rg.alpha = a, rg.on_black = true, rg.on = nullptr;
+    rg.color = ui_mix(0x9E9E9E, acc, on), rg.color2 = rg.color, rg.alpha = a, rg.on_black = true, rg.on = nullptr;
     up_commit(rg, v);
     HaloItem &dt = up_item(P);
-    ui_circle(dt, cx + 14, y, 6, 1, ink, a * on);
+    ui_circle(dt, cx + 14, y, 6, 1, acc, a * on);
     dt.on_black = true, up_commit(dt, v);
   }
   return pill;
+}
+
+// A settings page as Wear OS's: a scrolling list (UpApp.items) — its title, then a pill row an item, 52 dp each
+#define UP_SET_ROW 104.0f
+#define UP_SET_X0 (CX - 205)
+#define UP_SET_X1 (CX + 205)
+static inline float up_set_h(int k) { return k ? UP_SET_ROW : 70; }
+static inline void up_set_title(UpPage &P, const char *t, float ac, const HaloView &v) {
+  up_text(P, gl_up_title, t, up_mid_title, CX, 34, 1, UP_WHITE, ac, v);  // (at y 98 at rest: every app's title)
+}
+static inline HaloItem &up_set_row(UpPage &P, const char *label, const char *sub, uint8_t kind, float on, uint32_t acc,
+                                   uint32_t ink, float ac, const HaloView &v) {
+  return up_row(P, UP_SET_X0, UP_SET_X1, UP_SET_ROW / 2, UP_SET_ROW, label, sub, kind, on, acc, ink, ac, v);
 }
 
 static inline bool up_hit(float x, float y, float cx, float cy, float r) {

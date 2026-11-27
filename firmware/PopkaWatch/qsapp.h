@@ -91,7 +91,8 @@ static void qs_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_title(P, "Shade", a, v);
     up_row(P, UP_ROW_X0, UP_ROW_X1, 164, UP_ROW_H, "Open on Controls", nullptr, UP_ROW_RADIO, qs_on_levels ? 0 : 1, QS_MINT, QS_INK, a, v);
     up_row(P, UP_ROW_X0, UP_ROW_X1, 242, UP_ROW_H, "Open on Levels", nullptr, UP_ROW_RADIO, qs_on_levels ? 1 : 0, QS_MINT, QS_INK, a, v);
-    up_row(P, UP_ROW_X0, UP_ROW_X1, 320, UP_ROW_H, "Battery", "Show on Controls", UP_ROW_SWITCH, qs_sw.x, QS_MINT, QS_INK, a, v);
+    up_row(P, UP_ROW_X0, UP_ROW_X1, 320, UP_ROW_H, "Show battery", nullptr, UP_ROW_SWITCH, qs_sw.x, QS_MINT, QS_INK, a, v);
+    // (one line a row: the panel's pager lives beside the app's, so this page stays fixed — no list of its own)
   }
 }
 

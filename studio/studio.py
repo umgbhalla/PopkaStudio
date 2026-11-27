@@ -416,6 +416,10 @@ GALLERY_FONTS = [
     "font  gl_ic24   fa-solid-900.ttf    24  " + " ".join(f"0x{c:04x}" for c in ICONS.values())
     + " 0xf067 0xf068   # cards' icons; the player's + and −",
     "font  gl_back_ic fa-solid-900.ttf    24  0xf060   # Back arrow",
+    # Wear OS M3's button type (TypeScaleTokens.kt: LabelMedium 15 sp, LabelSmall 13 sp — weight 500, width 110; 1 sp =
+    # 2 px here): the pill rows' label and second line (upager.h up_row); the house's round corners (ROND 100: on the panel, ROND 0 looked the same)
+    "font  gl_row_lab GoogleSansFlex.ttf  28  latin punct \"°é\"  @wght=620,wdth=104,ROND=100   # a row's label",
+    "font  gl_row_sub GoogleSansFlex.ttf  22  latin punct \"°é\"  @wght=450,wdth=104,ROND=100   # a row's second line",
     "font  gl_cf_ic  fa-solid-900.ttf    30  0xf00d 0xf00c 0xf011 0xf1f8 0xf2f1   # the confirm (confirm.h): x, check, badges",
     # Paged apps (upager.h, clocks.h) — one type scale by the dial (154 / 103 / 35 / 15: 0.33, 0.22, 0.075, 0.033 D),
     # the cuts of Codex's measured study (apps/SPEC.md, 23 Nov 2026): heavy, the widths tuned per use

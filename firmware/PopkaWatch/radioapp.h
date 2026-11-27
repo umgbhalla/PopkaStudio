@@ -348,12 +348,14 @@ static void rpg_lay_volume(UpPage &P, float a, const HaloView &v) {
   rpg_button(P, 306, 348, 42, RPG_IC_PLUS, gl_rpg_ic31, RPG_ACC, RPG_INK, a, v);
 }
 
-// ---------- 4 Radio settings ----------
-static void rpg_lay_settings(UpPage &P, float a, const HaloView &v) {
-  up_title(P, "Settings", a, v);  // (the app's name is on its first page; Wear OS's switch buttons, one a row)
-  up_row(P, UP_ROW_X0, UP_ROW_X1, 164, UP_ROW_H, "Auto-retry", "Reconnect on drop", UP_ROW_SWITCH, rpg_retry, RPG_ACC, RPG_INK, a, v);
-  up_row(P, UP_ROW_X0, UP_ROW_X1, 242, UP_ROW_H, "Track info", "Show song titles", UP_ROW_SWITCH, rpg_tinfo, RPG_ACC, RPG_INK, a, v);
-  up_row(P, UP_ROW_X0, UP_ROW_X1, 320, UP_ROW_H, "Radio Browser", "Station catalog", UP_ROW_BUTTON, 0, RPG_ACC, RPG_INK, a, v);
+// ---------- 4 Radio settings: Wear OS's settings list (upager.h list mode) ----------
+static int rpg_items(int p) { return p == 3 ? 4 : 0; }
+static float rpg_item_h(int, int k) { return up_set_h(k); }
+static void rpg_lay_item(int, int k, UpPage &P, float, float ac, const HaloView &v) {
+  if (k == 0) return up_set_title(P, "Settings", ac, v);
+  if (k == 1) up_set_row(P, "Auto-retry", "Reconnect on drop", UP_ROW_SWITCH, rpg_retry, RPG_ACC, RPG_INK, ac, v);
+  else if (k == 2) up_set_row(P, "Track info", "Show song titles", UP_ROW_SWITCH, rpg_tinfo, RPG_ACC, RPG_INK, ac, v);
+  else up_set_row(P, "Radio Browser", "Station catalog", UP_ROW_BUTTON, 0, RPG_ACC, RPG_INK, ac, v);
 }
 
 // ---------- The app ----------
@@ -362,8 +364,7 @@ static void rpg_lay(int p, UpPage &P, float a, const HaloView &v) {
   if (!ru) return;
   if (p == 0) rpg_lay_station(P, a, v);
   else if (p == 1) rpg_lay_stations(P, a, v);
-  else if (p == 2) rpg_lay_volume(P, a, v);
-  else rpg_lay_settings(P, a, v);
+  else if (p == 2) rpg_lay_volume(P, a, v);  // (3, Settings: a list — rpg_lay_item)
 }
 static void rpg_tap(int p, float x, float y) {
   if (!ru) return;
@@ -378,8 +379,9 @@ static void rpg_tap(int p, float x, float y) {
     if (up_in(x, y, 118, 306, 202, 390)) vol_set(vol_level - 1, false);
     else if (up_in(x, y, 264, 306, 348, 390)) vol_set(vol_level + 1, false);
   } else {
-    if (up_in(x, y, 69, 132, 397, 196)) rpg_set(rpg_retry, "retry");
-    else if (up_in(x, y, 69, 210, 397, 274)) rpg_set(rpg_tinfo, "tinfo");
+    const int k = up_list_hit(3, y);
+    if (k == 1) rpg_set(rpg_retry, "retry");
+    else if (k == 2) rpg_set(rpg_tinfo, "tinfo");
   }
 }
 static void rpg_update(int p, float dt) {
@@ -395,7 +397,7 @@ static void rpg_update(int p, float dt) {
   if (f.dragging || !f.down) rpg_lp = -1;
   if (rpg_lp >= 0 && halo_ms() - f.t0 > 550) rpg_heart(rpg_lp), rpg_lp = -1, rpg_lp_done = true;
 }
-static const UpApp RPG_APP = {rpg_count_pages, rpg_lay, rpg_tap, rpg_update, nullptr, RPG_ACC};
+static const UpApp RPG_APP = {rpg_count_pages, rpg_lay, rpg_tap, rpg_update, nullptr, RPG_ACC, nullptr, false, rpg_items, rpg_item_h, rpg_lay_item};
 
 // The screen (settings.h calls these for FL_RADIO)
 static void rapp_enter() {

@@ -170,26 +170,32 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     // (a build without a clip store: say what happens to it)
     up_text(P, gl_up_lab, "KEPT IN MEMORY ONLY", up_mid_lab, CX, 236, 1, UP_MUTED, a, v);
     up_text(P, gl_up_lab, "RECORDING AGAIN REPLACES IT", up_mid_lab, CX, 258, 1, UP_MUTED, a, v);
-  } else {  // Recorder settings
-    up_title(P, "Settings", a, v);  // (the app's name is the page before: a short title keeps clear of the rim)
-    // the clip limit as Wear OS's stepper: its name over a pill with − and + at its ends, the value between them
-    up_text(P, gl_t20, "Clip limit", halo_text_mid(gl_t20, "Clp"), CX, 142, 1, RA_ACC, a, v);
-    up_rrect(P, UP_ROW_X0, 154, UP_ROW_X1, 238, 42, UP_ROW_OFF, a, v);
-    HaloItem &card = P.it[P.n - 1];
-    snprintf(ra_lim, sizeof(ra_lim), "%d", rc_limit_s);
-    up_text(P, gl_up_num, ra_lim, up_mid_num, CX, 188, 1, UP_WHITE, a, v, &card);
-    up_text(P, gl_t20, "seconds", halo_text_mid(gl_t20, "sec"), CX, 217, 1, UP_MUTED, a, v, &card);
-    for (int k = 0; k < 2; k++) {  // − and +: quiet at the ends (no hit there)
-      const float x = k ? UP_ROW_X1 - 42 : UP_ROW_X0 + 42;
-      const bool on = k ? rc_limit_s < RA_LIMITS[2] : rc_limit_s > RA_LIMITS[0];
-      HaloItem &d = up_disc(P, x, 196, 30, RA_CTRL, a, v);
-      const char *ic = k ? RA_IC_PLUS : RA_IC_MINUS;
-      up_text(P, gl_ra_ic26, ic, halo_text_mid(gl_ra_ic26, ic), x, 196, 1, on ? RA_ACC : RA_QUIET, a, v, &d);
+  }  // (2, Settings: a list — ra_lay_item)
+}
+// The Recorder's settings as Wear OS's settings list (upager.h list mode): the clip limit as a stepper pill (− and + at
+// its ends, its name over its value between them), Level audio as a switch row, what is kept under them
+static int ra_items(int p) { return p == 2 ? 4 : 0; }
+static float ra_item_h(int, int k) { return k == 3 ? 60 : up_set_h(k); }
+static void ra_lay_item(int, int k, UpPage &P, float, float ac, const HaloView &v) {
+  if (k == 0) return up_set_title(P, "Settings", ac, v);
+  if (k == 1) {
+    HaloItem &pill = up_set_row(P, "", nullptr, UP_ROW_BUTTON, 0, RA_ACC, RA_INK, ac, v);
+    snprintf(ra_lim, sizeof(ra_lim), "%d s", rc_limit_s);
+    up_text(P, gl_row_sub, "Clip limit", halo_text_mid(gl_row_sub, "Clp"), CX, 34, 1, UP_MUTED, ac, v, &pill);
+    up_text(P, gl_row_lab, ra_lim, halo_text_mid(gl_row_lab, "60"), CX, 68, 1, UP_WHITE, ac, v, &pill);
+    for (int j = 0; j < 2; j++) {  // − and +: quiet at the ends (no hit there)
+      const float x = j ? UP_SET_X1 - 52 : UP_SET_X0 + 52;
+      const bool on = j ? rc_limit_s < RA_LIMITS[2] : rc_limit_s > RA_LIMITS[0];
+      HaloItem &d = up_disc(P, x, UP_SET_ROW / 2, 32, RA_CTRL, ac, v);
+      const char *ic = j ? RA_IC_PLUS : RA_IC_MINUS;
+      up_text(P, gl_ra_ic26, ic, halo_text_mid(gl_ra_ic26, ic), x, UP_SET_ROW / 2, 1, on ? RA_ACC : RA_QUIET, ac, v, &d);
     }
-    up_row(P, UP_ROW_X0, UP_ROW_X1, 292, UP_ROW_H, "Level audio", "Even out playback", UP_ROW_SWITCH, ra_sw.x, RA_ACC, RA_INK, a, v);
+  } else if (k == 2) {
+    up_set_row(P, "Level audio", "Even out playback", UP_ROW_SWITCH, ra_sw.x, RA_ACC, RA_INK, ac, v);
+  } else {
     if (!rc_len) ra_sum[0] = 0;  // (nothing to say: the Recordings page says it)
     else snprintf(ra_sum, sizeof(ra_sum), "1 CLIP  /  %.1f MB IN MEMORY", rc_len * 2 / 1e6f);
-    up_text(P, gl_up_lab, ra_sum, up_mid_lab, CX, 360, 1, UP_MUTED, a, v);
+    up_text(P, gl_up_lab, ra_sum, up_mid_lab, CX, 30, 1, UP_MUTED, ac, v);
   }
 }
 static void ra_tap(int p, float x, float y) {
@@ -199,9 +205,10 @@ static void ra_tap(int p, float x, float y) {
   } else if (p == 1) {
     if (up_in(x, y, 80, 128, 386, 200)) ra_open_clip();
   } else {
-    if (up_in(x, y, UP_ROW_X0 + 6, 160, UP_ROW_X0 + 78, 232)) ra_step_limit(-1);
-    else if (up_in(x, y, UP_ROW_X1 - 78, 160, UP_ROW_X1 - 6, 232)) ra_step_limit(1);
-    else if (up_in(x, y, UP_ROW_X0, 256, UP_ROW_X1, 328)) rc_level_on = !rc_level_on, ra_keep();
+    const int k = up_list_hit(2, y);
+    if (k == 1 && x < UP_SET_X0 + 100) ra_step_limit(-1);
+    else if (k == 1 && x > UP_SET_X1 - 100) ra_step_limit(1);
+    else if (k == 2) rc_level_on = !rc_level_on, ra_keep();
   }
 }
 static void ra_springs(float dt) {
@@ -213,7 +220,7 @@ static float ra_ring() {  // capture: elapsed of the limit (the page in front; t
   if (up_pos.x > 0.5f) return -2;
   return rc_state == RC_REC ? rc_t / rc_limit_s : 0;
 }
-static const UpApp RA_APP = {ra_count, ra_lay, ra_tap, ra_upd, ra_ring, RA_ACC};
+static const UpApp RA_APP = {ra_count, ra_lay, ra_tap, ra_upd, ra_ring, RA_ACC, nullptr, false, ra_items, ra_item_h, ra_lay_item};
 
 // The playback child (over Recordings): one page, Back in place of the dots
 static int rp_count() { return 1; }
