@@ -33,6 +33,11 @@ extern const HaloFont gl_rpg_title, gl_rpg_tnar, gl_rpg_row, gl_rpg_meta, gl_rpg
 #define RPG_IC_PLUS "\xEF\x81\xA7"
 #define RPG_IC_GLOBE "\xEF\x82\xAC"
 #define RPG_SEP "  /  "  // (the design's metadata: two spaces either side of the slash)
+// Stations' rows: full pills 76 px tall (a bold name over a grey line), 82 px apart; the pager's buttons under them
+#define RPG_ROW_Y0 158.0f
+#define RPG_ROW_DY 82.0f
+#define RPG_ROW_H 76.0f
+#define RPG_NAV_Y 402.0f
 
 // ---------- Text by its ink ----------
 // The ink's left and right edges of s from its pen's start (the design places ink, not advance boxes)
@@ -209,21 +214,22 @@ static void rpg_station_strings() {
   }
   // LIVE / READY / how it goes, then the song (Track info) or the bitrate
   const bool on = rd_on && s;
-  const char *st = !on ? "READY" : rn_playing ? "LIVE" : rn_net == RN_NOWIFI ? "NO WI-FI" : rn_net == RN_FAILED ? "RETRYING"
-                 : rn_net == RN_JOINING ? "JOINING WI-FI" : rn_net == RN_STREAMING ? "BUFFERING" : "CONNECTING";
+  const char *st = !on ? "Ready" : rn_playing ? "Live" : rn_net == RN_NOWIFI ? "No Wi-Fi" : rn_net == RN_FAILED ? "Retrying"
+                 : rn_net == RN_JOINING ? "Joining Wi-Fi" : rn_net == RN_STREAMING ? "Buffering" : "Connecting";
   char tail[RD_TITLE];
   tail[0] = 0;
   if (on && rn_playing && rpg_tinfo) rn_title_copy(tail, sizeof(tail));
-  if (!tail[0] && s) snprintf(tail, sizeof(tail), "%d KBPS", s->kbps);
+  if (!tail[0] && s) snprintf(tail, sizeof(tail), "%d kbps", s->kbps);
   char m[RD_TITLE + 24];
-  if (!s) strlcpy(m, "NO STATIONS", sizeof(m));
-  else snprintf(m, sizeof(m), "%s" RPG_SEP "%s", st, tail);
-  rd_fit(gl_rpg_meta, m, 272, rpg_meta, sizeof(rpg_meta));
+  if (!s) strlcpy(m, "No stations", sizeof(m));
+  else snprintf(m, sizeof(m), "%s \xC2\xB7 %s", st, tail);  // (the card language's second line: sentence case, grey)
+  rd_fit(gl_row_sub, m, 300, rpg_meta, sizeof(rpg_meta));
 }
 static void rpg_lay_station(UpPage &P, float a, const HaloView &v) {
   up_title(P, "Radio", a, v);
   rpg_station_strings();
-  HaloItem &post = rpg_card(P, 79, 132, 387, 289, 35, RPG_PANEL, a, v);
+  // (Wear OS's media screen: no card round it — the monogram and its bars, the name, the status on black)
+  const HaloItem &post = halo_black;
   // The paired level bars (x 233 ± 108, 92, 76; 5 px, round ends, on y 190): ready — 12 px each; live — the sound's
   // bands (radio.h's smoothed levels) up to 16, 28, 48 px
   static const float OFF[3] = {108, 92, 76}, MAX[3] = {16, 28, 48};
@@ -233,13 +239,13 @@ static void rpg_lay_station(UpPage &P, float a, const HaloView &v) {
     for (int sd = 0; sd < 2; sd++) {
       const float len = live ? fmaxf(5, MAX[k] * halo_clamp01(ru->lv[BAND[sd][k]] * 1.15f)) : 12;
       const float x = CX + (sd ? OFF[k] : -OFF[k]);
-      up_rrect(P, x - 2.5f, 190 - len / 2, x + 2.5f, 190 + len / 2, 2.5f, RPG_WAVE, a, v);
+      up_rrect(P, x - 2.5f, 178 - len / 2, x + 2.5f, 178 + len / 2, 2.5f, RPG_WAVE, a, v);
     }
   // The monogram (a wide one smaller: 132 px of ink at most — RP's — clear of the inner bars)
   const float mw = rpg_ink_w(gl_rpg_mono, rpg_mono);
-  rpg_text(P, gl_rpg_mono, rpg_mono, CX, 190, 1, RPG_ACC, a, v, &post, mw > 132 ? 132 / mw : 1);
-  rpg_text(P, *rpg_name_f, rpg_name, CX, 250, 1, UP_WHITE, a, v, &post);
-  rpg_text(P, gl_rpg_meta, rpg_meta, CX, 274, 1, RPG_SOFT, a, v, &post);
+  rpg_text(P, gl_rpg_mono, rpg_mono, CX, 178, 1, RPG_ACC, a, v, &post, mw > 132 ? 132 / mw : 1);
+  rpg_text(P, *rpg_name_f, rpg_name, CX, 240, 1, UP_WHITE, a, v, &post);
+  rpg_text(P, gl_row_sub, rpg_meta, CX, 276, 1, 0x9E9E9E, a, v, &post);
   rpg_button(P, 108, 346, 34, RPG_IC_PREV, gl_rpg_ic32, RPG_CARD, RPG_ACC, a, v);
   rpg_button(P, 358, 346, 34, RPG_IC_NEXT, gl_rpg_ic32, RPG_CARD, RPG_ACC, a, v);
   up_primary(P, CX, 354, 55, rpg_morph, rd_on ? UP_IC_PAUSE : UP_IC_PLAY, RPG_ACC, RPG_INK, a, v, &gl_rpg_ic44);
@@ -256,7 +262,7 @@ static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
   for (int r = 0; r < 3; r++) {
     const int i = sl * 3 + r;
     if (i >= n) continue;
-    const float y = 163 + 68 * r;
+    const float y = RPG_ROW_Y0 + RPG_ROW_DY * r;
     bool sel;
     const char *icon = nullptr;
     char meta[64];
@@ -264,32 +270,33 @@ static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
       const RdFolder &fd = RD_FOLDER[i];
       sel = i == rd_folder;
       icon = RD_FIC[fd.icon % 5];
-      rd_fit(gl_rpg_row, fd.name, 244, rpg_rn[r], sizeof(rpg_rn[r]));
-      if (fd.kind == RF_FAV) snprintf(meta, sizeof(meta), "%d STATION%s", rd_fav_n, rd_fav_n == 1 ? "" : "S");
-      else if (fd.kind == RF_TOP) strlcpy(meta, "MOST LISTENED", sizeof(meta));
-      else if (fd.kind == RF_TAG) strlcpy(meta, "GENRE", sizeof(meta));
-      else snprintf(meta, sizeof(meta), "COUNTRY" RPG_SEP "%s", fd.arg);
+      rd_fit(gl_row_lab, fd.name, 236, rpg_rn[r], sizeof(rpg_rn[r]));
+      if (fd.kind == RF_FAV) snprintf(meta, sizeof(meta), "%d station%s", rd_fav_n, rd_fav_n == 1 ? "" : "s");
+      else if (fd.kind == RF_TOP) strlcpy(meta, "Most listened", sizeof(meta));
+      else if (fd.kind == RF_TAG) strlcpy(meta, "Genre", sizeof(meta));
+      else snprintf(meta, sizeof(meta), "Country \xC2\xB7 %s", fd.arg);
       if (sel) {
         char t[64];
-        snprintf(t, sizeof(t), "ON THE DIAL" RPG_SEP "%s", meta);
+        snprintf(t, sizeof(t), "On the dial \xC2\xB7 %s", meta);
         strlcpy(meta, t, sizeof(meta));
       }
     } else {  // a station: its badge, its name, its country and bitrate (selected, or a favourite in a folder)
       const RdSt &s = *rpg_st(i);
       sel = rpg_is_cur(s);
       rpg_badge(s.name, rpg_rb[r], sizeof(rpg_rb[r]));
-      rd_fit(gl_rpg_row, rpg_disp(s.name), 244, rpg_rn[r], sizeof(rpg_rn[r]));
+      rd_fit(gl_row_lab, rpg_disp(s.name), 236, rpg_rn[r], sizeof(rpg_rn[r]));
       const bool fav = rpg_route == RPG_FOLDER && RD_FOLDER[ru->s_folder].kind != RF_FAV && rd_fav_find(s.url) >= 0;
-      snprintf(meta, sizeof(meta), "%s%s%s%d KBPS", sel ? "SELECTED" RPG_SEP : fav ? "FAVORITE" RPG_SEP : "", s.cc,
-               s.cc[0] ? RPG_SEP : "", s.kbps);
+      snprintf(meta, sizeof(meta), "%s%s%s%d kbps", sel ? "Selected \xC2\xB7 " : fav ? "Favorite \xC2\xB7 " : "", s.cc,
+               s.cc[0] ? " \xC2\xB7 " : "", s.kbps);
     }
-    rd_fit(gl_rpg_meta, meta, 244, rpg_rm[r], sizeof(rpg_rm[r]));
-    HaloItem &card = rpg_card(P, 66, y - 30, 400, y + 30, 21, sel ? RPG_CUR : RPG_CARD, a, v);
-    HaloItem &badge = up_disc(P, 105, y, 22, sel ? RPG_ACC : RPG_PANEL, a, v);
-    if (icon) rpg_text(P, gl_rpg_ic22, icon, 105, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge, 0.82f);
-    else rpg_text(P, gl_rpg_meta, rpg_rb[r], 105, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge);
-    rpg_text(P, gl_rpg_row, rpg_rn[r], 139, y - 9, 0, UP_WHITE, a, v, &card);
-    rpg_text(P, gl_rpg_meta, rpg_rm[r], 139, y + 15, 0, sel ? RPG_ACC : RPG_SOFT, a, v, &card);
+    rd_fit(gl_row_sub, meta, 236, rpg_rm[r], sizeof(rpg_rm[r]));
+    // (the card language: a full pill, the name bold over a lighter grey line — upager.h up_row)
+    HaloItem &card = rpg_card(P, 58, y - RPG_ROW_H / 2, 408, y + RPG_ROW_H / 2, RPG_ROW_H / 2, sel ? RPG_CUR : RPG_CARD, a, v);
+    HaloItem &badge = up_disc(P, 58 + RPG_ROW_H / 2, y, 24, sel ? RPG_ACC : RPG_PANEL, a, v);  // (concentric with the pill's end)
+    if (icon) rpg_text(P, gl_rpg_ic22, icon, 58 + RPG_ROW_H / 2, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge, 0.82f);
+    else rpg_text(P, gl_rpg_meta, rpg_rb[r], 58 + RPG_ROW_H / 2, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge);
+    rpg_text(P, gl_row_lab, rpg_rn[r], 132, y - 14, 0, UP_WHITE, a, v, &card);
+    rpg_text(P, gl_row_sub, rpg_rm[r], 132, y + 16, 0, sel ? RPG_ACC : 0x9E9E9E, a, v, &card);
   }
   // Empty, loading, failed: a word in the middle of the rows
   const char *msg = nullptr, *sub = nullptr;
@@ -300,26 +307,25 @@ static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
   if (sub) rpg_text(P, gl_rpg_meta, sub, CX, 252, 1, RPG_ACC, a, v);
   // ‹ (folder or back) › and the slice count; an arrow at its end is shown, dimmed, and not a target
   const bool pv = sl > 0, nx = sl < cnt - 1;
-  rpg_button(P, 153, 373, 26, RPG_IC_LEFT, gl_rpg_ic22, pv ? RPG_CARD : RPG_PANEL, pv ? RPG_ACC : RPG_WAVE, a, v);
-  rpg_button(P, CX, 373, 26, rpg_route == RPG_DIAL ? RPG_IC_FOLDER : RPG_IC_BACK, gl_rpg_ic22, RPG_CARD, RPG_ACC, a, v);
-  rpg_button(P, 313, 373, 26, RPG_IC_RIGHT, gl_rpg_ic22, nx ? RPG_CARD : RPG_PANEL, nx ? RPG_ACC : RPG_WAVE, a, v);
-  snprintf(rpg_count, sizeof(rpg_count), "%d / %d", sl + 1, cnt);
-  rpg_text(P, gl_rpg_meta, rpg_count, CX, 415, 1, RPG_SOFT, a, v);
+  // (no "1 / 2" under them: the arrows dim at the ends, the rim's dots say the page)
+  rpg_button(P, 165, RPG_NAV_Y, 24, RPG_IC_LEFT, gl_rpg_ic22, pv ? RPG_CARD : RPG_PANEL, pv ? RPG_ACC : RPG_WAVE, a, v);
+  rpg_button(P, CX, RPG_NAV_Y, 24, rpg_route == RPG_DIAL ? RPG_IC_FOLDER : RPG_IC_BACK, gl_rpg_ic22, RPG_CARD, RPG_ACC, a, v);
+  rpg_button(P, 301, RPG_NAV_Y, 24, RPG_IC_RIGHT, gl_rpg_ic22, nx ? RPG_CARD : RPG_PANEL, nx ? RPG_ACC : RPG_WAVE, a, v);
 }
 static int rpg_row_at(float x, float y) {  // the row under (x, y) in the view, or −1
   const int sl = rpg_slice(), n = rpg_n();
   for (int r = 0; r < 3; r++) {
-    const float cy = 163 + 68 * r;
-    if (up_in(x, y, 66, cy - 30, 400, cy + 30) && sl * 3 + r < n) return sl * 3 + r;
+    const float cy = RPG_ROW_Y0 + RPG_ROW_DY * r;
+    if (up_in(x, y, 58, cy - RPG_ROW_H / 2, 408, cy + RPG_ROW_H / 2) && sl * 3 + r < n) return sl * 3 + r;
   }
   return -1;
 }
 static void rpg_tap_stations(float x, float y) {
   int &sl = rpg_slice();
   const int cnt = rpg_slices();
-  if (up_in(x, y, 127, 347, 179, 399)) return void(sl > 0 ? sl-- : 0);
-  if (up_in(x, y, 287, 347, 339, 399)) return void(sl < cnt - 1 ? sl++ : 0);
-  if (up_in(x, y, 207, 347, 259, 399)) {  // the folders, or back one level (the last view of each kept)
+  if (up_hit(x, y, 165, RPG_NAV_Y, 24)) return void(sl > 0 ? sl-- : 0);
+  if (up_hit(x, y, 301, RPG_NAV_Y, 24)) return void(sl < cnt - 1 ? sl++ : 0);
+  if (up_hit(x, y, CX, RPG_NAV_Y, 24)) {  // the folders, or back one level (the last view of each kept)
     rpg_route = rpg_route == RPG_DIAL ? RPG_FOLDERS : rpg_route == RPG_FOLDER ? RPG_FOLDERS : RPG_DIAL;
     if (rpg_route == RPG_FOLDERS && rpg_sl_folders * 3 > rd_folder + 2) rpg_sl_folders = rd_folder / 3;
     return;
