@@ -330,7 +330,11 @@ static void pw_unlock_tick(float dt, int64_t now) {
 
 static float pw_unlock_alpha() { return halo_clamp01(pw_unlock_in.x) * (1 - pw_unlock_fade); }
 
-static float pw_unlock_radius() { return 210 * (0.94f + 0.06f * pw_unlock_in.x - 0.06f * pw_unlock_fade); }
+// On the rim, as the house's progress ring (upager.h): 224 px, 8 wide — outside the face's digits even at their widest
+// (the clock's ends reach ~205 px on the locked, shrunk face; the old 210 px ring cut through the 0 and the 2 — the
+// user's report, 27 Nov 2026). It grows in only 2 % so it never sweeps across the face.
+static constexpr float PW_RING_R = 224, PW_RING_W = 8;
+static float pw_unlock_radius() { return PW_RING_R * (0.98f + 0.02f * pw_unlock_in.x - 0.02f * pw_unlock_fade); }
 
 // Redraw the old and new ring spans so the retained framebuffer clears the moving and fading edges.
 static void pw_unlock_damage() {
@@ -355,7 +359,7 @@ static void power_draw() {
   const float alpha = pw_unlock_alpha();
   if (alpha <= 0) return;
   const float radius = pw_unlock_radius();
-  halo_ring(CX, CY, radius, radius / 35, pw_unlock_progress, 0xE5D7FF, 0x40374D, alpha);
+  halo_ring(CX, CY, radius, PW_RING_W, pw_unlock_progress, 0xFFF8EE, 0x2E3034, alpha);  // (house text on a card's grey)
 }
 #endif
 
@@ -541,6 +545,13 @@ static void power_build() {  // after halo_begin: the motion sensor is on its I2
   halo_command("idle", [](const char *a) { pw_idle_s = max(0, atoi(a)), LOG("idle: %d s\n", pw_idle_s); });
   halo_command("sleep", [](const char *) { pw_cmd_sleep = true; });
   halo_command("wake", [](const char *) { pw_cmd_wake = true; });
+  // unlockpeek 0..1 | off — the hold-to-unlock ring at that progress, without unlocking (to see it over serial)
+#ifdef HALO_ROUND
+  halo_command("unlockpeek", [](const char *a) {
+    if (!strcmp(a, "off")) pw_unlock_hide();
+    else pw_unlock_progress = halo_clamp01(atof(a)), halo_spring_set(pw_unlock_in, 1), pw_unlock_in.target = 1;
+  });
+#endif
   halo_command("power", [](const char *) {
     LOG("power: %s, display %s\n", pw_locked ? "locked" : "unlocked", halo_display_is_on() ? "on" : "off");
   });
