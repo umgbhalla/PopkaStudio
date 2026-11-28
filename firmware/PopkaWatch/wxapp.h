@@ -18,6 +18,18 @@ static void wa_refresh() {
   xTaskNotifyGive(hclk_handle);
 #endif
 }
+// Where the first city came from: the editor's (the project's) — kept, so a "Use my location" can be undone
+static Preferences wa_prefs;
+static char wa_home_name[sizeof(wx_city[0].name)];
+static float wa_home_lat, wa_home_lon;
+static char wa_home_s[40], wa_foot[40];  // (each text its own buffer: an item keeps the pointer)
+static bool wa_moved;  // the first city is "my location", not the project's
+static void wa_go_home() {  // back to the project's city: the kept location forgotten, its weather asked
+  wa_prefs.remove("name"), wa_prefs.remove("lat"), wa_prefs.remove("lon");
+  strlcpy(wx_city[0].name, wa_home_name, sizeof(wx_city[0].name));
+  wx_city[0].lat = wa_home_lat, wx_city[0].lon = wa_home_lon, wa_moved = false;
+  wa_refresh();
+}
 static void wa_here() {
   wx_geo_req = true;
   wa_refresh();
@@ -119,7 +131,7 @@ static inline uint8_t wa_sky_now(const WxCity &c) {
 }
 
 // ---------- A city's items ----------
-enum : uint8_t { WI_HERO, WI_HEAD, WI_HOURS, WI_DAY, WI_DET, WI_SUN, WI_FOOT, WI_UNIT, WI_PLACE, WI_HERE, WI_REFRESH };
+enum : uint8_t { WI_HERO, WI_HEAD, WI_HOURS, WI_DAY, WI_DET, WI_SUN, WI_FOOT, WI_UNIT, WI_PLACE, WI_HERE, WI_REFRESH, WI_HOME };
 struct WaItem {
   uint8_t kind, arg;
 };
@@ -146,6 +158,8 @@ static int wa_build(int p) {
 #if SS_WIFI
     add(WI_HERE), add(WI_REFRESH);
 #endif
+    if (wa_moved && strcmp(wx_city[0].name, wa_home_name)) add(WI_HOME);  // (after "Use my location" moved it elsewhere:
+                                                                          // the way back to the city set up in the editor)
     return wa_ni[p] = n;
   }
   const WxCity &c = wx_city[p];
@@ -179,7 +193,7 @@ static float wa_item_h(int p, int k) {
     case WI_DAY: return 84;
     case WI_DET: return 120;
     case WI_SUN: return 170;
-    case WI_UNIT: case WI_PLACE: case WI_HERE: case WI_REFRESH: return 104;  // (Wear OS: a two-line button is 52 dp)
+    case WI_UNIT: case WI_PLACE: case WI_HERE: case WI_REFRESH: case WI_HOME: return 104;  // (Wear OS: a two-line button is 52 dp)
     default: return 64;
   }
 }
@@ -336,11 +350,11 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
         const time_t t = time(nullptr) - (halo_ms() - wx_fetched_ms) / 1000;
         struct tm m;
         localtime_r(&t, &m);
-        snprintf(wa_src, sizeof(wa_src), "Open-Meteo \xC2\xB7 %02d:%02d", m.tm_hour, m.tm_min);
+        snprintf(wa_foot, sizeof(wa_foot), "Open-Meteo \xC2\xB7 %02d:%02d", m.tm_hour, m.tm_min);
       } else {
-        strlcpy(wa_src, "Open-Meteo", sizeof(wa_src));
+        strlcpy(wa_foot, "Open-Meteo", sizeof(wa_foot));
       }
-      wa_txt(P, gl_row_sub, wa_src, CX, h / 2, 1, WA_DIM, ac, v);
+      wa_txt(P, gl_row_sub, wa_foot, CX, h / 2, 1, WA_DIM, ac, v);
       break;
     }
     case WI_UNIT: {
@@ -358,6 +372,10 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
     case WI_REFRESH:
       up_row(P, WA_X0, WA_X1, h / 2, h, "Refresh now", "Open-Meteo", UP_ROW_BUTTON, 0, WA_ACC, 0x2A1A00, ac, v);
       break;
+    case WI_HOME:
+      snprintf(wa_home_s, sizeof(wa_home_s), "Use %s", wa_home_name);  // (its own buffer: an item keeps the pointer)
+      up_row(P, WA_X0, WA_X1, h / 2, h, wa_home_s, "The city you set up", UP_ROW_BUTTON, 0, WA_ACC, 0x2A1A00, ac, v);
+      break;
   }
 }
 static void wa_lay(int, UpPage &, float, const HaloView &) {}
@@ -366,6 +384,7 @@ static void wa_tap(int p, float x, float y) {
   if (k < 0 || fabsf(x - CX) > WA_W / 2) return;
   const WaItem &w = wa_items[p][k];
   if (w.kind == WI_UNIT) sy_set_units(w.arg);
+  else if (w.kind == WI_HOME) wa_go_home();
 #if SS_WIFI
   else if (w.kind == WI_HERE) wa_here();
   else if (w.kind == WI_REFRESH) wa_refresh();
@@ -377,10 +396,12 @@ static void wa_upd(int, float) {
 }
 static const UpApp WA_APP = {wa_count, wa_lay, wa_tap, wa_upd, nullptr, WA_ACC, nullptr, true, wa_n_items, wa_item_h, wa_lay_item};
 // The location kept (Use my location): the first city at start
-static Preferences wa_prefs;
 static void wxapp_begin() {
   wa_prefs.begin("wx", false);
-  if (wa_prefs.isKey("lat")) {
+  strlcpy(wa_home_name, wx_city[0].name, sizeof(wa_home_name));
+  wa_home_lat = wx_city[0].lat, wa_home_lon = wx_city[0].lon;
+  wa_moved = wa_prefs.isKey("lat");
+  if (wa_moved) {
     if (wa_prefs.getBytes("name", wx_city[0].name, sizeof(wx_city[0].name)) > 0) wx_city[0].name[sizeof(wx_city[0].name) - 1] = 0;
     wx_city[0].lat = wa_prefs.getFloat("lat", wx_city[0].lat), wx_city[0].lon = wa_prefs.getFloat("lon", wx_city[0].lon);
   }
@@ -390,6 +411,7 @@ static void wa_keep_location() {
   wx_geo_done = false;
   wa_prefs.putBytes("name", wx_city[0].name, strlen(wx_city[0].name) + 1);
   wa_prefs.putFloat("lat", wx_city[0].lat), wa_prefs.putFloat("lon", wx_city[0].lon);
+  wa_moved = true;
 }
 
 // The screen (settings.h calls these)
