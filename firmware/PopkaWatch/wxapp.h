@@ -30,7 +30,7 @@ static void wa_here() {
 // high), Details (Wear OS progress cards: humidity, wind, UV with a ring each; the sun's day as an arc), the source.
 // The house's tokens (the Apps list, gallery.h): cards 0x2E3034, full pills 410 wide, the Weather card's amber, warm
 // white and grey; the sky drawn in shapes (the face's pill: a yellow sun, a white cloud), no icon font.
-extern const HaloFont gl_wx_temp, gl_wx_line, gl_wx_val, gl_wx_week, gl_title, gl_t24;  // (studio.py GALLERY_FONTS; the cards'
+extern const HaloFont gl_wx_temp, gl_wx_val, gl_title, gl_t24;  // (studio.py GALLERY_FONTS; the cards'
 // names and lines in the rows' type: gl_row_lab, gl_row_sub — upager.h)
 #define WA_ACC 0xFFB030    // the Weather card's colour (the Apps list)
 #define WA_CARD 0x2E3034   // the house's card
@@ -173,9 +173,9 @@ static int wa_build(int p) {
 static int wa_n_items(int p) { return wa_build(p); }
 static float wa_item_h(int p, int k) {
   switch (wa_items[p][k].kind) {
-    case WI_HERO: return 400;  // (the next header just under the rim at rest; no dead gap when scrolled)
+    case WI_HERO: return 372;  // (the next header just under the rim at rest; no dead gap when scrolled)
     case WI_HEAD: return wa_items[p][k].arg == 3 ? 70 : 58;
-    case WI_HOURS: return 150;
+    case WI_HOURS: return 140;
     case WI_DAY: return 84;
     case WI_DET: return 120;
     case WI_SUN: return 170;
@@ -236,11 +236,14 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
     }
     case WI_HEAD: {
       const bool big = w.arg == 3;  // (Settings' own title; the others — list headers in the accent)
+      // (a header on the rim's last 30 px — under the page dots at rest — is not shown half: it fades in as it comes up)
+      const float sy = halo_view_y(v, h / 2 + 4);
+      if (!big) ac *= halo_clamp01((448 - sy) / 30);
       wa_txt(P, big ? gl_title : gl_t24, WA_HEADS[w.arg], CX, big ? 34 : h / 2 + 4, 1, big ? WA_TXT : WA_ACC, ac, v);
       break;
     }
     case WI_HOURS: {  // four hours: the time, the sky, the degrees (the Pixel's weather tile)
-      HaloItem &card = wa_card(P, 0, h, abg, v, 48);
+      HaloItem &card = wa_card(P, 0, h, abg, v, h / 2);  // (a full pill, as the landing's)
       const int first = wa_hours_from(c);
       for (int j = 0; j < 4; j++) {
         const int i = w.arg + j, hh = first + i;
@@ -258,7 +261,7 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
 #endif
         wa_sky_icon(P, sky, x, 76, 40, WA_CARD, ac, v);
         wx_deg(ts, 8, c.ht[hh], "--");
-        wa_num(P, gl_wx_week, ts, x + 4, 120, 1, WA_TXT, ac, v, &card);
+        wa_num(P, gl_row_lab, ts, x + 3, 116, 1, WA_TXT, ac, v, &card);  // (the landing's pill's type)
       }
       break;
     }
@@ -277,11 +280,11 @@ static void wa_lay_item(int p, int k, UpPage &P, float abg, float ac, const Halo
       for (int j = 0; j < WX_DAYS && c.dhi[j] != WX_NONE; j++) lo = min(lo, (int)c.dlo[j]), hi = max(hi, (int)c.dhi[j]);
       const float span = max(4, hi - lo), bx0 = 272, bx1 = 334;
       wx_deg(wa_day[d][0], 8, c.dlo[d], "--"), wx_deg(wa_day[d][1], 8, c.dhi[d], "--");
-      wa_num(P, gl_wx_week, wa_day[d][0], bx0 - 12, y, 2, WA_DIM, ac, v, &card);
+      wa_num(P, gl_row_lab, wa_day[d][0], bx0 - 12, y, 2, WA_DIM, ac, v, &card);
       wa_bar(P, bx0, bx1, y, 8, WA_TRACK, ac, v);
       const float f0 = bx0 + (bx1 - bx0) * (c.dlo[d] - lo) / span, f1 = bx0 + (bx1 - bx0) * (c.dhi[d] - lo) / span;
       wa_bar(P, f0, fmaxf(f1, f0 + 8), y, 8, WA_ACC, ac, v);
-      wa_num(P, gl_wx_week, wa_day[d][1], WA_X1 - 34, y, 2, WA_TXT, ac, v, &card);
+      wa_num(P, gl_row_lab, wa_day[d][1], WA_X1 - 34, y, 2, WA_TXT, ac, v, &card);
       break;
     }
 #endif

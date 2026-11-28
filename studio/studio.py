@@ -436,9 +436,7 @@ GALLERY_FONTS = [
     "font  gl_up_ic24 fa-solid-900.ttf    24  0x2b 0xf185 0xf186   # small glyphs",
     # Weather (wxapp.h; design/SPEC_weather.md)
     "font  gl_wx_temp GoogleSansFlex.ttf  96  digits \"°-\" @wght=600,wdth=100,ROND=100,opsz=96   # Weather: now, as the weather tile (docs/references)",
-    "font  gl_wx_line GoogleSansFlex.ttf  35  latin punct digits \"°·\" @wght=660,wdth=83,ROND=42,opsz=35   # the sky, feels",
     "font  gl_wx_val  GoogleSansFlex.ttf  35  digits \"°%:-CF\" @wght=830,wdth=91,ROND=55,opsz=35   # card readings",
-    "font  gl_wx_week GoogleSansFlex.ttf  35  digits \"°-\" @wght=775,wdth=67,ROND=43,opsz=35   # a day's low, high",
     "font  gl_wx_ic38 fa-solid-900.ttf    38  0xf185 0xf6c4 0xf0c2 0xf73d 0xf2dc   # the sky now",
     # Settings (sysset.h; design/SPEC_settings.md): the level's digit, the condensed row label, the icons at their sizes
     "font  gl_sg_digit GoogleSansFlex.ttf 154  digits \"-\" @wght=850,wdth=84,ROND=46,opsz=128   # Settings: a level, the battery",
