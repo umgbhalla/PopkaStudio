@@ -123,6 +123,20 @@ static const char *gl_str(const char *s) {
 
 // Text by the middle of its letters (mid — halo_text_mid) at (x, y), as WearKit places text; on — what it lies on
 extern const HaloFont gl_row_lab, gl_row_sub;  // (studio.py GALLERY_FONTS: the rows' type)
+// A card's line in sentence case, as every other row's (Wear OS: sentence case): the project's "now and hourly" shows as
+// "Now and hourly" — the project's text stays as written. A copy per source string, kept: an item holds its text's pointer
+static const char *gl_sentence(const char *t) {
+  static struct { const char *src; char buf[40]; } C[24];
+  if (!t || !*t || !(*t >= 'a' && *t <= 'z')) return t;
+  for (auto &c : C) {
+    if (c.src == t) return c.buf;
+    if (!c.src) {
+      c.src = t, snprintf(c.buf, sizeof c.buf, "%s", t), c.buf[0] -= 32;
+      return c.buf;
+    }
+  }
+  return t;  // (more than 24 cards: as written)
+}
 static void gl_text_mid(HaloItem &it, const HaloFont &f, const char *s, float mid, float x, float y, float sc,
                         uint32_t color, float alpha, const HaloItem *on) {
   halo_item_text(it, f, s, mid, x, y, sc, 1, color, alpha, on);
@@ -334,7 +348,7 @@ static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       // a bold 28 px name, a lighter 22 px grey line, the pair centred on the card)
       halo_item_text(it[3], gl_row_lab, gl_str(L.text), halo_text_mid(gl_row_lab, "Hxkdg"), x0 + 104 * s, y0 + (GL_ITEM_H / 2 - 15) * s, s, 0,
                      GL_TEXT, ac, &bg);
-      halo_item_text(it[4], gl_row_sub, gl_str(L.sub), halo_text_mid(gl_row_sub, "Hxkdg"), x0 + 104 * s, y0 + (GL_ITEM_H / 2 + 17) * s, s, 0,
+      halo_item_text(it[4], gl_row_sub, gl_sentence(gl_str(L.sub)), halo_text_mid(gl_row_sub, "Hxkdg"), x0 + 104 * s, y0 + (GL_ITEM_H / 2 + 17) * s, s, 0,
                      GL_DIM, ac, &bg);
       // (Wear OS: a title or a line too long for the card is cut with an ellipsis, not run past the card's end)
       it[3].fit = it[4].fit = GL_ITEM_W - 104 - 28;
