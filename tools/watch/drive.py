@@ -9,6 +9,10 @@ Steps, in order:
     w:SECONDS    wait, printing what the watch logs meanwhile
     s:FILE.png   a screenshot of the panel (the firmware's `shot` command: RGB565 over serial)
 
+Navigate by name, never by coordinates on a list (a list keeps its scroll; a blind tap once hit Power off):
+    tools/watch/drive.py c:wake "c:drag 233 300 233 40" w:1.5 "c:open Radio" w:3 s:/tmp/radio.png
+("open NAME" opens the Apps list's card of that name — the list must be in front; Power off is never a card.)
+
 Example — open Weather from the face and capture it:
     tools/watch/drive.py c:wake w:1 "c:tap 233 360" w:3 s:/tmp/wx.png
 

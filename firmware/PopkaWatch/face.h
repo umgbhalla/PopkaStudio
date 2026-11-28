@@ -1385,7 +1385,24 @@ static void power_confirm_open();
 // A tap on a card or on the button (gal_update, the frame before): open its screen over the one it is on — as HaloWatch
 // opens a card's screen (open_req: from the gallery only once it is in place). A screen already in the stack is not
 // opened twice; the face and the gallery are not opened by a card
+// Serial "open NAME" (tools/watch/drive.py): the Apps list's card of that name, as if tapped — the list must be in front.
+// Navigation by name, never by where a card happens to be (a blind tap at a scrolled list once hit Power off). Only
+// cards (FL_CARD): the edge button (Power off) is never opened this way
+static void gallery_open_cmd(const char *a) {
+  while (*a == ' ') a++;
+  for (int k = 0; k < face_scr_n; k++)
+    for (int i = 0; i < face_scr[k].n; i++) {
+      const FaceLayer &L = face_scr[k].layers[i];
+      if (L.kind == FL_CARD && !L.hidden && L.text && !strcasecmp(L.text, a)) {
+        gl_req = &L, gl_req_depth = halo_nav_depth();
+        return (void)LOG("open: %s\n", L.text);
+      }
+    }
+  LOG("open: no card \"%s\"\n", a);
+}
 static void gallery_tick() {
+  static bool cmd;
+  if (!cmd) cmd = true, halo_command("open", gallery_open_cmd);
   const FaceLayer *L = gl_req;
   gl_req = nullptr;
   if (!L) return;
