@@ -299,13 +299,16 @@ static void ui_layout(int k, const HaloView &v) {
       ui_rrect(it[0], CX, cy, UI_CPT_W, UI_CPT_H, UI_CPT_H / 2, s, ui_container(acc), ab);
       if (r.text) r.text(buf, 32);
       const char *lb = buf[0] ? buf : r.title;
-      const float tw = halo_text_width(gl_t24, lb) * 0.9f * s, iw = r.icon ? 30 * s : 0, x = CX - (tw + iw) / 2;
+      // (the card language's name type, as every row's — was the 24 px cut at 0.9)
+      static const float mid_l = halo_text_mid(gl_row_lab, "Hxkdg");
+      const float tw = halo_text_width(gl_row_lab, lb) * s, iw = r.icon ? 32 * s : 0, x = CX - (tw + iw) / 2;
       if (r.icon) ui_text(it[2], gl_ic24, r.icon, ui_mid_ic, x + 11 * s, cy, 0.9f * s, 1, ui_on_container(acc), ac, &it[0]);
-      ui_text(it[3], gl_t24, lb, ui_mid_t24, x + iw, cy, 0.9f * s, 0, ui_on_container(acc), ac, &it[0]);
+      ui_text(it[3], gl_row_lab, lb, mid_l, x + iw, cy, s, 0, ui_on_container(acc), ac, &it[0]);
     } else if (r.kind == UR_ACTION) {  // a secondary action in the list: the accent's container, a light label
       ui_rrect(it[0], CX, cy, GL_ITEM_W, hh, hh / 2, s, ui_container(acc), ab);
       if (r.text) r.text(buf, 32);
-      ui_text(it[3], gl_t24, buf[0] ? buf : r.title, ui_mid_t24, CX, cy, s, 1, ui_on_container(acc), ac, &it[0], GL_ITEM_W - 80);
+      ui_text(it[3], gl_row_lab, buf[0] ? buf : r.title, halo_text_mid(gl_row_lab, "Hxkdg"), CX, cy, s, 1, ui_on_container(acc), ac, &it[0],
+              GL_ITEM_W - 80);  // (the rows' name type)
     } else if (r.kind == UR_SLIDER) {  // its label over a pill: − and + at the ends, a bar with a thumb between
       const int lo = r.lo, hi = r.hi, val = r.get ? constrain(r.get(), lo, hi) : lo;
       ui_text(it[3], gl_t20, r.title, ui_mid_t20, x0 + 30 * s, y0 + 20 * s, s, 0, UI_DIM, ac, &halo_black);
