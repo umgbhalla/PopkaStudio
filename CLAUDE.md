@@ -56,5 +56,7 @@ python3 tools/watch/sheet.py /tmp/sheet.png /tmp/r/*.png   # side by side, cut t
 - Render every change, then check it on the device: `upcheck` for overlaps, `sheet.py --guides` for balance.
 
 ## Conventions
+- Commit and push every UI iteration as soon as it builds, even before it is seen on the watch (say which in the
+  body): the history is how renders are compared iteration to iteration.
 - Comments explain *why*, in the codebase's voice (parenthetical asides, dates of user decisions).
 - Commit messages: `feat(watch): …` / `fix(…)`, a body listing what each file got.
