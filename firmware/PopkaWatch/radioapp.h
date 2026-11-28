@@ -270,7 +270,7 @@ static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
       const RdFolder &fd = RD_FOLDER[i];
       sel = i == rd_folder;
       icon = RD_FIC[fd.icon % 5];
-      rd_fit(gl_row_lab, fd.name, 236, rpg_rn[r], sizeof(rpg_rn[r]));
+      rd_fit(gl_rpg_row, fd.name, 236, rpg_rn[r], sizeof(rpg_rn[r]));  // (the rows' type with the stations' letters)
       if (fd.kind == RF_FAV) snprintf(meta, sizeof(meta), "%d station%s", rd_fav_n, rd_fav_n == 1 ? "" : "s");
       else if (fd.kind == RF_TOP) strlcpy(meta, "Most listened", sizeof(meta));
       else if (fd.kind == RF_TAG) strlcpy(meta, "Genre", sizeof(meta));
@@ -284,7 +284,7 @@ static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
       const RdSt &s = *rpg_st(i);
       sel = rpg_is_cur(s);
       rpg_badge(s.name, rpg_rb[r], sizeof(rpg_rb[r]));
-      rd_fit(gl_row_lab, rpg_disp(s.name), 236, rpg_rn[r], sizeof(rpg_rn[r]));
+      rd_fit(gl_rpg_row, rpg_disp(s.name), 236, rpg_rn[r], sizeof(rpg_rn[r]));
       const bool fav = rpg_route == RPG_FOLDER && RD_FOLDER[ru->s_folder].kind != RF_FAV && rd_fav_find(s.url) >= 0;
       snprintf(meta, sizeof(meta), "%s%s%s%d kbps", sel ? "Selected \xC2\xB7 " : fav ? "Favorite \xC2\xB7 " : "", s.cc,
                s.cc[0] ? " \xC2\xB7 " : "", s.kbps);
@@ -297,16 +297,16 @@ static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
     HaloItem &badge = up_disc(P, 58 + RPG_ROW_H / 2, y, 24, sel ? RPG_ACC : RPG_PANEL, a, v);  // (concentric with the pill's end)
     if (icon) rpg_text(P, gl_rpg_ic22, icon, 58 + RPG_ROW_H / 2, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge, 0.82f);
     else rpg_text(P, gl_rpg_meta, rpg_rb[r], 58 + RPG_ROW_H / 2, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge);
-    rpg_text(P, gl_row_lab, rpg_rn[r], 132, y - 14, 0, UP_WHITE, a, v, &card);
+    rpg_text(P, gl_rpg_row, rpg_rn[r], 132, y - 14, 0, UP_WHITE, a, v, &card);
     rpg_text(P, gl_row_sub, rpg_rm[r], 132, y + 16, 0, sel ? RPG_ACC : 0x9E9E9E, a, v, &card);
   }
   // Empty, loading, failed: a word in the middle of the rows
   const char *msg = nullptr, *sub = nullptr;
   if (rpg_route == RPG_FOLDER && ru->s_state == 0) msg = "Loading";
-  else if (rpg_route == RPG_FOLDER && ru->s_state == 2) msg = rn_net == RN_NOWIFI ? "No Wi-Fi" : "No connection", sub = "TAP TO RETRY";
+  else if (rpg_route == RPG_FOLDER && ru->s_state == 2) msg = rn_net == RN_NOWIFI ? "No Wi-Fi" : "No connection", sub = "Tap to retry";
   else if (!n) msg = rpg_route == RPG_DIAL || RD_FOLDER[ru->s_folder].kind == RF_FAV ? "No favorites yet" : "Nothing here";
-  if (msg) rpg_text(P, gl_rpg_row, msg, CX, sub ? 220 : 231, 1, RPG_SOFT, a, v);
-  if (sub) rpg_text(P, gl_rpg_meta, sub, CX, 252, 1, RPG_ACC, a, v);
+  if (msg) rpg_text(P, gl_rpg_row, msg, CX, sub ? 220 : 231, 1, UP_WHITE, a, v);  // (an empty state: a bold line, a grey one)
+  if (sub) rpg_text(P, gl_row_sub, sub, CX, 252, 1, 0x9E9E9E, a, v);
   // ‹ (folder or back) › and the slice count; an arrow at its end is shown, dimmed, and not a target
   const bool pv = sl > 0, nx = sl < cnt - 1;
   // (no "1 / 2" under them: the arrows dim at the ends, the rim's dots say the page)

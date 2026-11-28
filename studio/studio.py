@@ -418,8 +418,9 @@ GALLERY_FONTS = [
     "font  gl_back_ic fa-solid-900.ttf    24  0xf060   # Back arrow",
     # Wear OS M3's button type (TypeScaleTokens.kt: LabelMedium 15 sp, LabelSmall 13 sp — weight 500, width 110; 1 sp =
     # 2 px here): the pill rows' label and second line (upager.h up_row); the house's round corners (ROND 100: on the panel, ROND 0 looked the same)
-    "font  gl_row_lab GoogleSansFlex.ttf  28  latin punct \"°é\"  @wght=620,wdth=104,ROND=100   # a row's label",
-    "font  gl_row_sub GoogleSansFlex.ttf  22  latin punct \"°é\"  @wght=450,wdth=104,ROND=100   # a row's second line",
+    # (with the accented Latin letters tracks' and places' names have: MU_ACCENTS)
+    "font  gl_row_lab GoogleSansFlex.ttf  28  latin punct " + MU_ACCENTS[:-1] + '°"' + "  @wght=620,wdth=104,ROND=100   # a row's label",
+    "font  gl_row_sub GoogleSansFlex.ttf  22  latin punct " + MU_ACCENTS[:-1] + '°"' + "  @wght=450,wdth=104,ROND=100   # a row's second line",
     "font  gl_cf_ic  fa-solid-900.ttf    30  0xf00d 0xf00c 0xf011 0xf1f8 0xf2f1   # the confirm (confirm.h): x, check, badges",
     # Paged apps (upager.h, clocks.h) — one type scale by the dial (154 / 103 / 35 / 15: 0.33, 0.22, 0.075, 0.033 D),
     # the cuts of Codex's measured study (apps/SPEC.md, 23 Nov 2026): heavy, the widths tuned per use
@@ -437,24 +438,8 @@ GALLERY_FONTS = [
     # Weather (wxapp.h; design/SPEC_weather.md)
     "font  gl_wx_temp GoogleSansFlex.ttf  96  digits \"°-\" @wght=600,wdth=100,ROND=100,opsz=96   # Weather: now, as the weather tile (docs/references)",
     "font  gl_wx_val  GoogleSansFlex.ttf  35  digits \"°%:-CF\" @wght=830,wdth=91,ROND=55,opsz=35   # card readings",
-    "font  gl_wx_ic38 fa-solid-900.ttf    38  0xf185 0xf6c4 0xf0c2 0xf73d 0xf2dc   # the sky now",
-    # Settings (sysset.h; design/SPEC_settings.md): the level's digit, the condensed row label, the icons at their sizes
-    "font  gl_sg_digit GoogleSansFlex.ttf 154  digits \"-\" @wght=850,wdth=84,ROND=46,opsz=128   # Settings: a level, the battery",
-    "font  gl_sg_row  GoogleSansFlex.ttf  35  latin punct @wght=745,wdth=61,ROND=48,opsz=35   # Settings: a row's label",
-    "font  gl_sg_ic15 fa-solid-900.ttf    15  0xf00c   # the picked card's check",
-    "font  gl_sg_ic20 fa-solid-900.ttf    20  0xf054   # App settings' chevron",
-    "font  gl_sg_ic21 fa-solid-900.ttf    21  0xf185 0xf06e   # Display's cards",
-    "font  gl_sg_ic22 fa-solid-900.ttf    22  0xf054 0xf6a9 0xf028 0xf021 0xf067 0xf068   # chevrons, mute, sync, charge steps",
-    "font  gl_sg_ic23 fa-solid-900.ttf    23  0xf060   # back",
-    "font  gl_sg_ic24 fa-solid-900.ttf    24  0xf067 0xf068 0xf12a 0xf186 0xf023 0xf185 0xf015 0xf060   # timeout steps, actions",
-    "font  gl_sg_ic25 fa-solid-900.ttf    25  0xf053 0xf054 0xf023 0xf011   # face arrows, the buttons' keys",
-    "font  gl_sg_ic26 fa-solid-900.ttf    26  0xf1de   # App settings",
-    "font  gl_sg_ic28 fa-solid-900.ttf    28  0xf185 0xf017 0xf011   # open-to cards, power off",
-    "font  gl_sg_ic29 fa-solid-900.ttf    29  0xf067 0xf068 0xf2ea   # level steps, restart",
-    "font  gl_sg_ic66 fa-solid-900.ttf    66  0xf1eb   # Wi-Fi",
     # Music on the round board (muapp.h; design/SPEC_music.md): tracks' names keep their accents (MU_ACCENTS)
     "font  gl_mu_track GoogleSansFlex.ttf 35  latin digits punct " + MU_ACCENTS + " @wght=790,wdth=86,ROND=45,opsz=35   # Music: the track",
-    "font  gl_mu_queue GoogleSansFlex.ttf 35  latin digits punct " + MU_ACCENTS + " @wght=750,wdth=58,ROND=36,opsz=35   # Music: a queued track",
     "font  gl_mu_opt  GoogleSansFlex.ttf  35  latin punct @wght=750,wdth=69,ROND=38,opsz=35   # Music: a setting",
     "font  gl_mu_lab  GoogleSansFlex.ttf  15  latin digits punct " + MU_ACCENTS + " @wght=700,wdth=105,ROND=30,opsz=15   # Music: artists, labels",
     "font  gl_mu_vol  GoogleSansFlex.ttf 154  digits @wght=900,wdth=105,ROND=47,opsz=128   # Music: the volume",
@@ -618,7 +603,7 @@ ROUND_APP_FONTS["radio"] = [  # the Radio (radio.h): names and songs from anywhe
     # Font Awesome at the design's sizes
     f"font  gl_rpg_title GoogleSansFlex.ttf 35  digits {RADIO_LETTERS} @wght=775,wdth=98,ROND=50,opsz=35 +else=Nunito.ttf:700   # Radio: the station",
     f"font  gl_rpg_tnar GoogleSansFlex.ttf  35  digits {RADIO_LETTERS} @wght=775,wdth=70,ROND=50,opsz=35 +else=Nunito.ttf:700   # Radio: a long station",
-    f"font  gl_rpg_row  GoogleSansFlex.ttf  35  digits {RADIO_LETTERS} @wght=760,wdth=79,ROND=43,opsz=35 +else=Nunito.ttf:700   # Radio: rows, labels",
+    f"font  gl_rpg_row  GoogleSansFlex.ttf  28  digits {RADIO_LETTERS} @wght=620,wdth=104,ROND=100 +else=Nunito.ttf:700   # Radio: a row's name in the rows' type (gl_row_lab), with the stations' letters",
     f"font  gl_rpg_meta GoogleSansFlex.ttf  15  digits {RADIO_LETTERS} @wght=700,wdth=105,ROND=30,opsz=15 +else=Nunito.ttf:700   # Radio: metadata, badges",
     "font  gl_rpg_mono GoogleSansFlex.ttf  103  digits \"ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ&+\" @wght=900,wdth=96,ROND=60,opsz=103 +else=Nunito.ttf:700   # Radio: the monogram",
     "font  gl_rpg_vol  GoogleSansFlex.ttf  154  digits @wght=875,wdth=91,ROND=48,opsz=128   # Radio: the volume",

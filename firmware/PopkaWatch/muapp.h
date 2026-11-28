@@ -8,7 +8,7 @@
 // The sound, the tracks and the volume stay player.h's, music.h's (music_sd.h's: a card's) and volume.h's: this file
 // only shows them and says what to do. Included from PopkaWatch.ino after upager.h.
 #if defined(HALO_ROUND) && HAS_MUSIC
-extern const HaloFont gl_mu_track, gl_mu_queue, gl_mu_opt, gl_mu_lab, gl_mu_vol, gl_mu_pct, gl_mu_ic31, gl_mu_ic32,
+extern const HaloFont gl_mu_track, gl_mu_opt, gl_mu_lab, gl_mu_vol, gl_mu_pct, gl_mu_ic31, gl_mu_ic32,
     gl_mu_ic24, gl_mu_ic26;  // (studio.py GALLERY_FONTS)
 // The design's tokens
 #define MU_ACC 0xE9C8FC    // orchid
