@@ -445,7 +445,8 @@ static void ck_fill(int p) {
   int off = (t.tm_yday * 1440 + t.tm_hour * 60 + t.tm_min) - (u.tm_yday * 1440 + u.tm_hour * 60 + u.tm_min);
   if (off > 1440) off -= 365 * 1440;
   if (off < -1440) off += 365 * 1440;
-  snprintf(ck_utc[p], 12, "UTC%c%02d:%02d", off < 0 ? '-' : '+', abs(off) / 60, abs(off) % 60);
+  if (abs(off) % 60) snprintf(ck_utc[p], 12, "UTC %c%d:%02d", off < 0 ? '-' : '+', abs(off) / 60, abs(off) % 60);
+  else snprintf(ck_utc[p], 12, off ? "UTC %c%d" : "UTC", off < 0 ? '-' : '+', abs(off) / 60);  // ("UTC +5:30", "UTC −8", "UTC")
   const float lat = i < 0 ? wx_city[0].lat : CK_CITIES[i].lat, lon = i < 0 ? wx_city[0].lon : CK_CITIES[i].lon;
   ck_sun(lat, lon, off / 60.0f, t.tm_yday, ck_rise[p], ck_set_h[p]);
   ck_now_h[p] = t.tm_hour + t.tm_min / 60.0f;
@@ -464,16 +465,17 @@ static void ck_lay(int p, UpPage &P, float a, const HaloView &v) {
     mx = CX + UP_RING_R * sinf(an), my = CY - UP_RING_R * cosf(an);
     up_disc(P, mx, my, 10, 0x000000, a, v), up_disc(P, mx, my, 6, UP_WHITE, a, v);           // now
     up_title(P, i < 0 ? "Here" : CK_CITIES[i].name, a, v);
-    up_text(P, gl_up_hero, ck_time[p], up_mid_hero, CX, 209, 1, UP_WHITE, a, v);
-    up_text(P, gl_up_num, ck_utc[p], up_mid_num, CX, 303, 1, UP_MUTED, a, v);
-    const char *lab = ck_isday[p] ? "DAYLIGHT" : "NIGHT";
-    const float lw = halo_text_width(gl_up_lab, lab), gx = CX - (24 + 10 + lw) / 2;
-    up_text(P, gl_up_ic24, ck_isday[p] ? UP_IC_SUN : UP_IC_MOON, halo_text_mid(gl_up_ic24, UP_IC_SUN), gx + 12, 350, 1, tint, a, v);
-    up_text(P, gl_up_lab, lab, up_mid_lab, gx + 34, 350, 0, tint, a, v);
+    // (one type for time: the Stopwatch's cut; under it, the card language — the part of the day in its tint, the offset grey)
+    up_text(P, gl_up_disp, ck_time[p], up_mid_disp, CX, 200, 1, UP_WHITE, a, v);
+    const char *lab = ck_isday[p] ? "Daylight" : "Night";
+    const float lw = halo_text_width(gl_row_lab, lab), gx = CX - (24 + 10 + lw) / 2;
+    up_text(P, gl_up_ic24, ck_isday[p] ? UP_IC_SUN : UP_IC_MOON, halo_text_mid(gl_up_ic24, UP_IC_SUN), gx + 12, 270, 1, tint, a, v);
+    up_text(P, gl_row_lab, lab, halo_text_mid(gl_row_lab, "Hxkdg"), gx + 34, 270, 0, tint, a, v);
+    up_text(P, gl_row_sub, ck_utc[p], halo_text_mid(gl_row_sub, "Hxkdg"), CX, 304, 1, 0x9E9E9E, a, v);
   } else {
     up_title(P, "Cities", a, v);
     up_primary(P, CX, 250, UP_PRI_R, 0, UP_IC_GLOBE, CK_ACC, 0x1C1A33, a, v);
-    up_text(P, gl_up_lab, "PICK THE PLACES", up_mid_lab, CX, 336, 1, UP_MUTED, a, v);
+    up_text(P, gl_row_sub, "Pick the places", halo_text_mid(gl_row_sub, "Hxkdg"), CX, 336, 1, 0x9E9E9E, a, v);
   }
 }
 static void ck_tap(int p, float x, float y) {
