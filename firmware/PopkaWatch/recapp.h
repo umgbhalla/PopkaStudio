@@ -52,7 +52,7 @@ static void ra_bar(UpPage &P, int i, float h, uint32_t c, float a, const HaloVie
 }
 // The capture's and the playback's shared card: the wave and its caption
 static HaloItem &ra_wave_card(UpPage &P, uint32_t fill, float a, const HaloView &v) {
-  up_rrect(P, 86, 243, 380, 293, 24, fill, a, v);
+  up_rrect(P, 86, 243, 380, 293, 25, fill, a, v);  // (a full pill: corners half its height)
   return P.it[P.n - 1];
 }
 // The big button: the shape (up_primary: circle → four lobes by t), then a glyph of the spec's size on it
@@ -133,7 +133,7 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
   if (p == 0) {  // Capture: ready or recording
     up_title(P, "Recorder", a, v);
     mmss(ra_time, sizeof(ra_time), rec ? rc_t : 0, true);
-    up_text(P, gl_up_disp, ra_time, up_mid_disp, CX, 190, 1, UP_WHITE, a, v);  // (the Stopwatch's size: one type for time)
+    up_text(P, gl_up_disp, ra_time, up_mid_disp, CX, 180, 1, UP_WHITE, a, v);  // (the Stopwatch's size: one type for time; air over the wave)
     HaloItem &card = ra_wave_card(P, rec ? RA_HOT : RA_PANEL, a, v);
     for (int i = 0; i < RA_BARS; i++) {  // the last 23 slices, the newest (in progress) at the right
       float h = 2;
@@ -229,7 +229,7 @@ static void rp_lay(int, UpPage &P, float a, const HaloView &v) {
   const bool play = rc_state == RC_PLAY;
   up_title(P, ra_name(), a, v);
   mmss(ra_time, sizeof(ra_time), (float)rc_pos / rc_rate, true);
-  up_text(P, gl_up_hero, ra_time, up_mid_hero, CX, 181, 1, UP_WHITE, a, v);
+  up_text(P, gl_up_disp, ra_time, up_mid_disp, CX, 180, 1, UP_WHITE, a, v);  // (the clocks' one cut, as capture)
   HaloItem &card = ra_wave_card(P, RA_PANEL, a, v);
   const int played = rc_len ? (int)lroundf(RA_BARS * (float)rc_pos / rc_len) : 0;
   for (int i = 0; i < RA_BARS; i++) ra_bar(P, i, ra_ov[i], i < played ? RA_ACC : RA_QUIET, a, v);
