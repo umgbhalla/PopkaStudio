@@ -178,6 +178,8 @@ static void sy_restart() {
 #define SS_IC_SUN "\xEF\x86\x85"
 #define SS_IC_BOLT "\xEF\x83\xA7"
 #define SS_IC_LOCATION "\xEF\x8F\x85"
+#define SS_IC_CHIP "\xEF\x8B\x9B"    // (Firmware)
+#define SS_IC_MEMORY "\xEF\x94\xB8"  // (Memory: each row its own icon, not one wrench for all)
 static UiPage sy_root, sy_display, sy_time, sy_wifi, sy_sound, sy_battery, sy_system, sy_faces, sy_buttons, sy_weather;
 #define SY_IC_IMAGE "\xEF\x80\xBE"
 #define SY_IC_GAMEPAD "\xEF\x84\x9B"
@@ -256,8 +258,8 @@ static void sy_build() {
 #endif
 
   sy_system = {"System", {}, 0, 0xC7BFFF};
-  sy_add(sy_system, ur_info(SS_IC_WRENCH, "Firmware", sy_fw));
-  sy_add(sy_system, ur_info(SS_IC_WRENCH, "Memory", sy_mem));
+  sy_add(sy_system, ur_info(SS_IC_CHIP, "Firmware", sy_fw));
+  sy_add(sy_system, ur_info(SS_IC_MEMORY, "Memory", sy_mem));
   sy_add(sy_system, ur_action("Restart", sy_restart, 0xA8C7FA));
   sy_add(sy_system, ur_action("Power off", power_confirm_open, 0xFFB4AB));
 
