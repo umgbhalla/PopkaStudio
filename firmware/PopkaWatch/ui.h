@@ -293,7 +293,7 @@ static void ui_layout(int k, const HaloView &v) {
     if (r.kind == UR_CUSTOM) {  // (the app's own: it is told where, it draws)
       if (r.clay) r.clay(x0, y0, w, h, s, ac, v);
     } else if (r.kind == UR_HEAD) {  // a section's label: small, left, in sentence case — not in a pill
-      ui_text(it[3], gl_t20, r.title, ui_mid_t20, x0 + 30 * s, y0 + h * 0.62f, s, 0, UI_DIM, ac, &halo_black);
+      ui_text(it[3], gl_row_sub, r.title, halo_text_mid(gl_row_sub, "Hxkdg"), x0 + 30 * s, y0 + h * 0.62f, s, 0, UI_DIM, ac, &halo_black);  // (a section's name: the grey line's type)
       it[3].on_black = true;
     } else if (r.kind == UR_ACTION && r.lo) {  // compact: a small pill, its icon and label centred as one
       ui_rrect(it[0], CX, cy, UI_CPT_W, UI_CPT_H, UI_CPT_H / 2, s, ui_container(acc), ab);
@@ -311,7 +311,7 @@ static void ui_layout(int k, const HaloView &v) {
               GL_ITEM_W - 80);  // (the rows' name type)
     } else if (r.kind == UR_SLIDER) {  // its label over a pill: − and + at the ends, a bar with a thumb between
       const int lo = r.lo, hi = r.hi, val = r.get ? constrain(r.get(), lo, hi) : lo;
-      ui_text(it[3], gl_t20, r.title, ui_mid_t20, x0 + 30 * s, y0 + 20 * s, s, 0, UI_DIM, ac, &halo_black);
+      ui_text(it[3], gl_row_sub, r.title, halo_text_mid(gl_row_sub, "Hxkdg"), x0 + 30 * s, y0 + 20 * s, s, 0, UI_DIM, ac, &halo_black);
       it[3].on_black = true;
       const float py = y0 + 36 * s + 48 * s, bw = (GL_ITEM_W - 196) * s, bx = CX - bw / 2;
       ui_rrect(it[0], CX, py, GL_ITEM_W, 96, 48, s, UI_SURF, ab);
@@ -382,7 +382,7 @@ static void ui_layout(int k, const HaloView &v) {
   e.color = pri, e.alpha = eh > 4 ? halo_clamp01((eh - 8) / 52) : 0, e.on_black = true, e.on = nullptr;
   if (pg.edge.text) pg.edge.text(R.eb_buf, 32);
   else strlcpy(R.eb_buf, pg.edge.title ? pg.edge.title : "", 32);
-  ui_text(R.eb_label, gl_t24, R.eb_buf, ui_mid_t24, CX, CY + ebr - eh + fminf(eh, UI_EB_FULL) * 0.42f, 1, 1, ui_on_primary(pri),
+  ui_text(R.eb_label, gl_row_lab, R.eb_buf, halo_text_mid(gl_row_lab, "Hxkdg"), CX, CY + ebr - eh + fminf(eh, UI_EB_FULL) * 0.42f, 1, 1, ui_on_primary(pri),
           eh > 40 ? halo_clamp01((eh - 40) / 30) : 0, &R.eb, UI_EB_W - 70);
   halo_view_commit(e, v), halo_view_commit(R.eb_label, v);
 }
