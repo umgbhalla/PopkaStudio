@@ -342,7 +342,7 @@ static void rpg_tap_stations(float x, float y) {
 
 // ---------- 3 Volume: Wear OS's volume screen (upager.h up_volume) ----------
 static void rpg_lay_volume(UpPage &P, float a, const HaloView &v) {
-  up_volume(P, vol_level, RPG_ACC, RPG_RING, gl_rpg_ic31, RPG_IC_PLUS, RPG_IC_MINUS, a, v);
+  up_volume(P, vol_level, RPG_ACC, RPG_RING, gl_rpg_ic31, RPG_IC_PLUS, RPG_IC_MINUS, a, v, &gl_ra_ic24);
 }
 
 // ---------- 4 Radio settings: Wear OS's settings list (upager.h list mode) ----------

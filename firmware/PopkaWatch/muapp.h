@@ -130,7 +130,7 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
     }
     up_primary(P, 233, 365, 52, mu_m, pl_playing ? UP_IC_PAUSE : UP_IC_PLAY, MU_ACC, MU_INK, ca, v);
   } else if (p == 1) {  // Volume: Wear OS's volume screen (upager.h up_volume)
-    up_volume(P, vol_level, MU_ACC, MU_RING, gl_mu_ic32, MU_IC_PLUS, MU_IC_MINUS, a, v);
+    up_volume(P, vol_level, MU_ACC, MU_RING, gl_mu_ic32, MU_IC_PLUS, MU_IC_MINUS, a, v, &gl_mu_ic24);
   } else if (p == 2) {  // Queue
     up_title(P, "Queue", a, v);
     mu_qn = mu_n > 1 ? min(3, mu_n - 1) : 0;

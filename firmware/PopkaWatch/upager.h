@@ -241,6 +241,10 @@ enum : uint8_t { UP_ROW_BUTTON, UP_ROW_SWITCH, UP_ROW_RADIO };
 #define UP_ROW_OFF 0x2E3034  // the house's card (gallery.h's)
 extern const HaloFont gl_row_lab, gl_row_sub;  // (Wear OS M3's LabelMedium / LabelSmall: 30 / 26 px, weight 500, width 110;
                                               // on the panel, 28 Nov 2026: clearer than the gallery's t24 / t20 at 620)
+// A leading icon for the next up_row only (Wear OS's chips: the icon, then the label — the volume screen's output),
+// in the accent; up_row clears it
+static const char *up_row_ic;
+static const HaloFont *up_row_icf;
 static HaloItem &up_row(UpPage &P, float x0, float x1, float y, float h, const char *label, const char *sub,
                         uint8_t kind, float on, uint32_t acc, uint32_t ink, float a, const HaloView &v) {
   // Wear OS M3's tokens (SwitchButtonTokens, FilledTonalButtonTokens): unchecked — the surface container, the label
@@ -261,7 +265,15 @@ static HaloItem &up_row(UpPage &P, float x0, float x1, float y, float h, const c
   up_commit(pill, v);
   const uint32_t lab_on = ui_mix(acc, 0xFFFFFF, 0.55f);  // (on-primary-container)
   const uint32_t txt = ui_mix(0xFFF8EE, lab_on, fills ? on : 0), txt2 = ui_mix(0x9E9E9E, ui_mix(lab_on, box, 0.25f), fills ? on : 0);
-  const float lx = x0 + 32, room = x1 - x0 - 32 - (kind == UP_ROW_BUTTON ? 32 : 98);
+  const char *ic = up_row_ic;
+  const HaloFont *icf = up_row_icf;
+  up_row_ic = nullptr, up_row_icf = nullptr;
+  if (ic && icf) {  // (the icon's middle 52 px in from the end, the text 44 px after it)
+    HaloItem &t = up_item(P);
+    ui_text(t, *icf, ic, halo_text_mid(*icf, ic), x0 + 52, y, 1, 1, ui_mix(acc, 0xFFFFFF, 0.2f), a, &pill, 0);
+    up_commit(t, v);
+  }
+  const float lx = x0 + (ic && icf ? 84 : 32), room = x1 - lx - (kind == UP_ROW_BUTTON ? 32 : 98);
   auto text = [&](const HaloFont &f, const char *s, float ty, uint32_t c) {
     HaloItem &t = up_item(P);
     ui_text(t, f, s, halo_text_mid(f, "Hxkdg"), lx, ty, 1, 0, c, a, &pill, room);
@@ -331,12 +343,13 @@ static void up_vol_button(UpPage &P, float y, const char *icon, const HaloFont &
 }
 // level 0 … 10; track — the arc's empty part; f, plus, minus — the app's glyphs
 static void up_volume(UpPage &P, int level, uint32_t acc, uint32_t track, const HaloFont &f, const char *plus,
-                      const char *minus, float a, const HaloView &v) {
+                      const char *minus, float a, const HaloView &v, const HaloFont *spk = nullptr) {
   const float A0 = 212 * HALO_PI / 180, SW = 116 * HALO_PI / 180;  // (8 to 10 o'clock and a bit)
   up_arc(P, UP_RING_R, UP_RING_W, A0, A0 + SW, track, a, v);
   up_arc(P, UP_RING_R, UP_RING_W, A0, A0 + SW * level / 10.0f, acc, level > 0 ? a : 0, v);
   up_vol_button(P, UP_VB_UP, plus, f, acc, level < 10 ? a : a * 0.38f, v);
   snprintf(up_vol_line, sizeof(up_vol_line), "Volume %d %%", level * 10);
+  if (spk) up_row_ic = "\xEF\x80\xA8", up_row_icf = spk;  // (the speaker, U+F028)
   up_row(P, CX - 150, CX + 150, CY, 96, "Speaker", up_vol_line, UP_ROW_BUTTON, 0, acc, 0, a, v);
   up_vol_button(P, UP_VB_DN, minus, f, acc, level > 0 ? a : a * 0.38f, v);
 }
