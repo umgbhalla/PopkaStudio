@@ -962,7 +962,10 @@ static void screen_layout(int s, const HaloView &v) {
     } else
 #endif
     if (L.kind != FL_WEATHER) {
-      halo_roll_layout(R.roll, x, y, L.color, a, over ? nullptr : &halo_black, v);
+      // (the clock before the time is known — the seconds after a start, until Wi-Fi: its "--:--" dimmed to 35 %, so the
+      // face reads as waiting rather than broken; full as soon as the time comes)
+      const uint32_t col = L.kind == FL_CLOCK && !halo_clock_valid() ? wg_mix(L.color, 0x000000, 0.65f) : L.color;
+      halo_roll_layout(R.roll, x, y, col, a, over ? nullptr : &halo_black, v);
     } else {
       // The pill: as wide as its text right now (it follows the temperature's width spring)
 #ifdef HALO_ROUND
