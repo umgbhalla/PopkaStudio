@@ -144,7 +144,7 @@ static void gal_layer_build(const FaceScreen &S, int i) {
   if (L.kind == FL_DEVCARD) return dv_run_make(R);
   R.g = new HaloItem[5]();
   if (L.kind == FL_TITLE) R.mid = halo_text_mid(gl_title, gl_str(L.text));
-  if (L.kind == FL_EDGE) R.mid = halo_text_mid(gl_t24, gl_str(L.text));
+  if (L.kind == FL_EDGE) R.mid = halo_text_mid(gl_row_lab, gl_str(L.text));  // (the rows' name type)
 #ifndef HALO_ROUND
   rg_layer_build(S, i);
 #endif
@@ -213,10 +213,10 @@ static void gal_build() {
   K_EB = halo_spring(halo_stiff(400), 1);
   gl_mid_icon = halo_text_mid(gl_ic24, "");
 #ifdef HALO_ROUND
-  gl_mid_back = halo_text_mid(gl_t24, "Back");
+  gl_mid_back = halo_text_mid(gl_row_lab, "Back");
   gl_mid_back_arrow = halo_text_mid(gl_back_ic, GL_BACK_ARROW);
   gl_back_text_dx = (halo_text_width(gl_back_ic, GL_BACK_ARROW) + 10) / 2.0f;
-  gl_back_arrow_dx = (halo_text_width(gl_t24, "Back") + 10) / 2.0f;
+  gl_back_arrow_dx = (halo_text_width(gl_row_lab, "Back") + 10) / 2.0f;
 #endif
   for (int k = 0; k < face_scr_n; k++) gal_rebuild(face_scr[k]);
 }
@@ -351,7 +351,7 @@ static void gal_layout(const FaceScreen &S, int i, float a, const HaloView &v) {
       const bool unlinked = gal_edge_back(L), back = unlinked && !gal_apps(S);
       const char *label = back ? "Back" : unlinked ? "Power off" : gl_str(L.text);
       const float y = e_top + fminf(eh, EB_FULL) * 0.4f, alpha = eh > 1 ? e_txt * a : 0;
-      gl_text_mid(it[1], gl_t24, label, unlinked ? gl_mid_back : R.mid,
+      gl_text_mid(it[1], gl_row_lab, label, unlinked ? gl_mid_back : R.mid,
                   CX + (back ? gl_back_text_dx : 0), y, 1, GL_TEXT, alpha, &e);
       gl_text_mid(it[2], gl_back_ic, GL_BACK_ARROW, gl_mid_back_arrow, CX - gl_back_arrow_dx, y, 1, GL_TEXT,
                   back ? alpha : 0, &e);
