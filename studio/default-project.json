@@ -565,7 +565,7 @@
      "color2": "#2E3034",
      "text": "Dot Snake",
      "subtitle": "LED matrix",
-     "icon": "gamepad"
+     "icon": "grid"
     },
     {
      "id": "card9",
@@ -582,7 +582,7 @@
      "color2": "#2E3034",
      "text": "Comet",
      "subtitle": "snake in space",
-     "icon": "gamepad"
+     "icon": "star"
     },
     {
      "id": "card10",
