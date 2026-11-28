@@ -60,7 +60,8 @@ static void ui_confirm_layout(const HaloView &v) {
               &halo_black);  // (the card language's grey line)
   body.on_black = true, body.fit = 320;
   const float x0 = cf_x0();
-  halo_item_rrect(sq, x0 + CF_SQ_W / 2, CF_BTN_Y, CF_SQ_W, CF_BTN_H, 26, 1, 0x2E3034, 1);
+  // (cancel: a round icon button, as Wear OS's — the pill beside it confirms; was a rounded square, the one block here)
+  halo_item_rrect(sq, x0 + CF_SQ_W / 2, CF_BTN_Y, CF_SQ_W, CF_BTN_H, fminf(CF_SQ_W, CF_BTN_H) / 2, 1, 0x2E3034, 1);
   halo_item_rrect(pill, x0 + CF_SQ_W + CF_GAP + CF_PILL_W / 2, CF_BTN_Y, CF_PILL_W, CF_BTN_H, CF_BTN_H / 2, 1, cf.accent, 1);
   gl_text_mid(glyphs, gl_cf_ic, UI_IC_CHECK, cf_mid_ic, pill.x, CF_BTN_Y, 1, on_acc, 1, &pill);
   for (HaloItem *it : {&badge, &ic, &title, &body, &sq, &pill, &glyphs}) halo_view_commit(*it, v);
