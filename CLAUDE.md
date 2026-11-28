@@ -55,6 +55,12 @@ python3 tools/watch/sheet.py /tmp/sheet.png /tmp/r/*.png   # side by side, cut t
 - One card language: a card's name in `gl_row_lab` (28 px, 620), the line under it in `gl_row_sub` (22 px, 450,
   `0x9E9E9E`), 32 px apart, the pair centred — settings rows, the Apps list, Weather's cards. Checked rows sit on the
   accent's tonal container (Wear OS's primary container), never a bright accent fill.
+- The one exception: live readings are Wear OS progress cards — the label small in the accent, the reading big, a ring
+  or chart at the right (Weather's Humidity/Wind/UV, About's Processor/Memory…). Keep them; don't turn them into rows.
+- Volume is one screen, `up_volume()` in `upager.h` (Wear OS's volume screen: + on top, − below, the output chip
+  between, the level on the left rim); percentages are written `60%`, no space.
+- Hold to unlock is the whole rim glowing, deeper as the hold fills (`power.h`; serial `unlockpeek 0..1 | off` shows it).
+- Frame rate: the log's "N fps drawn" counts only frames with changes; measure with motion filling the whole second.
 - Render every change, then check it on the device: `upcheck` for overlaps, `sheet.py --guides` for balance.
 
 ## Conventions
