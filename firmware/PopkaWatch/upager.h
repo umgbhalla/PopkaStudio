@@ -224,6 +224,12 @@ static void up_secondary(UpPage &P, float x, float y, float r, const char *icon,
 // second line) from the left in the house's type, its control at the right end — a switch, a radio, or nothing (a
 // plain button). on: 0 … 1 (a spring) — the pill fills with the accent and its text turns to the dark ink, as Wear OS's
 // selected toggles. The pill's item comes back (its tap box: x0 … x1, y ± h/2)
+// Is the finger down on this box (page coordinates, through the view) and not yet a drag? — a control's press
+static inline bool up_pressed(const HaloView &v, float x0, float y0, float x1, float y1) {
+  const HaloFinger &f = halo_finger;
+  return f.down && !f.dragging && f.x0 >= halo_view_x(v, x0) && f.x0 <= halo_view_x(v, x1) && f.y0 >= halo_view_y(v, y0) &&
+         f.y0 <= halo_view_y(v, y1);
+}
 enum : uint8_t { UP_ROW_BUTTON, UP_ROW_SWITCH, UP_ROW_RADIO };
 #define UP_ROW_X0 47.0f   // the rows' ends on a non-scrolling page (Wear OS: full width less 5.2 % a side)
 #define UP_ROW_X1 419.0f
@@ -242,9 +248,7 @@ static HaloItem &up_row(UpPage &P, float x0, float x1, float y, float h, const c
   const bool fills = kind != UP_ROW_BUTTON;
   // pressed (the finger came down on it and has not become a drag): lighter, its corners squeezed — the Apps list's
   // cards' press, so a tap answers at once
-  const HaloFinger &fg = halo_finger;
-  const bool press = fg.down && !fg.dragging && a > 0.5f && fg.x0 >= halo_view_x(v, x0) && fg.x0 <= halo_view_x(v, x1) &&
-                     fg.y0 >= halo_view_y(v, y - h / 2) && fg.y0 <= halo_view_y(v, y + h / 2);
+  const bool press = a > 0.5f && up_pressed(v, x0, y - h / 2, x1, y + h / 2);
   uint32_t box = ui_mix(UP_ROW_OFF, ui_mix(acc, 0x000000, 0.68f), fills ? on : 0);  // (the primary container)
   if (press) box = ui_mix(box, 0xFFFFFF, 0.10f);
   HaloItem &pill = up_item(P);

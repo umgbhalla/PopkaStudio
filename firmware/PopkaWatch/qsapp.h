@@ -40,7 +40,8 @@ static int qs_count() { return 3; }
 static const float QS_BX[3] = {125, 233, 341}, QS_BY[2] = {214, 318};
 static void qs_btn(UpPage &P, int k, const HaloFont &f, const char *icon, float on, float a, const HaloView &v) {
   const float x = QS_BX[k % 3], y = QS_BY[k / 3];
-  HaloItem &d = up_disc(P, x, y, QS_BTN_R, ui_mix(QS_CARD, QS_MINT, on), a, v);
+  const bool press = up_pressed(v, x - QS_BTN_R, y - QS_BTN_R, x + QS_BTN_R, y + QS_BTN_R);  // (pressed: lighter, a touch smaller)
+  HaloItem &d = up_disc(P, x, y, QS_BTN_R * (press ? 0.92f : 1), ui_mix(ui_mix(QS_CARD, QS_MINT, on), 0xFFFFFF, press ? 0.12f : 0), a, v);
   ln_text(P, f, icon, x, y, 1, ui_mix(QS_MINT, QS_INK, on), a, v, &d);
 }
 // A level as Wear OS's slider: a full pill, − and + at its ends, the icon and value between them over its marks

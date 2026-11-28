@@ -291,7 +291,9 @@ static void rpg_lay_stations(UpPage &P, float a, const HaloView &v) {
     }
     rd_fit(gl_row_sub, meta, 236, rpg_rm[r], sizeof(rpg_rm[r]));
     // (the card language: a full pill, the name bold over a lighter grey line — upager.h up_row)
-    HaloItem &card = rpg_card(P, 58, y - RPG_ROW_H / 2, 408, y + RPG_ROW_H / 2, RPG_ROW_H / 2, sel ? RPG_CUR : RPG_CARD, a, v);
+    const bool press = up_pressed(v, 58, y - RPG_ROW_H / 2, 408, y + RPG_ROW_H / 2);  // (the rows' press: lighter, squeezed)
+    HaloItem &card = rpg_card(P, 58, y - RPG_ROW_H / 2, 408, y + RPG_ROW_H / 2, RPG_ROW_H * (press ? 0.36f : 0.5f),
+                              ui_mix(sel ? RPG_CUR : RPG_CARD, 0xFFFFFF, press ? 0.1f : 0), a, v);
     HaloItem &badge = up_disc(P, 58 + RPG_ROW_H / 2, y, 24, sel ? RPG_ACC : RPG_PANEL, a, v);  // (concentric with the pill's end)
     if (icon) rpg_text(P, gl_rpg_ic22, icon, 58 + RPG_ROW_H / 2, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge, 0.82f);
     else rpg_text(P, gl_rpg_meta, rpg_rb[r], 58 + RPG_ROW_H / 2, y, 1, sel ? RPG_INK : RPG_ACC, a, v, &badge);

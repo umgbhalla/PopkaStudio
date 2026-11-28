@@ -158,7 +158,8 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
       mu_qi[k] = i;
       // (the card language: a full pill, the number in a disc concentric with its end, the title bold over a grey line
       // — the composer and the length)
-      up_rrect(P, 58, y - 38, 408, y + 38, 38, k ? MU_PANEL : MU_TONE, a, v);
+      const bool press = up_pressed(v, 58, y - 38, 408, y + 38);  // (the rows' press: lighter, squeezed)
+      up_rrect(P, 58, y - 38, 408, y + 38, press ? 27 : 38, ui_mix(k ? MU_PANEL : MU_TONE, 0xFFFFFF, press ? 0.1f : 0), a, v);
       HaloItem &card = P.it[P.n - 1];
       HaloItem &badge = up_disc(P, 96, y, 24, k ? MU_RING : MU_ACC, a, v);
       snprintf(mu_q[k][0], 8, "%02d", i + 1);
