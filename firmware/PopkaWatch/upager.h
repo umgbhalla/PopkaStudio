@@ -192,10 +192,18 @@ static void up_arc(UpPage &P, float r, float w, float a0, float a1, uint32_t c, 
   up_arc_seg(P, r, w, a0, fminf(a1, g0), c, a0 < g0 ? a : 0, v);
   up_arc_seg(P, r, w, fmaxf(a0, g1), a1, c, a1 > g1 ? a : 0, v);
 }
+// Is the finger down on this box (page coordinates, through the view) and not yet a drag? — a control's press
+static inline bool up_pressed(const HaloView &v, float x0, float y0, float x1, float y1) {
+  const HaloFinger &f = halo_finger;
+  return f.down && !f.dragging && f.x0 >= halo_view_x(v, x0) && f.x0 <= halo_view_x(v, x1) && f.y0 >= halo_view_y(v, y0) &&
+         f.y0 <= halo_view_y(v, y1);
+}
 // The primary: a filled shape (circle → four lobes by t) and its glyph in the dark ink (f — an app's own glyph size;
 // nullptr — the study's 43 px)
 static void up_primary(UpPage &P, float x, float y, float r, float t, const char *icon, uint32_t fill, uint32_t ink,
                        float a, const HaloView &v, const HaloFont *f = nullptr) {
+  const bool press = a > 0.5f && up_pressed(v, x - r, y - r, x + r, y + r);  // (pressed: a touch smaller and lighter)
+  if (press) r *= 0.94f, fill = ui_mix(fill, 0xFFFFFF, 0.12f);
   if (P.nb < UP_BLOBS) {
     UpBlob &b = P.b[P.nb++];
     b.at = P.n, b.x = halo_view_x(v, x), b.y = halo_view_y(v, y), b.r = r * v.s, b.t = t, b.a = a * v.a, b.c = fill;
@@ -215,7 +223,8 @@ static void up_primary(UpPage &P, float x, float y, float r, float t, const char
 // A secondary: a tonal disc, its glyph in the accent
 static void up_secondary(UpPage &P, float x, float y, float r, const char *icon, uint32_t bg, uint32_t fg, float a,
                          const HaloView &v, const HaloFont &f = gl_up_ic32) {
-  HaloItem &d = up_disc(P, x, y, r, bg, a, v);
+  const bool press = a > 0.5f && up_pressed(v, x - r, y - r, x + r, y + r);  // (pressed: a touch smaller and lighter)
+  HaloItem &d = up_disc(P, x, y, press ? r * 0.92f : r, press ? ui_mix(bg, 0xFFFFFF, 0.12f) : bg, a, v);
   up_text(P, f, icon, halo_text_mid(f, icon), x, y, 1, fg, a, v, &d);
 }
 // ---------- Wear OS's pill rows (Button / SwitchButton / RadioButton: docs/references/wear-os, the scrolling settings
@@ -224,12 +233,6 @@ static void up_secondary(UpPage &P, float x, float y, float r, const char *icon,
 // second line) from the left in the house's type, its control at the right end — a switch, a radio, or nothing (a
 // plain button). on: 0 … 1 (a spring) — the pill fills with the accent and its text turns to the dark ink, as Wear OS's
 // selected toggles. The pill's item comes back (its tap box: x0 … x1, y ± h/2)
-// Is the finger down on this box (page coordinates, through the view) and not yet a drag? — a control's press
-static inline bool up_pressed(const HaloView &v, float x0, float y0, float x1, float y1) {
-  const HaloFinger &f = halo_finger;
-  return f.down && !f.dragging && f.x0 >= halo_view_x(v, x0) && f.x0 <= halo_view_x(v, x1) && f.y0 >= halo_view_y(v, y0) &&
-         f.y0 <= halo_view_y(v, y1);
-}
 enum : uint8_t { UP_ROW_BUTTON, UP_ROW_SWITCH, UP_ROW_RADIO };
 #define UP_ROW_X0 47.0f   // the rows' ends on a non-scrolling page (Wear OS: full width less 5.2 % a side)
 #define UP_ROW_X1 419.0f
