@@ -28,10 +28,10 @@ extern const HaloFont gl_ra_dur, gl_ra_ic43, gl_ra_ic38, gl_ra_ic31, gl_ra_ic26,
 #define RA_PANEL 0x22171B  // cards, the idle wave's card
 #define RA_HOT 0x321B1E    // the wave's card while recording
 #define RA_QUIET 0x795655  // the quiet wave, disabled glyphs
-// The action row (apps/SPEC.md): the secondary r 38 at (161, 352), the primary r 55 at (287, 352); square hit boxes
+// The action row (apps/SPEC.md): the secondary r 38 at (161, RA_ROW_Y), the primary r 55 at (287, RA_ROW_Y); square hit boxes
 #define RA_SEC_X 161.0f
 #define RA_PRI_X 287.0f
-#define RA_ROW_Y 352.0f
+#define RA_ROW_Y 368.0f  // (10 px lower than it was: the wave's caption went under its pill — 28 Nov 2026)
 #define RA_BARS 23
 static const int RA_LIMITS[3] = {15, 30, 60};
 
@@ -46,13 +46,17 @@ static Preferences ra_prefs;
 static int ra_owner;  // (the horizontal drag held while recording)
 
 static inline float ra_bar_h(int lv) { return 2 + 22 * constrain(lv, 0, 255) / 255.0f; }  // level 0..255 → 2..24 px
+// The wave's pill holds only the wave, centred (its tallest bar 6 px from either edge); its caption is the grey line under
+// the pill. (Was: a 50 px pill with the caption squeezed in under the bars, 3 px off its edge; 28 Nov 2026)
+#define RA_WAVE_Y 256.0f
+#define RA_CAP_Y 294.0f
 static void ra_bar(UpPage &P, int i, float h, uint32_t c, float a, const HaloView &v) {
   const float x = 123 + 10 * i;  // (a round 4 px stroke, caps r 2: the box is h + 4 tall)
-  up_rrect(P, x - 2, 260 - h / 2 - 2, x + 2, 260 + h / 2 + 2, 2, c, a, v);
+  up_rrect(P, x - 2, RA_WAVE_Y - h / 2 - 2, x + 2, RA_WAVE_Y + h / 2 + 2, 2, c, a, v);
 }
 // The capture's and the playback's shared card: the wave and its caption
 static HaloItem &ra_wave_card(UpPage &P, uint32_t fill, float a, const HaloView &v) {
-  up_rrect(P, 86, 243, 380, 293, 25, fill, a, v);  // (a full pill: corners half its height)
+  up_rrect(P, 86, RA_WAVE_Y - 20, 380, RA_WAVE_Y + 20, 20, fill, a, v);  // (a full pill: corners half its height)
   return P.it[P.n - 1];
 }
 // The big button: the shape (up_primary: circle → four lobes by t), then a glyph of the spec's size on it
@@ -66,8 +70,8 @@ static void ra_secondary(UpPage &P, uint32_t bg, const char *ic, float mid, uint
   HaloItem &d = up_disc(P, RA_SEC_X, RA_ROW_Y, 38, bg, a, v);
   up_text(P, gl_ra_ic31, ic, mid, RA_SEC_X, RA_ROW_Y, 1, fg, a, v, &d);
 }
-static bool ra_in_pri(float x, float y) { return up_in(x, y, 232, 297, 342, 407); }
-static bool ra_in_sec(float x, float y) { return up_in(x, y, 123, 314, 199, 390); }
+static bool ra_in_pri(float x, float y) { return up_in(x, y, 232, RA_ROW_Y - 55, 342, RA_ROW_Y + 55); }
+static bool ra_in_sec(float x, float y) { return up_in(x, y, 123, RA_ROW_Y - 38, 199, RA_ROW_Y + 38); }
 
 // ---------- The kept settings ----------
 static void ra_keep() { ra_prefs.putUChar("limit", rc_limit_s), ra_prefs.putBool("level", rc_level_on); }
@@ -134,7 +138,7 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_title(P, "Recorder", a, v);
     mmss(ra_time, sizeof(ra_time), rec ? rc_t : 0, true);
     up_text(P, gl_up_disp, ra_time, up_mid_disp, CX, 180, 1, UP_WHITE, a, v);  // (the Stopwatch's size: one type for time; air over the wave)
-    HaloItem &card = ra_wave_card(P, rec ? RA_HOT : RA_PANEL, a, v);
+    ra_wave_card(P, rec ? RA_HOT : RA_PANEL, a, v);
     for (int i = 0; i < RA_BARS; i++) {  // the last 23 slices, the newest (in progress) at the right
       float h = 2;
       if (rec) {
@@ -147,7 +151,7 @@ static void ra_lay(int p, UpPage &P, float a, const HaloView &v) {
     char lim[8];
     mmss(lim, sizeof(lim), rc_limit_s, true);
     snprintf(ra_cap, sizeof(ra_cap), rec ? "Recording" : "Up to %s", lim);  // (the card language's grey line, sentence case)
-    up_text(P, gl_row_sub, ra_cap, halo_text_mid(gl_row_sub, "Hxkdg"), CX, 282, 1, rec ? RA_ACC : 0x9E9E9E, a, v, &card);
+    up_text(P, gl_row_sub, ra_cap, halo_text_mid(gl_row_sub, "Hxkdg"), CX, RA_CAP_Y, 1, rec ? RA_ACC : 0x9E9E9E, a, v);
     ra_secondary(P, rec ? RA_PANEL : RA_CTRL, RA_IC_LIST, ra_mid_list, rec ? RA_QUIET : RA_ACC, a, v);
     ra_primary(P, ra_morph.x, rec ? gl_ra_ic38 : gl_ra_ic43, rec ? RA_IC_STOP : RA_IC_MIC, rec ? ra_mid_stop : ra_mid_mic, a, v);
   } else if (p == 1) {  // Recordings
@@ -230,13 +234,13 @@ static void rp_lay(int, UpPage &P, float a, const HaloView &v) {
   up_title(P, ra_name(), a, v);
   mmss(ra_time, sizeof(ra_time), (float)rc_pos / rc_rate, true);
   up_text(P, gl_up_disp, ra_time, up_mid_disp, CX, 180, 1, UP_WHITE, a, v);  // (the clocks' one cut, as capture)
-  HaloItem &card = ra_wave_card(P, RA_PANEL, a, v);
+  ra_wave_card(P, RA_PANEL, a, v);
   const int played = rc_len ? (int)lroundf(RA_BARS * (float)rc_pos / rc_len) : 0;
   for (int i = 0; i < RA_BARS; i++) ra_bar(P, i, ra_ov[i], i < played ? RA_ACC : RA_QUIET, a, v);
   char tot[8];
   mmss(tot, sizeof(tot), (float)rc_len / rc_rate, true);
-  snprintf(ra_cap, sizeof(ra_cap), "OF %s", tot);
-  up_text(P, gl_up_lab, ra_cap, up_mid_lab, CX, 282, 1, UP_MUTED, a, v, &card);
+  snprintf(ra_cap, sizeof(ra_cap), "of %s", tot);  // (Music's and Timer's "of 0:20": the grey line, sentence case)
+  up_text(P, gl_row_sub, ra_cap, halo_text_mid(gl_row_sub, "Hxkdg"), CX, RA_CAP_Y, 1, 0x9E9E9E, a, v);
   ra_secondary(P, RA_CTRL, RA_IC_BACK, ra_mid_back, RA_ACC, a, v);
   up_primary(P, RA_PRI_X, RA_ROW_Y, 55, ra_pmorph.x, play ? UP_IC_PAUSE : UP_IC_PLAY, RA_ACC, RA_INK, a, v);
 }
