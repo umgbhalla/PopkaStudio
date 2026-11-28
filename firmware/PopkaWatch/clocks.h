@@ -330,7 +330,7 @@ static void tm_lay(int p, UpPage &P, float a, const HaloView &v) {
     if (tm_state != TM_IDLE) up_title(P, "Timer", a, v);
     if (tm_state == TM_IDLE) {
       // (Google's time picker: the focused field's name on top, the two columns, the confirm at the bottom edge)
-      up_text(P, gl_up_lab, tm_focus ? "SECONDS" : "MINUTES", up_mid_lab, tm_focus ? 306 : 160, 108, 1, UP_MUTED, a, v);  // (over its column)
+      up_text(P, gl_row_sub, tm_focus ? "Seconds" : "Minutes", halo_text_mid(gl_row_sub, "Hxkdg"), tm_focus ? 306 : 160, 108, 1, 0x9E9E9E, a, v);  // (over its column)
       tm_column(P, tm_pm, 0, 160, a, v);
       up_text(P, gl_up_disp, ":", up_mid_disp, CX, 200, 1, UP_DIM, a, v);
       tm_column(P, tm_ps, 1, 306, a, v);

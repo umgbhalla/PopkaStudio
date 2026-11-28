@@ -349,7 +349,7 @@ static void rpg_lay_volume(UpPage &P, float a, const HaloView &v) {
   const float wv = rpg_ink_w(gl_rpg_vol, rpg_vol_s), wu = rpg_ink_w(gl_up_title, "%"), x0 = CX - (wv + 8 + wu) / 2;
   rpg_text(P, gl_rpg_vol, rpg_vol_s, x0, 209, 0, UP_WHITE, a, v);
   rpg_text(P, gl_up_title, "%", x0 + wv + 8, 237, 0, RPG_ACC, a, v);
-  rpg_text(P, gl_rpg_meta, "SPEAKER", CX, 278, 1, RPG_SOFT, a, v);
+  rpg_text(P, gl_row_sub, "Speaker", CX, 290, 1, 0x9E9E9E, a, v);  // (the grey line, sentence case)
   rpg_button(P, 160, 348, 42, RPG_IC_MINUS, gl_rpg_ic31, RPG_CARD, RPG_ACC, a, v);
   rpg_button(P, 306, 348, 42, RPG_IC_PLUS, gl_rpg_ic31, RPG_ACC, RPG_INK, a, v);
 }

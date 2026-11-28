@@ -140,10 +140,10 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
     mu_text(P, gl_mu_vol, mu_vol_s, x0, 209, 0, UP_WHITE, a, v);
     mu_text(P, gl_mu_pct, "%", x0 + d.r - d.l + 7, bot - (q.b - q.t) / 2, 0, MU_ACC, a, v);
     // the speaker and SPEAKER on y 288, 8 px apart, the pair centred
-    const MuInk s = mu_ink(gl_mu_ic24, MU_IC_SPEAKER), l = mu_ink(gl_up_lab, "SPEAKER");
+    const MuInk s = mu_ink(gl_mu_ic24, MU_IC_SPEAKER), l = mu_ink(gl_row_sub, "Speaker");
     const float sx = CX - (s.r - s.l + 8 + l.r - l.l) / 2;
     mu_text(P, gl_mu_ic24, MU_IC_SPEAKER, sx, 288, 0, MU_ACC, a, v);
-    mu_text(P, gl_up_lab, "SPEAKER", sx + s.r - s.l + 8, 288, 0, UP_MUTED, a, v);
+    mu_text(P, gl_row_sub, "Speaker", sx + s.r - s.l + 8, 288, 0, 0x9E9E9E, a, v);  // (the grey line, sentence case)
     for (int k = 0; k < 2; k++) {  // − (tonal) and + (orchid): the one at its end can do nothing
       const float x = k ? 306 : 160, ba = (k ? vol_level < 10 : vol_level > 0) ? a : a * MU_OFF;
       HaloItem &b = up_disc(P, x, 355, 42, k ? MU_ACC : MU_TONE, ba, v);
