@@ -115,7 +115,7 @@ static void sy_wifi_saved(char *o, int n) { snprintf(o, n, "%d network%s", hclk_
 static void sy_wifi_sync() { xTaskNotifyGive(hclk_handle); }
 #endif
 #if SS_SOUND
-static void sy_sound_line(char *o, int n) { snprintf(o, n, "Volume %d of 10", vol_level); }
+static void sy_sound_line(char *o, int n) { snprintf(o, n, "Volume %d%%", vol_level * 10); }  // (as the volume screens and quick settings say it)
 #endif
 static void sy_bat_line(char *o, int n) {
   const HaloBattery b = halo_battery();

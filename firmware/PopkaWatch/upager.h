@@ -348,7 +348,7 @@ static void up_volume(UpPage &P, int level, uint32_t acc, uint32_t track, const 
   up_arc(P, UP_RING_R, UP_RING_W, A0, A0 + SW, track, a, v);
   up_arc(P, UP_RING_R, UP_RING_W, A0, A0 + SW * level / 10.0f, acc, level > 0 ? a : 0, v);
   up_vol_button(P, UP_VB_UP, plus, f, acc, level < 10 ? a : a * 0.38f, v);
-  snprintf(up_vol_line, sizeof(up_vol_line), "Volume %d %%", level * 10);
+  snprintf(up_vol_line, sizeof(up_vol_line), "Volume %d%%", level * 10);  // (no space: the watch writes 100%, 60%)
   if (spk) up_row_ic = "\xEF\x80\xA8", up_row_icf = spk;  // (the speaker, U+F028)
   up_row(P, CX - 150, CX + 150, CY, 96, "Speaker", up_vol_line, UP_ROW_BUTTON, 0, acc, 0, a, v);
   up_vol_button(P, UP_VB_DN, minus, f, acc, level > 0 ? a : a * 0.38f, v);
