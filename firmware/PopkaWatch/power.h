@@ -32,8 +32,10 @@
 //   locked, screen off    off                       off     screen on              unlock (the screen comes on first)
 //
 // The hold, as brightness (brlog): the screen comes in from where it is (from black: 0, fading up) and brightens and
-// grows with the hold, then the wake-up spring goes on at the same pace — one curve. Let go before 0.5 s: still
-// locked; the glow fades and the screen eases back to where it was (the locked screen's level, or down to black, off).
+// grows with the hold, then the wake-up spring goes on at the same pace — one curve. A press under 0.3 s is a tap
+// (however slow); let go between 0.3 and 0.5 s: still locked, the glow fades, the locked screen stays on (from black
+// too) at its own level. Two PWR clicks inside one read of the PMIC (every ~16 ms awake and locked, 200 ms asleep) are
+// one click: its flags say pressed / released, not how many times.
 //
 // Locked = asleep with the touch off; only a button changes it. Asleep on battery the chip light-sleeps: BOOT wakes it
 // by its pin, PWR (whose PMIC line is not a wake pin) is looked at every 200 ms (Halo: HALO_WAKE_PWR), so a PWR tap or
@@ -107,8 +109,8 @@ static volatile int pw_boot = FN_BOOT, pw_pwr = FN_PWR;
 #ifdef HALO_ROUND
 static volatile bool pw_palm_lock = FN_PALM_LOCK;
 static constexpr int64_t PW_LOCK_DIM_US = 120000000;
-static constexpr int64_t PW_TAP_US = 100000, PW_UNLOCK_US = 500000, PW_UNLOCK_FADE_US = 150000;
-static constexpr int64_t PW_RING_US = PW_TAP_US + (PW_UNLOCK_US - PW_TAP_US) / 4;
+static constexpr int64_t PW_TAP_US = 100000, PW_UNLOCK_US = 500000;
+static constexpr int64_t PW_RING_US = 300000;  // the glow starts: a press shorter than this is a tap, however slow (was 200 ms — a deliberate click often lasts 0.2–0.3 s and read as a hold let go; 28 Nov 2026)
 static int64_t pw_dim_until;
 static uint8_t pw_unlock_keys, pw_unlock_btn;  // captured through release, even after unlocking
 static int64_t pw_unlock_down_us, pw_unlock_exit_us;
@@ -297,9 +299,8 @@ static void pw_unlock_hide() {
 }
 
 // The hold let go (before it unlocked — a later release is nothing): too short for the glow — a tap (the locked screen
-// on / off); with the glow showing — it fades out, and the watch goes back where it was, along the springs: the
-// brightness and the face's size back to the locked screen's (pw_amb → 1), from black also the panel down to nothing,
-// then off (pw_unlock_hide, once both are there). Still locked either way. (28 Nov 2026)
+// on / off); with the glow showing — it fades out and the locked screen stays on, its brightness and the face's size
+// easing back to the locked screen's (pw_amb → 1). Still locked either way. (28 Nov 2026)
 static void pw_unlock_release(int btn, int64_t now) {
   const int64_t held = now - pw_unlock_down_us;
   if (held >= PW_UNLOCK_US) return;  // complete in tick even if release and deadline share this frame
@@ -308,9 +309,11 @@ static void pw_unlock_release(int btn, int64_t now) {
     if (pw_unlock_exit_us) pw_unlock_hide();
     pw_button(btn, FN_NOTHING, false, now);
   } else if (pw_unlock_in.target > 0 && !pw_unlock_exit_us) {
+    // A hold let go: the locked screen stays ON, from black too (what a tap from black would do — going back to black
+    // read as "the click did nothing"; 28 Nov 2026); its brightness and size ease back to the locked screen's
     pw_unlock_exit_us = now;
     pw_amb.target = 1;
-    if (pw_unlock_was_dark) pw_unlock_in.target = 0;  // (the fade-in's spring, back down: the panel to 0)
+    pw_unlock_was_dark = false;
   }
 }
 
@@ -339,11 +342,10 @@ static bool pw_unlock_key(int btn, uint8_t events, int64_t now) {
 static void pw_unlock_tick(float dt, int64_t now) {
   if (pw_sim_release_us && now >= pw_sim_release_us) pw_sim_release_us = 0, pw_unlock_release(1, now);
   if (pw_unlock_exit_us) {
-    const float t = halo_clamp01((now - pw_unlock_exit_us) / (float)PW_UNLOCK_FADE_US);
+    // (unlocked: the light recedes into the rim over 0.45 s while the face settles; let go early: 0.2 s)
+    const float t = halo_clamp01((now - pw_unlock_exit_us) / (pw_locked ? 200000.0f : 450000.0f));
     pw_unlock_fade = t * t * (3 - 2 * t);
-    if (pw_locked) halo_spring_run(pw_unlock_in, K_PW_UNLOCK, dt);  // (let go: from black, the panel's way down)
-    const bool settled = !pw_locked || (pw_amb.x > 0.99f && (!pw_unlock_was_dark || pw_unlock_in.x < 0.02f));
-    if (t < 1 || !settled) return;
+    if (t < 1) return;  // (only the glow's 0.15 s fade: the brightness eases back on its own spring meanwhile)
     pw_unlock_hide();
   }
   if (!pw_unlock_btn) return;
@@ -399,15 +401,18 @@ static void pw_glow_frame(float p, float alpha) {
   for (int q = 0; q <= PW_GLOW_DMAX * 4; q++) pw_glow_a[q] = (uint8_t)(255 * edge * expf(-(q / 4.0f) / tau) + 0.5f);
 }
 
-static float pw_unlock_alpha() { return halo_clamp01(pw_unlock_in.x) * (1 - pw_unlock_fade); }
+// (leaving, the light stays bright while it thins back into the rim, then goes: 1 − fade²)
+static float pw_unlock_alpha() { return halo_clamp01(pw_unlock_in.x) * (1 - pw_unlock_fade * pw_unlock_fade); }
 
 // The lit ring's rows are redrawn while it shows (as deep as it reaches now or reached last frame — the retained
 // framebuffer clears what it leaves); the frame's light is set here, before the bands draw
 static void pw_unlock_damage() {
   static float was;
   const float alpha = pw_unlock_alpha();
-  if (alpha > 0) pw_glow_frame(pw_unlock_exit_us && pw_unlock_progress >= 1 ? 1.0f : pw_unlock_progress, alpha);
+  // the depth: the hold's progress, and leaving — back toward the rim with the fade (the way it came in, reversed)
+  if (alpha > 0) pw_glow_frame(pw_unlock_progress * (1 - pw_unlock_fade), alpha);
   const float reach = alpha > 0 ? pw_glow_reach : 0;
+  if (pw_brlog && (alpha > 0 || was)) LOG("glow %lu reach %.1f a %.2f %s\n", (unsigned long)(esp_timer_get_time() / 1000), reach, alpha, pw_locked ? "locked" : "unlocked");
   if (!was && !reach) return;
   const float outer = CX + 1, inner = CX - fmaxf(was, reach) - 2;
   was = reach;
