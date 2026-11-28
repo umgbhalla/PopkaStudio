@@ -280,7 +280,7 @@ void halo_stay_awake(bool hold) {
 }
 
 static const char *wake_name(uint8_t w) {
-  return w == HALO_WAKE_TOUCH ? "touch" : w == HALO_WAKE_BOOT ? "BOOT" : w == HALO_WAKE_MOTION ? "motion" : "timer";
+  return w == HALO_WAKE_TOUCH ? "touch" : w == HALO_WAKE_BOOT ? "BOOT" : w == HALO_WAKE_MOTION ? "motion" : w == HALO_WAKE_PWR ? "PWR" : "timer";
 }
 
 // The slow clock keeps time while asleep: the fast RC oscillator / 256 instead of the slow RC one, re-measured
@@ -368,7 +368,23 @@ static uint8_t sleep_real() {
     }
     const bool charge_timer = ht_charge_limit() && (!ms || ms > charge_poll_ms);
     if (charge_timer) ms = charge_poll_ms;
+    // PWR's key is not a wake-up pin (the PMIC's interrupt line is not wired): look at its latched flags every
+    // PWR_POLL_MS (~1 ms awake, I2C) — before, a PWR hold on a dark or locked watch did nothing until something else
+    // woke the board (a minute later in Always On; never when dark), then acted late (the user, 28 Nov 2026)
+    static constexpr uint32_t PWR_POLL_MS = 200;
+    const bool pwr_tick = !ms || ms > PWR_POLL_MS;
+    if (pwr_tick) ms = PWR_POLL_MS;
     const uint8_t w = sleep_now(ms, imu_on && !imu_live && !deaf);  // accel + gyro data: INT1 is off
+    if (w == HALO_WAKE_TIMER && pwr_tick) {
+      if (ht_pwr_pending()) return HALO_WAKE_PWR;
+      static int64_t charge_at;  // (the charge limit's minute look, now that the timer is the PWR look's)
+      if (charge_timer && esp_timer_get_time() - charge_at >= charge_poll_ms * 1000ll) {
+        charge_at = esp_timer_get_time();
+        if (ht_charge_usb() && !on_usb_ok) return 0;
+      }
+      if (!(sleep_ms && (esp_timer_get_time() - asleep_at_us) / 1000 >= sleep_ms)) continue;  // (not the sketch's timer)
+      return HALO_WAKE_TIMER;
+    }
     if (w == HALO_WAKE_TIMER && charge_timer && ht_charge_usb() && !on_usb_ok) return 0;
     if (w == HALO_WAKE_TIMER && !(sleep_ms && (esp_timer_get_time() - asleep_at_us) / 1000 >= sleep_ms)) {
       quiet++;

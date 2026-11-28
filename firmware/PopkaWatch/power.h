@@ -22,6 +22,20 @@
 // chip's interrupt is not wired) — on battery PWR is read when the board runs again (for example, when picked up).
 // On USB the board does not really sleep (Halo) — the same screens, the frames just go on.
 //
+// The round watch's states, in one table (28 Nov 2026 — the user: "too fuzzy to understand"):
+//
+//   state                 screen                    touch   BOOT / PWR tap        BOOT / PWR hold (0.5 s)
+//   awake                 on                        on      the button's Function  the button's long Function
+//   Always On (idle)      dim, 95 %, minute ticks   wakes   wakes                  wakes
+//   dark (Screen off)     off                       wakes   wakes                  wakes
+//   locked, screen on     dim, 95 % (locked AOD)    off     screen off             unlock: the rim glows, deepening
+//   locked, screen off    off                       off     screen on              unlock (the screen comes on first)
+//
+// Locked = asleep with the touch off; only a button changes it. Asleep on battery the chip light-sleeps: BOOT wakes it
+// by its pin, PWR (whose PMIC line is not a wake pin) is looked at every 200 ms (Halo: HALO_WAKE_PWR), so a PWR tap or
+// hold acts within ~0.2 s, dark or not. Locked: 3 s awake after any button, for a hold to finish; the locked screen
+// goes dark by itself after 2 minutes.
+//
 // Waking up (FN_WAKE_TAP, FN_WAKE_RAISE, FN_WAKE_BTN — the editor's Always On → Wake up): what brings the screen back
 // from Always On or dark — a touch, picking the watch up (the motion sensor; off — the sensor is not even started,
 // unless the Steps layer needs it — then the pedometer has it and motion never wakes the board), a button (BOOT or PWR:
@@ -104,7 +118,7 @@ static int pw_boot_fn() {  // (settings.h: Display's hint)
   return pw_boot;
 }
 static volatile int pw_wake_tap = FN_WAKE_TAP, pw_wake_raise = FN_WAKE_RAISE, pw_wake_btn = FN_WAKE_BTN;
-#define PW_WAKE_CMD 5  // woken by the command wake (the editor entering Try): always
+#define PW_WAKE_CMD 6  // woken by the command wake (the editor entering Try): always (5 is HALO_WAKE_PWR)
 
 // Does this wake-up (HALO_WAKE_*) bring the screen back — is its way on
 static bool pw_wakes(uint8_t w) {
@@ -140,8 +154,8 @@ static void pw_fade(bool to_aod) {
 }
 
 static void pw_wake(uint8_t w) {  // the screen where it was: back along the same spring
-  static const char *const NAMES[] = {"button", "touch", "BOOT", "motion", "timer", "command"};
-  LOG("power: woke by %s\n", NAMES[w < 6 ? w : 0]);
+  static const char *const NAMES[] = {"button", "touch", "BOOT", "motion", "timer", "PWR", "command"};
+  LOG("power: woke by %s\n", NAMES[w < 7 ? w : 0]);
   pw_mode = PW_ACTIVE, pw_amb.target = 0, pw_active_us = esp_timer_get_time();
   halo_wake();  // woken by a button the chip reads or a command — lib/Halo would still take the next touch for a wake-up
   face_still(false);
@@ -425,6 +439,10 @@ static void power_tick(float dt) {
   if (f.down || moved || settings_busy()) pw_active_us = now;  // touched, moved, recording or playing — not idle
   pw_motion = halo_motion_count();
   uint8_t w = halo_woke();
+  // Woken because PWR was touched (sleep looks at the PMIC's flags every 200 ms): not a wake-up of its own — stay up
+  // and let the press, which comes as PWR's events, do what it does: locked — a tap toggles the screen, a hold unlocks
+  // (the glow); asleep — pw_button wakes it. (Before, a PWR hold on a dark locked watch did nothing; 28 Nov 2026)
+  if (w == HALO_WAKE_PWR) pw_listen_us = now + PW_LISTEN_S * 1000000ll, w = 0;
 #ifdef HALO_ROUND
   const bool boot_locks = pw_boot == FN_LOCK;
   const bool boot = halo_boot_short(pw_locked || boot_locks);

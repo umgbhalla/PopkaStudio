@@ -128,7 +128,9 @@ bool halo_finger_blocked();
 // спящую не прошить), а только «притворяется»: те же пробуждения, тот же halo_woke(), кадры идут как обычно.
 // Кнопка PWR не будит: её сигнал к ESP32 не подведён. Время во сне считает быстрый RC-генератор ÷ 256: ~0,03 %
 // (по умолчанию медленный — спешил на 0,5 %)
-enum : uint8_t { HALO_WAKE_TOUCH = 1, HALO_WAKE_BOOT, HALO_WAKE_MOTION, HALO_WAKE_TIMER };
+enum : uint8_t { HALO_WAKE_TOUCH = 1, HALO_WAKE_BOOT, HALO_WAKE_MOTION, HALO_WAKE_TIMER, HALO_WAKE_PWR };  // PWR: its key
+// touched while asleep (round 1.75: its PMIC's interrupt is not a wake-up pin — sleep looks every 200 ms; the press
+// itself still comes as halo_pwr_key_event's edges)
 void halo_sleep(uint32_t ms = 0);  // из update; уже спит («притворяясь») — только новый таймер
 uint8_t halo_woke();               // в update: первый кадр после сна — чем разбудили (HALO_WAKE_*), иначе 0
 // Скетч проснулся сам (кнопка PWR — её читают опросом, команда): больше не «спит» — следующее касание или BOOT — уже

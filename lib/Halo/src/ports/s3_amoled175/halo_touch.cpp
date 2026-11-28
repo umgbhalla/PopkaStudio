@@ -196,6 +196,14 @@ static void pmu_poll(bool prompt = false) {
     LOG("pwr:%s%s\n", ev & HALO_PWR_CLICK ? " click" : "", ev & HALO_PWR_LONG ? " long" : "");
 }
 
+bool ht_pwr_pending() {  // (the flags stay for halo_pwr_key_event: the press is the sketch's to read)
+  if (!pmu) return false;
+  ht_bus_lock();
+  pmu_poll(true);
+  ht_bus_unlock();
+  return __atomic_load_n(&pwr_ev, __ATOMIC_RELAXED) != 0;
+}
+
 uint8_t halo_pwr_event() {
   return halo_pwr_key_event(false) & (HALO_PWR_CLICK | HALO_PWR_LONG);
 }
