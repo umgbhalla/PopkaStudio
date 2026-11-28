@@ -232,7 +232,10 @@ static void sw_lay(int p, UpPage &P, float a, const HaloView &v) {
     up_primary(P, UP_PRI_X, UP_ROW_Y, UP_PRI_R, sw_morph.x, sw_run ? UP_IC_PAUSE : UP_IC_PLAY, SW_ACC, SW_INK, a, v);
   } else {
     up_title(P, "Laps", a, v);
-    if (!sw_nlaps) return up_text(P, gl_up_lab, "NO LAPS YET", up_mid_lab, CX, 249, 1, UP_MUTED, a, v);
+    if (!sw_nlaps) {  // (an empty state in the card language: a bold line, a grey one)
+      up_text(P, gl_row_lab, "No laps yet", halo_text_mid(gl_row_lab, "Hxkdg"), CX, 218, 1, UP_WHITE, a, v);
+      return up_text(P, gl_row_sub, "Tap the flag while it runs", halo_text_mid(gl_row_sub, "Hxkdg"), CX, 250, 1, 0x9E9E9E, a, v);
+    }
     int fast = 0, slow = 0;
     int64_t sp[SW_LAPS];
     for (int i = 0; i < sw_nlaps; i++) {
@@ -245,14 +248,17 @@ static void sw_lay(int p, UpPage &P, float a, const HaloView &v) {
       const int i = sw_nlaps - 1 - r;
       const bool f = sw_nlaps > 1 && i == fast, sl = sw_nlaps > 1 && i == slow;
       const uint32_t bg = f ? 0x122720 : sl ? 0x2B211B : UP_ROW, ink = f ? 0xB7EBD6 : sl ? 0xF4C18B : UP_MUTED;
-      up_rrect(P, 76, RY[r] - 34, 390, RY[r] + 34, 24, bg, a, v);
+      // (the card language: a full pill, "Lap 2" bold over its tag in grey — or in its tint, fastest / slowest —,
+      // the lap's time at the right end)
+      up_rrect(P, 58, RY[r] - 38, 408, RY[r] + 38, 38, bg, a, v);
       HaloItem &card = P.it[P.n - 1];
-      snprintf(sw_lap[r][0], 16, "%02d", i + 1);
+      snprintf(sw_lap[r][0], 16, "Lap %d", i + 1);
       char t[8];
       ck_hms(sw_lap[r][1], 16, sp[i], true, t, sizeof(t)), strlcat(sw_lap[r][1], t, 16);
-      up_text(P, gl_up_num, sw_lap[r][0], up_mid_num, 101, RY[r] - (f || sl ? 9 : 0), 0, ink, a, v, &card);
-      if (f || sl) up_text(P, gl_up_lab, f ? "FASTEST" : "SLOWEST", up_mid_lab, 101, RY[r] + 17, 0, ink, a, v, &card);
-      up_text(P, gl_up_num, sw_lap[r][1], up_mid_num, 364, RY[r], 2, UP_WHITE, a, v, &card);
+      const bool two = f || sl;
+      up_text(P, gl_row_lab, sw_lap[r][0], halo_text_mid(gl_row_lab, "Hxkdg"), 92, RY[r] - (two ? 14 : 0), 0, UP_WHITE, a, v, &card);
+      if (two) up_text(P, gl_row_sub, f ? "Fastest" : "Slowest", halo_text_mid(gl_row_sub, "Hxkdg"), 92, RY[r] + 16, 0, ink, a, v, &card);
+      up_text(P, gl_up_num, sw_lap[r][1], up_mid_num, 374, RY[r], 2, UP_WHITE, a, v, &card);
     }
   }
 }
@@ -332,11 +338,11 @@ static void tm_lay(int p, UpPage &P, float a, const HaloView &v) {
       tm_edge(P, UP_IC_PLAY, ok ? a : a * 0.35f, v);
     } else {
       ck_hms(tm_main, sizeof(tm_main), tm_left() + 999999, false, tm_tail, sizeof(tm_tail));
-      up_text(P, gl_up_hero, tm_main, up_mid_hero, CX, 206, 1, UP_WHITE, a, v);
+      up_text(P, gl_up_disp, tm_main, up_mid_disp, CX, 200, 1, UP_WHITE, a, v);  // (the Stopwatch's cut: one type for time)
       char tot[16];
       ck_hms(tot, sizeof(tot), tm_total, false);
-      snprintf(tm_of, sizeof(tm_of), "OF %s", tot);
-      up_text(P, gl_up_lab, tm_of, up_mid_lab, CX, 280, 1, UP_MUTED, a, v);
+      snprintf(tm_of, sizeof(tm_of), "of %s", tot);
+      up_text(P, gl_row_sub, tm_of, halo_text_mid(gl_row_sub, "Hxkdg"), CX, 262, 1, 0x9E9E9E, a, v);
       if (tm_state == TM_PAUSED) {
         up_secondary(P, UP_SEC_X, UP_ROW_Y, UP_SEC_R, UP_IC_X, TM_BG, 0xFFB4AB, a, v);
       } else {
