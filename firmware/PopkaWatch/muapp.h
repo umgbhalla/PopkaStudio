@@ -110,10 +110,10 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
       mu_text(P, gl_up_disp, mu_el, CX, 168, 1, UP_WHITE, a, v);
       char len[8];
       mmss(len, sizeof(len), pl_len[pl_cur]);
-      snprintf(mu_of, sizeof(mu_of), "OF %s", len);
-      mu_text(P, gl_up_lab, mu_of, CX, 233, 1, MU_ACC, a, v);  // (clear of the digits' feet)
+      snprintf(mu_of, sizeof(mu_of), "of %s", len);  // (the grey line, sentence case — was "OF 0:20")
+      mu_text(P, gl_row_sub, mu_of, CX, 233, 1, 0x9E9E9E, a, v);  // (clear of the digits' feet)
       mu_text(P, gl_mu_track, t.title, CX, 268, 1, UP_WHITE, a, v, &halo_black, 300);
-      mu_text(P, gl_mu_lab, t.artist, CX, 297, 1, UP_MUTED, a, v, &halo_black, 250);
+      mu_text(P, gl_row_sub, t.artist, CX, 299, 1, 0x9E9E9E, a, v, &halo_black, 250);  // (the card language's grey line)
     } else {  // (no tracks: where they come from)
       mu_text(P, gl_mu_opt, "No music", CX, 209, 1, UP_WHITE, a, v);
 #ifdef HALO_SD_CS

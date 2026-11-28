@@ -631,6 +631,8 @@ static void up_audit() {
     for (int j = i + 1; j < P.n; j++) {
       const HaloItem &b = P.it[j];
       if (!b.shown || b.alpha < 0.05f || a.kind != HI_TEXT && b.kind != HI_TEXT) continue;
+      if (a.kind == HI_ARC || b.kind == HI_ARC) continue;  // (a rim arc's box covers the dial; its ink is at the rim — the
+                                                           // near-the-rim check is the one that matters for it)
       if (b.on == &a || a.on == &b || holds(a, b) || holds(b, a)) continue;
       float A[4], B[4];
       ink(a, A), ink(b, B);
