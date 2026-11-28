@@ -18,6 +18,7 @@
 #include <Halo.h>
 #include <WiFi.h>
 #include <esp_sntp.h>
+#include <Preferences.h>
 #include "HaloWifiList.h"
 #if __has_include("wifi_secrets.h")  // the shared network (if there is one); else — only the one passed to begin
 #include "wifi_secrets.h"
@@ -96,6 +97,13 @@ static void hclk_sync() {
       WiFi.begin(hclk_net_ssid[i], hclk_net_pass[i]);
       if (hclk_wait_joined(hclk_nets > 1 ? 15000u : 60000u, hclk_scan_asked)) {
         hclk_good = i, hclk_ssid = hclk_net_ssid[i], hclk_pass = hclk_net_pass[i];
+        // (kept by its name: the next start tries it first — it was the network list's first, always, and a saved
+        // network not around cost 15 s a boot before the one that is: the time came 20 s late)
+        Preferences p;
+        if (p.begin("hclk", false)) {
+          if (p.getString("good", "") != hclk_net_ssid[i]) p.putString("good", hclk_net_ssid[i]);
+          p.end();
+        }
         break;
       }
       LOG("wifi: %s not there\n", hclk_net_ssid[i]);
@@ -167,6 +175,15 @@ static inline void halo_clock_begin(const char *tz, const char *ssid = WIFI_SSID
     hclk_net_ssid[0] = hclk_ssid, hclk_net_pass[0] = hclk_pass, hclk_nets++;
   }
   if (!strlen(hclk_ssid)) LOG("clock: wifi not configured (no network given)\n");
+  {  // the network that joined last time, first now (by its name: the list may have changed since)
+    Preferences p;
+    if (p.begin("hclk", true)) {
+      const String good = p.getString("good", "");
+      p.end();
+      for (int i = 0; i < hclk_nets; i++)
+        if (good == hclk_net_ssid[i]) hclk_good = i;
+    }
+  }
   xTaskCreatePinnedToCore(hclk_task, "clock", hclk_online ? 8192 : 6144, nullptr, 1, &hclk_handle, 0);  // (запрос — глубже)
   halo_command("ntp", [](const char *) { xTaskNotifyGive(hclk_handle); });  // сверить время сейчас
   halo_command("wifi", [](const char *a) {
