@@ -308,6 +308,45 @@ static inline bool up_hit(float x, float y, float cx, float cy, float r) {
 static inline bool up_in(float x, float y, float x0, float y0, float x1, float y1) {
   return x >= x0 && x <= x1 && y >= y0 && y <= y1;
 }
+// ---------- Wear OS's volume screen (docs/references/wear-os/surfaces/apps/layouts/non-scrolling/
+// app-layout-non-scrolling-volume.png, m2-5 steppers): one for every app with a speaker level ----------
+// Louder at the top, quieter at the bottom — tonal stadium buttons, the one at its end dimmed —, the output named in a
+// row between them ("Speaker" / "Volume 60 %"), the level an arc on the left rim filling upwards. No title: the buttons
+// are the page. (Radio and Music had a big number with − and + side by side and rim marks round both sides; 28 Nov 2026)
+#define UP_VB_W 148.0f
+#define UP_VB_H 88.0f
+#define UP_VB_UP 116.0f
+#define UP_VB_DN 350.0f
+static char up_vol_line[24];
+static void up_vol_button(UpPage &P, float y, const char *icon, const HaloFont &f, uint32_t acc, float a, const HaloView &v) {
+  const float x0 = CX - UP_VB_W / 2, x1 = CX + UP_VB_W / 2;
+  const bool press = a > 0.5f && up_pressed(v, x0, y - UP_VB_H / 2, x1, y + UP_VB_H / 2);
+  uint32_t box = ui_mix(acc, 0x000000, 0.68f);  // (the accent's tonal container, as a checked row)
+  if (press) box = ui_mix(box, 0xFFFFFF, 0.10f);
+  HaloItem &b = up_item(P);
+  ui_rrect(b, CX, y, UP_VB_W, UP_VB_H, press ? UP_VB_H * 0.36f : UP_VB_H / 2, 1, box, a);
+  b.on_black = true;
+  up_commit(b, v);
+  up_text(P, f, icon, halo_text_mid(f, icon), CX, y, 1, acc, a, v, &b);
+}
+// level 0 … 10; track — the arc's empty part; f, plus, minus — the app's glyphs
+static void up_volume(UpPage &P, int level, uint32_t acc, uint32_t track, const HaloFont &f, const char *plus,
+                      const char *minus, float a, const HaloView &v) {
+  const float A0 = 212 * HALO_PI / 180, SW = 116 * HALO_PI / 180;  // (8 to 10 o'clock and a bit)
+  up_arc(P, UP_RING_R, UP_RING_W, A0, A0 + SW, track, a, v);
+  up_arc(P, UP_RING_R, UP_RING_W, A0, A0 + SW * level / 10.0f, acc, level > 0 ? a : 0, v);
+  up_vol_button(P, UP_VB_UP, plus, f, acc, level < 10 ? a : a * 0.38f, v);
+  snprintf(up_vol_line, sizeof(up_vol_line), "Volume %d %%", level * 10);
+  up_row(P, CX - 150, CX + 150, CY, 96, "Speaker", up_vol_line, UP_ROW_BUTTON, 0, acc, 0, a, v);
+  up_vol_button(P, UP_VB_DN, minus, f, acc, level > 0 ? a : a * 0.38f, v);
+}
+// A tap on it: +1, −1 or 0
+static int up_volume_tap(float x, float y) {
+  const float x0 = CX - UP_VB_W / 2 - 8, x1 = CX + UP_VB_W / 2 + 8, h = UP_VB_H / 2 + 8;
+  if (up_in(x, y, x0, UP_VB_UP - h, x1, UP_VB_UP + h)) return 1;
+  if (up_in(x, y, x0, UP_VB_DN - h, x1, UP_VB_DN + h)) return -1;
+  return 0;
+}
 // A page's title under the curved clock
 static inline void up_title(UpPage &P, const char *s, float a, const HaloView &v) {
   up_text(P, gl_up_title, s, up_mid_title, CX, UP_TITLE_Y, 1, UP_WHITE, a, v);

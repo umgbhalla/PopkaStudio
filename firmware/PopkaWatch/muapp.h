@@ -129,26 +129,8 @@ static void mu_lay(int p, UpPage &P, float a, const HaloView &v) {
       mu_text(P, gl_mu_ic31, k ? MU_IC_NEXT : MU_IC_PREV, x, 365, 1, MU_ACC, ca, v, &d);
     }
     up_primary(P, 233, 365, 52, mu_m, pl_playing ? UP_IC_PAUSE : UP_IC_PLAY, MU_ACC, MU_INK, ca, v);
-  } else if (p == 1) {  // Volume
-    up_title(P, "Volume", a, v);
-    for (int i = 0; i < 10; i++)
-      up_arc(P, UP_RING_R, UP_RING_W, (27.8f + i * 30.8f) * MU_DEG, (55 + i * 30.8f) * MU_DEG, i < vol_level ? MU_ACC : MU_RING, a, v);
-    // the level, white, its ink centred on y 209; the % in orchid 7 px after it, the bottoms aligned; the pair centred
-    snprintf(mu_vol_s, sizeof(mu_vol_s), "%d", vol_level * 10);
-    const MuInk d = mu_ink(gl_mu_vol, mu_vol_s), q = mu_ink(gl_mu_pct, "%");
-    const float x0 = CX - (d.r - d.l + 7 + q.r - q.l) / 2, bot = 209 + (d.b - d.t) / 2;
-    mu_text(P, gl_mu_vol, mu_vol_s, x0, 209, 0, UP_WHITE, a, v);
-    mu_text(P, gl_mu_pct, "%", x0 + d.r - d.l + 7, bot - (q.b - q.t) / 2, 0, MU_ACC, a, v);
-    // the speaker and SPEAKER on y 288, 8 px apart, the pair centred
-    const MuInk s = mu_ink(gl_mu_ic24, MU_IC_SPEAKER), l = mu_ink(gl_row_sub, "Speaker");
-    const float sx = CX - (s.r - s.l + 8 + l.r - l.l) / 2;
-    mu_text(P, gl_mu_ic24, MU_IC_SPEAKER, sx, 288, 0, MU_ACC, a, v);
-    mu_text(P, gl_row_sub, "Speaker", sx + s.r - s.l + 8, 288, 0, 0x9E9E9E, a, v);  // (the grey line, sentence case)
-    for (int k = 0; k < 2; k++) {  // − (tonal) and + (orchid): the one at its end can do nothing
-      const float x = k ? 306 : 160, ba = (k ? vol_level < 10 : vol_level > 0) ? a : a * MU_OFF;
-      HaloItem &b = up_disc(P, x, 355, 42, k ? MU_ACC : MU_TONE, ba, v);
-      mu_text(P, gl_mu_ic32, k ? MU_IC_PLUS : MU_IC_MINUS, x, 355, 1, k ? MU_INK : MU_ACC, ba, v, &b);
-    }
+  } else if (p == 1) {  // Volume: Wear OS's volume screen (upager.h up_volume)
+    up_volume(P, vol_level, MU_ACC, MU_RING, gl_mu_ic32, MU_IC_PLUS, MU_IC_MINUS, a, v);
   } else if (p == 2) {  // Queue
     up_title(P, "Queue", a, v);
     mu_qn = mu_n > 1 ? min(3, mu_n - 1) : 0;
@@ -189,8 +171,7 @@ static void mu_tap(int p, float x, float y) {
     else if (up_in(x, y, 181, 313, 285, 417)) pl_set_playing(!pl_playing);
     else if (up_in(x, y, 308, 331, 376, 399)) pl_change_track(1);
   } else if (p == 1) {
-    if (up_in(x, y, 118, 313, 202, 397) && vol_level > 0) vol_set(vol_level - 1, false);
-    else if (up_in(x, y, 264, 313, 348, 397) && vol_level < 10) vol_set(vol_level + 1, false);
+    if (const int d = up_volume_tap(x, y)) vol_set(constrain(vol_level + d, 0, 10), false);
   } else if (p == 2) {
     for (int k = 0; k < mu_qn; k++) {
       const float cy = MU_ROW_Y[k];

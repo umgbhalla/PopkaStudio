@@ -340,36 +340,9 @@ static void rpg_tap_stations(float x, float y) {
   else if (!(rd_on && rpg_is_cur(ru->s_rows[i]))) rpg_pick_folder(i);
 }
 
-// ---------- 3 Volume ----------
-// Wear OS's volume screen (docs/references/wear-os/surfaces/apps/layouts/non-scrolling/app-layout-non-scrolling-volume.png,
-// m2-5 steppers): louder at the top, quieter at the bottom — tonal stadium buttons —, the output named in a chip between
-// them, the level an arc on the left rim filling upwards. (Was: a big number with − and + side by side under it, arcs
-// round both sides — not the stepper; 28 Nov 2026.) No title: the buttons are the page, as on Wear OS
-#define RPG_VB_W 148.0f  // the stadium buttons
-#define RPG_VB_H 88.0f
-#define RPG_VB_UP 116.0f
-#define RPG_VB_DN 350.0f
-static char rpg_vol_line[24];
-static void rpg_vol_button(UpPage &P, float y, const char *icon, float a, const HaloView &v) {
-  const float x0 = CX - RPG_VB_W / 2, x1 = CX + RPG_VB_W / 2;
-  const bool press = a > 0.5f && up_pressed(v, x0, y - RPG_VB_H / 2, x1, y + RPG_VB_H / 2);
-  uint32_t box = ui_mix(RPG_ACC, 0x000000, 0.68f);  // (the accent's tonal container, as a checked row)
-  if (press) box = ui_mix(box, 0xFFFFFF, 0.10f);
-  HaloItem &b = up_item(P);
-  ui_rrect(b, CX, y, RPG_VB_W, RPG_VB_H, press ? RPG_VB_H * 0.36f : RPG_VB_H / 2, 1, box, a);
-  b.on_black = true;
-  up_commit(b, v);
-  up_text(P, gl_rpg_ic31, icon, halo_text_mid(gl_rpg_ic31, icon), CX, y, 1, RPG_ACC, a, v, &b);
-}
+// ---------- 3 Volume: Wear OS's volume screen (upager.h up_volume) ----------
 static void rpg_lay_volume(UpPage &P, float a, const HaloView &v) {
-  // the level along the left rim, 8 to 10 o'clock and a bit, filling from the bottom
-  const float A0 = 212 * HALO_PI / 180, SW = 116 * HALO_PI / 180;
-  up_arc(P, 214, 8, A0, A0 + SW, RPG_RING, a, v);
-  up_arc(P, 214, 8, A0, A0 + SW * vol_level / 10.0f, RPG_ACC, vol_level > 0 ? a : 0, v);
-  rpg_vol_button(P, RPG_VB_UP, RPG_IC_PLUS, a, v);
-  snprintf(rpg_vol_line, sizeof(rpg_vol_line), "Volume %d %%", vol_level * 10);
-  up_row(P, CX - 150, CX + 150, CY, 96, "Speaker", rpg_vol_line, UP_ROW_BUTTON, 0, RPG_ACC, RPG_INK, a, v);
-  rpg_vol_button(P, RPG_VB_DN, RPG_IC_MINUS, a, v);
+  up_volume(P, vol_level, RPG_ACC, RPG_RING, gl_rpg_ic31, RPG_IC_PLUS, RPG_IC_MINUS, a, v);
 }
 
 // ---------- 4 Radio settings: Wear OS's settings list (upager.h list mode) ----------
@@ -400,10 +373,7 @@ static void rpg_tap(int p, float x, float y) {
   } else if (p == 1) {
     if (!rpg_lp_done) rpg_tap_stations(x, y);
   } else if (p == 2) {
-    if (up_in(x, y, CX - RPG_VB_W / 2 - 8, RPG_VB_DN - RPG_VB_H / 2 - 8, CX + RPG_VB_W / 2 + 8, RPG_VB_DN + RPG_VB_H / 2 + 8))
-      vol_set(vol_level - 1, false);
-    else if (up_in(x, y, CX - RPG_VB_W / 2 - 8, RPG_VB_UP - RPG_VB_H / 2 - 8, CX + RPG_VB_W / 2 + 8, RPG_VB_UP + RPG_VB_H / 2 + 8))
-      vol_set(vol_level + 1, false);
+    if (const int d = up_volume_tap(x, y)) vol_set(constrain(vol_level + d, 0, 10), false);
   } else {
     const int k = up_list_hit(3, y);
     if (k == 1) rpg_set(rpg_retry, "retry");
