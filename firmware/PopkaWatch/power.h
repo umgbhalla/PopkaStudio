@@ -31,6 +31,10 @@
 //   locked, screen on     dim, 95 % (locked AOD)    off     screen off             unlock: the rim glows, deepening
 //   locked, screen off    off                       off     screen on              unlock (the screen comes on first)
 //
+// The hold, as brightness (brlog): the screen comes in from where it is (from black: 0, fading up) and brightens and
+// grows with the hold, then the wake-up spring goes on at the same pace — one curve. Let go before 0.5 s: still
+// locked; the glow fades and the screen eases back to where it was (the locked screen's level, or down to black, off).
+//
 // Locked = asleep with the touch off; only a button changes it. Asleep on battery the chip light-sleeps: BOOT wakes it
 // by its pin, PWR (whose PMIC line is not a wake pin) is looked at every 200 ms (Halo: HALO_WAKE_PWR), so a PWR tap or
 // hold acts within ~0.2 s, dark or not. Locked: 3 s awake after any button, for a hold to finish; the locked screen
@@ -95,7 +99,8 @@ static uint32_t pw_lock_ms;   // locked then: a long press of that same press do
 #endif
 static HaloSpring pw_shift_amount = {1, 0, 1};  // 0 during lock and its wake-up, 1 for regular Always On
 static volatile bool pw_cmd_sleep, pw_cmd_wake;
-static volatile bool pw_debug;  // debug on: never idle into Always On or dark, no palm lock (testing; not kept)
+static volatile bool pw_debug;
+static volatile bool pw_brlog;  // brlog on: every brightness sent to the panel, logged with its time (to see a fade's curve)  // debug on: never idle into Always On or dark, no palm lock (testing; not kept)
 static volatile int pw_aod_on = FN_AOD, pw_idle_s = FN_AOD_IDLE, pw_aod_level = FN_AOD_BRIGHT, pw_aod_home = FN_AOD_HOME;
 static volatile int pw_aod_shift = FN_AOD_SHIFT;
 static volatile int pw_boot = FN_BOOT, pw_pwr = FN_PWR;
@@ -112,6 +117,8 @@ static bool pw_pwr_release_captured;  // a PMIC click may arrive separately from
 static float pw_unlock_progress, pw_unlock_fade;
 static HaloSpring pw_unlock_in;
 static HaloSpringK K_PW_UNLOCK;
+static constexpr float PW_HOLD_WAKE = 0.65f;
+static int64_t pw_sim_release_us;  // unlocksim MS: let go then  // how much of the way to awake the hold itself brings
 static int pw_shutdown;
 #endif
 static int pw_boot_fn() {  // (settings.h: Display's hint)
@@ -282,10 +289,29 @@ static void pw_button(int btn, int fn, bool held, int64_t now) {
 #ifdef HALO_ROUND
 static void pw_unlock_hide() {
   if (pw_locked && pw_unlock_was_dark) pw_locked_display(false);
+  else if (pw_locked) pw_amb.target = 1;  // (let go early on the locked screen: back to its level, along the spring)
   pw_unlock_was_dark = false;
   pw_unlock_exit_us = 0;
   pw_unlock_progress = pw_unlock_fade = 0;
   halo_spring_set(pw_unlock_in, 0);
+}
+
+// The hold let go (before it unlocked — a later release is nothing): too short for the glow — a tap (the locked screen
+// on / off); with the glow showing — it fades out, and the watch goes back where it was, along the springs: the
+// brightness and the face's size back to the locked screen's (pw_amb → 1), from black also the panel down to nothing,
+// then off (pw_unlock_hide, once both are there). Still locked either way. (28 Nov 2026)
+static void pw_unlock_release(int btn, int64_t now) {
+  const int64_t held = now - pw_unlock_down_us;
+  if (held >= PW_UNLOCK_US) return;  // complete in tick even if release and deadline share this frame
+  pw_unlock_btn = 0;
+  if (held < PW_RING_US) {
+    if (pw_unlock_exit_us) pw_unlock_hide();
+    pw_button(btn, FN_NOTHING, false, now);
+  } else if (pw_unlock_in.target > 0 && !pw_unlock_exit_us) {
+    pw_unlock_exit_us = now;
+    pw_amb.target = 1;
+    if (pw_unlock_was_dark) pw_unlock_in.target = 0;  // (the fade-in's spring, back down: the panel to 0)
+  }
 }
 
 // The first key down owns the gesture. Absorb the release and any legacy click/hold for captured keys.
@@ -306,23 +332,18 @@ static bool pw_unlock_key(int btn, uint8_t events, int64_t now) {
   if (!(edges & HALO_KEY_UP) || !captured) return captured;
   pw_unlock_keys &= ~btn;
   if (pw_unlock_btn != btn) return true;
-  const int64_t held = now - pw_unlock_down_us;
-  if (held >= PW_UNLOCK_US) return true;  // complete in tick even if release and deadline share this frame
-  pw_unlock_btn = 0;
-  if (held < PW_RING_US) {
-    if (pw_unlock_exit_us) pw_unlock_hide();
-    pw_button(btn, FN_NOTHING, false, now);
-  } else if (pw_unlock_in.target > 0 && !pw_unlock_exit_us) {
-    pw_unlock_exit_us = now;
-  }
+  pw_unlock_release(btn, now);
   return true;
 }
 
 static void pw_unlock_tick(float dt, int64_t now) {
+  if (pw_sim_release_us && now >= pw_sim_release_us) pw_sim_release_us = 0, pw_unlock_release(1, now);
   if (pw_unlock_exit_us) {
     const float t = halo_clamp01((now - pw_unlock_exit_us) / (float)PW_UNLOCK_FADE_US);
     pw_unlock_fade = t * t * (3 - 2 * t);
-    if (t < 1) return;
+    if (pw_locked) halo_spring_run(pw_unlock_in, K_PW_UNLOCK, dt);  // (let go: from black, the panel's way down)
+    const bool settled = !pw_locked || (pw_amb.x > 0.99f && (!pw_unlock_was_dark || pw_unlock_in.x < 0.02f));
+    if (t < 1 || !settled) return;
     pw_unlock_hide();
   }
   if (!pw_unlock_btn) return;
@@ -335,10 +356,16 @@ static void pw_unlock_tick(float dt, int64_t now) {
   }
   pw_unlock_progress = halo_clamp01((held - PW_RING_US) / (float)(PW_UNLOCK_US - PW_RING_US));
   halo_spring_run(pw_unlock_in, K_PW_UNLOCK, dt);
+  // The hold wakes the watch as it fills: the Always On spring (brightness, the face's 95 → 100 %) follows the hold's
+  // progress, 1 → 0.35, and when it completes the wake-up spring goes on from there at the same pace. (Was: the
+  // locked level held flat through the hold, then the whole climb after it — black, lit, a flat stretch, then a bump;
+  // measured with brlog, the user's report, 28 Nov 2026)
+  pw_amb.x = pw_amb.target = 1 - PW_HOLD_WAKE * pw_unlock_progress, pw_amb.v = 0;
   if (held < PW_UNLOCK_US) return;
   halo_spring_set(pw_unlock_in, 1);
   pw_unlock_exit_us = now;
   pw_lock_set(false, 0);
+  pw_amb.v = -PW_HOLD_WAKE / ((PW_UNLOCK_US - PW_RING_US) / 1e6f);  // (the hold's pace, carried on)
   pw_wake(0);
 }
 
@@ -549,8 +576,15 @@ static void power_tick(float dt) {
   halo_spring_run(pw_amb, pw_amb.target > 0.5f ? K_PW_IN : K_PW_OUT, dt);
   if (!pw_locked && pw_amb.x == 0) halo_spring_set(pw_shift_amount, 1);
   else halo_spring_run(pw_shift_amount, K_PW_SHIFT, dt);
-  const int level = pw_level(pw_awake_level);
-  if (level != pw_sent) halo_brightness(level), pw_sent = level;
+  int level = pw_level(pw_awake_level);
+#ifdef HALO_ROUND
+  // From black, the hold's screen fades in (with the glow's spring, ~0.2 s) instead of switching on at the locked level
+  if (pw_locked && pw_unlock_was_dark) level = (int)lroundf(level * halo_clamp01(pw_unlock_in.x));
+#endif
+  if (level != pw_sent) {
+    halo_brightness(level), pw_sent = level;
+    if (pw_brlog) LOG("br %lu %d amb %.3f\n", (unsigned long)(now / 1000), level, pw_amb.x);
+  }
 }
 
 // After face_tick (its minute is fresh), before halo_nav_update: the whole interface's view along the spring — 5 %
@@ -617,6 +651,15 @@ static void power_build() {  // after halo_begin: the motion sensor is on its I2
   halo_command("idle", [](const char *a) { pw_idle_s = max(0, atoi(a)), LOG("idle: %d s\n", pw_idle_s); });
   halo_command("sleep", [](const char *) { pw_cmd_sleep = true; });
   halo_command("wake", [](const char *) { pw_cmd_wake = true; });
+  // unlocksim — a BOOT hold to unlock from here, as the finger would (locked only; to see the unlock's screen and its
+  // brightness: brlog on); brlog on|off
+#ifdef HALO_ROUND
+  halo_command("unlocksim", [](const char *a) {
+    if (pw_locked && !pw_unlock_btn) pw_unlock_btn = 1, pw_unlock_down_us = esp_timer_get_time(), pw_listen_us = pw_unlock_down_us + PW_LISTEN_S * 1000000ll, halo_wake();
+    pw_sim_release_us = atoi(a) > 0 ? pw_unlock_down_us + atoi(a) * 1000ll : 0;  // (unlocksim 300: let go after 300 ms)
+  });
+#endif
+  halo_command("brlog", [](const char *a) { pw_brlog = strcmp(a, "off") != 0; });
   // unlockpeek 0..1 | off — the hold-to-unlock ring at that progress, without unlocking (to see it over serial)
 #ifdef HALO_ROUND
   halo_command("unlockpeek", [](const char *a) {
