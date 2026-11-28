@@ -104,6 +104,7 @@ static void up_list_sync(int p) {  // (heights from the app; a change — the li
   const float was = up_ls[p].scroll;
   up_ls_key[p] = key;
   halo_list_init(up_ls[p], h, n, UP_LIST_TOP, UP_LIST_BOTTOM, true);
+  up_ls[p].width = 410;  // (the pills' width: near the rim they shrink to the circle's chord — round ends, not sliced)
   if (!fresh) up_ls[p].scroll = constrain(was, halo_list_min(up_ls[p]), UP_LIST_TOP);  // (same place, if it still fits)
 }
 static int up_list_hit(int p, float y) { return up_is_list(p) ? halo_list_hit(up_ls[p], y) : -1; }

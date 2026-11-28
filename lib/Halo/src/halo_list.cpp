@@ -81,6 +81,11 @@ static HaloListFx fx_at(const HaloList &l, int i, float top, float bottom) {
   f.s = l.edge + (1 - l.edge) * e;
   f.a_bg = 0.5f + 0.5f * e;
   f.a_c = f.a_bg * f.a_bg;  // содержимое лежит в слое фона: 0,5 × 0,5 у края
+  if (l.width > 0) {  // (an item no wider than the circle's chord at its middle, 8 px in a side: its ends stay round)
+    const float yc = (top + bottom) / 2 - HALO_H / 2.0f, R = HALO_W / 2.0f, c2 = R * R - yc * yc;
+    const float chord = c2 > 0 ? 2 * sqrtf(c2) - 16 : 0;
+    f.s = fminf(f.s, fmaxf(0.3f, chord / l.width));
+  }
   if (!i && l.header) {     // заголовок не уменьшается и бледнеет только у нижнего края (так на Pixel Watch)
     f.s = 1;
     if (top + bottom < HALO_H) f.a_bg = f.a_c = 1;

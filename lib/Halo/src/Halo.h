@@ -504,6 +504,8 @@ struct HaloList {
   float top, bottom;  // верх первого элемента в покое; низ последнего — не выше bottom
   float gap, edge;    // промежуток (8 px) и масштаб у края (0,6)
   bool header;        // элемент 0 — заголовок: не уменьшается, бледнеет только у нижнего края
+  float width;        // width of its items, px (0 — not known): near the rim an item also shrinks to fit the circle's chord, so a
+                      // pill keeps its round ends instead of being sliced flat by the screen's edge
   float scroll;       // верх первого элемента (до раскладки)
   float fling_v;      // px/с
   bool flinging, back_on, moving;
