@@ -71,7 +71,7 @@ static void qs_lay(int p, UpPage &P, float a, const HaloView &v) {
     const uint32_t fill = sh_chg ? 0x6DD58C : pct <= 15 ? 0xF28B82 : QS_MINT;
     up_rrect(P, bx - bw / 2, by - bh / 2, bx + bw / 2, by + bh / 2, bh / 2, QS_TONAL, ba, v);
     up_rrect(P, bx - bw / 2 + in, by - bh / 2 + in, bx - bw / 2 + in + fmaxf(fw, bh - 2 * in), by + bh / 2 - in, bh / 2 - in,
-             ui_mix(fill, QS_TONAL, 0.55f), pct > 0 ? ba : 0, v);
+             ui_mix(fill, QS_TONAL, 0.68f), pct > 0 ? ba : 0, v);
     up_rrect(P, bx + bw / 2 + 2, by - 7, bx + bw / 2 + 8, by + 7, 3, QS_TONAL, ba, v);  // (the nub)
     const float tw = halo_text_width(gl_up_lab, qs_bat_s), gx = bx + (sh_chg ? 9 : 0);
     ln_text(P, gl_qs_ic19, "\xEF\x83\xA7", gx - tw / 2 - 12, by, 1, UP_WHITE, sh_chg ? ba : 0, v, nullptr);

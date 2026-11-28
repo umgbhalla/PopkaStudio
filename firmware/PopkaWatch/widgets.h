@@ -302,7 +302,7 @@ static void wg_layout(const FaceScreen &S, int i, float a, const HaloView &v0) {
       const uint32_t fill = b.charging ? 0x6DD58C : pc >= 0 && pc <= 15 ? 0xF28B82 : L.color;
       HaloItem &body = R.g[0], &lvl = R.g[1], &nub = R.g[2], &num = R.g[3];
       halo_item_rrect(body, x, y, w, h, h / 2, 1, L.color2, a), body.on_black = true, halo_view_commit(body, v);
-      halo_item_rrect(lvl, x0 + in + fw / 2, y, fmaxf(fw, 0.1f), h - 2 * in, (h - 2 * in) / 2, 1, wg_mix(fill, L.color2, 0.55f),
+      halo_item_rrect(lvl, x0 + in + fw / 2, y, fmaxf(fw, 0.1f), h - 2 * in, (h - 2 * in) / 2, 1, wg_mix(fill, L.color2, 0.68f)  /* (a step darker: the white digits over it read clearly) */,
                pc > 0 ? a : 0);
       lvl.on_black = false, halo_view_commit(lvl, v);
       halo_item_rrect(nub, x + w / 2 + 3 * k, y, 6 * k, 11 * k, 3 * k, 1, L.color2, a), nub.on_black = true, halo_view_commit(nub, v);
