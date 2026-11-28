@@ -28,8 +28,8 @@ python3 tools/watch/sheet.py /tmp/sheet.png /tmp/r/*.png   # side by side, cut t
 - `wxt` (serial, once Weather has opened) prints the forecast's start against the watch's clock — the hours shown hang on both.
 - Before committing firmware that the editor shows, rebuild `studio/web/build` (`studio/engine/build.sh`) and commit
   `PopkaWatch.js/.wasm` with `git add -f` (they are tracked under an ignore rule).
-- Compile all boards: `write_sketch` per board then arduino-cli — see `tools/watch/flash.py --build-only` for one;
-  the raw `firmware/PopkaWatch` folder does not build on the rectangular boards.
+- Compile all boards: `.venv/bin/python tools/watch/build_all.py` (all five, P4 too; or name some) — `write_sketch`
+  per board then arduino-cli; the raw `firmware/PopkaWatch` folder does not build on the rectangular boards.
 
 ## Gotchas
 - arduino-cli needs `ARDUINO_DIRECTORIES_USER=.tools/arduino-s3` (the ESP32 core lives there); flash.py sets it.
