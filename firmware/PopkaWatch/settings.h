@@ -705,8 +705,8 @@ static void battery_layout(const HaloView &v) {
   bq_caps(bq_state_t, bq_state, 16, 66, 0, v);
   const float dy = bt_line2[0] ? 0 : 16;  // (one line: by the percent's middle)
   bt_text(bt_pct_t, gl_n92, bt_pct, bt_mid_pct, 16, 124, has ? GL_TEXT : GL_DIM, 0, v);
-  bt_text(bt_line1_t, gl_t24, bt_line1, bt_mid_t24, 202, 108 + dy, bt_c1, 0, v);
-  bt_text(bt_line2_t, gl_t20, bt_line2, bt_mid_t20, 202, 138, GL_DIM, 0, v, bt_line2[0] ? 1 : 0);
+  bt_text(bt_line1_t, gl_row_lab, bt_line1, halo_text_mid(gl_row_lab, "Hxkdg"), 202, 108 + dy, bt_c1, 0, v);  // (the card language)
+  bt_text(bt_line2_t, gl_row_sub, bt_line2, halo_text_mid(gl_row_sub, "Hxkdg"), 202, 140, GL_DIM, 0, v, bt_line2[0] ? 1 : 0);
   for (int j = 0; j < 3; j++) {  // the 0, 50 and 100 % lines, their words at the right
     const float y = BQ_Y1 - (BQ_Y1 - BQ_Y0) * j / 2;
     HaloItem &g = bq_grid[j];
@@ -766,8 +766,8 @@ static void battery_layout(const HaloView &v) {
   bt_words(bt_bot_i, bt_bot_m, bt_bot_x, bt_bot_y, v);
   const float dy = bt_line2[0] ? 0 : 14;  // one line: the middle a bit lower
   bt_text(bt_pct_t, gl_n92, bt_pct, bt_mid_pct, CX, BT_PCT_Y + dy, has ? GL_TEXT : GL_DIM, 1, v);
-  bt_text(bt_line1_t, gl_t24, bt_line1, bt_mid_t24, CX, BT_LINE1_Y + dy, bt_c1, 1, v);
-  bt_text(bt_line2_t, gl_t20, bt_line2, bt_mid_t20, CX, BT_LINE2_Y, GL_DIM, 1, v, bt_line2[0] ? 1 : 0);
+  bt_text(bt_line1_t, gl_row_lab, bt_line1, halo_text_mid(gl_row_lab, "Hxkdg"), CX, BT_LINE1_Y + dy, bt_c1, 1, v);
+  bt_text(bt_line2_t, gl_row_sub, bt_line2, halo_text_mid(gl_row_sub, "Hxkdg"), CX, BT_LINE2_Y, GL_DIM, 1, v, bt_line2[0] ? 1 : 0);
 #ifdef HALO_ROUND
   charge_limit_layout(v);
 #endif

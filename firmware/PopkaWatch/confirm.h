@@ -56,7 +56,8 @@ static void ui_confirm_layout(const HaloView &v) {
   gl_text_mid(ic, gl_cf_ic, gl_str(cf.icon), cf_mid_ic, CX, CF_BADGE_Y, 1, cf.accent, cf.icon ? 1 : 0, &badge);
   gl_text_mid(title, gl_title, gl_str(cf_title), cf_mid_title, CX, CF_TITLE_Y, 1, GL_TEXT, 1, &halo_black);
   title.on_black = true, title.fit = 340;
-  gl_text_mid(body, gl_t20, gl_str(cf.body), cf_mid_body, CX, CF_BODY_Y, 1, GL_DIM, cf.body ? 1 : 0, &halo_black);
+  gl_text_mid(body, gl_row_sub, gl_str(cf.body), halo_text_mid(gl_row_sub, "Hxkdg"), CX, CF_BODY_Y, 1, GL_DIM, cf.body ? 1 : 0,
+              &halo_black);  // (the card language's grey line)
   body.on_black = true, body.fit = 320;
   const float x0 = cf_x0();
   halo_item_rrect(sq, x0 + CF_SQ_W / 2, CF_BTN_Y, CF_SQ_W, CF_BTN_H, 26, 1, 0x2E3034, 1);
