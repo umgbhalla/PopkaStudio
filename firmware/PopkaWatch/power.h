@@ -330,21 +330,43 @@ static void pw_unlock_tick(float dt, int64_t now) {
 
 static float pw_unlock_alpha() { return halo_clamp01(pw_unlock_in.x) * (1 - pw_unlock_fade); }
 
-// On the rim, as the house's progress ring (upager.h): 224 px, 8 wide — outside the face's digits even at their widest
-// (the clock's ends reach ~205 px on the locked, shrunk face; the old 210 px ring cut through the 0 and the 2 — the
-// user's report, 27 Nov 2026). It grows in only 2 % so it never sweeps across the face.
-static constexpr float PW_RING_R = 224, PW_RING_W = 8;
-static float pw_unlock_radius() { return PW_RING_R * (0.98f + 0.02f * pw_unlock_in.x - 0.02f * pw_unlock_fade); }
+// Hold to unlock: light pouring in from the rim — the overscroll glow's look (ui.h ui_glow: a soft crescent fading in from
+// the edge, e^(-d/11)), swept clockwise from 12 o'clock as the hold fills, its head a little brighter, the rest of the rim
+// faintly lit so the way round shows; complete — the whole rim lit, then it fades. (The user, 28 Nov 2026: the hard
+// 210 px ring cut the face's digits and did not match — "the edge light on overscroll as the outer circle's render".)
+// Cheap per pixel: its depth from a table on r² (no sqrt), its angle from a polynomial atan (no atan2f).
+#define PW_GLOW_D 34                         // how far in the light reaches, px
+static constexpr uint32_t PW_GLOW_C = 0xFFF8EE;  // house text white
+static uint8_t pw_glow_lut[1024];            // alpha (0 … 255) by (4r² − 4r_in²) >> 6
+static int pw_glow_r2in, pw_glow_r2out;      // 4r² of the light's inner and outer edge
+static void pw_glow_make() {
+  if (pw_glow_r2out) return;
+  const float rin = CX - PW_GLOW_D, rout = CX;
+  pw_glow_r2in = (int)(4 * rin * rin), pw_glow_r2out = (int)(4 * rout * rout);
+  for (int k = 0; k < 1024; k++) {
+    const float r = sqrtf((pw_glow_r2in + (k << 6) + 32) / 4.0f), d = CX - r;
+    pw_glow_lut[k] = d < 0 ? 0 : (uint8_t)(255 * expf(-d / 11) + 0.5f);
+  }
+}
+// The angle clockwise from 12 o'clock, 0 … 1 (a turn), to ~0.001 (atan by a short polynomial)
+static inline float pw_turn(float dx, float dy) {
+  const float ax = fabsf(dx), ay = fabsf(dy), mn = fminf(ax, ay), mx = fmaxf(ax, ay) + 1e-6f, a = mn / mx;
+  float t = a * (0.1591549f * 0.9998660f) + a * a * a * (0.1591549f * (-0.3302995f)) +
+            a * a * a * a * a * (0.1591549f * 0.1801410f) + a * a * a * a * a * a * a * (0.1591549f * (-0.0851330f));
+  if (ax > ay) t = 0.25f - t;            // from 12 o'clock: the angle off the vertical
+  if (dy > 0) t = 0.5f - t;              // below the middle
+  return dx < 0 ? 1 - t : t;             // the left half
+}
 
-// Redraw the old and new ring spans so the retained framebuffer clears the moving and fading edges.
+
+// The light's ring of rows is redrawn while it shows (and once after: the retained framebuffer clears it)
 static void pw_unlock_damage() {
-  static float previous;
-  const float radius = pw_unlock_alpha() > 0 ? pw_unlock_radius() : 0;
-  if (!previous && !radius) return;
-  const float outer = fmaxf(previous, radius) + 5;
-  const float inner = (previous && radius ? fminf(previous, radius) : fmaxf(previous, radius)) - 5;
-  previous = radius;
-  for (int y = (int)(CY - outer) / HALO_ROWS * HALO_ROWS; y <= CY + outer; y += HALO_ROWS) {
+  static bool was;
+  const bool on = pw_unlock_alpha() > 0;
+  if (!was && !on) return;
+  was = on;
+  const float outer = CX + 1, inner = CX - PW_GLOW_D - 2;
+  for (int y = 0; y < HALO_H; y += HALO_ROWS) {
     const int bottom = min(y + HALO_ROWS - 1, HALO_H - 1);
     const float near = fmaxf(0, fmaxf(y - CY, CY - bottom - 1));
     const float far = fmaxf(fabsf(y - CY), fabsf(bottom + 1 - CY));
@@ -358,8 +380,40 @@ static void pw_unlock_damage() {
 static void power_draw() {
   const float alpha = pw_unlock_alpha();
   if (alpha <= 0) return;
-  const float radius = pw_unlock_radius();
-  halo_ring(CX, CY, radius, PW_RING_W, pw_unlock_progress, 0xFFF8EE, 0x2E3034, alpha);  // (house text on a card's grey)
+  pw_glow_make();
+  const float p = pw_unlock_exit_us && pw_unlock_progress >= 1 ? 1.0f : pw_unlock_progress;  // (complete: all lit)
+  const int K = (int)(alpha * 0.9f * 256);
+  const int cr = (PW_GLOW_C >> 16 & 255) * 31 * 16 / 255, cg = (PW_GLOW_C >> 8 & 255) * 63 * 16 / 255,
+            cb = (PW_GLOW_C & 255) * 31 * 16 / 255;
+  static const uint8_t BY[16] = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
+  for (int y = hb.y; y < hb.y + hb.rows; y++) {
+    const int Y2 = 2 * y + 1 - HALO_H, yy = Y2 * Y2;
+    if (yy >= pw_glow_r2out) continue;
+    uint16_t *row = halo_row(y);
+    const uint8_t *by = BY + (y & 3) * 4;
+    for (int x = hb.x0; x <= hb.x1; x++) {
+      const int X2 = 2 * x + 1 - W, r2 = X2 * X2 + yy;
+      if (r2 < pw_glow_r2in || r2 >= pw_glow_r2out) {
+        if (r2 < pw_glow_r2in && X2 < 0) x = W - 1 - x - 1;  // (inside the light's inner edge: jump to the mirror)
+        continue;
+      }
+      const int base = pw_glow_lut[min(1023, (r2 - pw_glow_r2in) >> 6)];
+      if (!base) continue;
+      // lit up to the head (a 1.5 % soft edge), brighter just behind it; past it — the faint way round
+      const float t = pw_turn((float)X2, (float)Y2), behind = p - t;
+      // (its tail fades in over the first 2 % of the turn — no seam at 12 o'clock; complete — evenly lit all round)
+      const float lit = p >= 1 ? 1 : halo_clamp01(behind / 0.015f + 0.5f) * halo_clamp01(t / 0.02f);
+      const float k = 0.14f + lit * (p >= 1 ? 0.8f : 0.62f + 0.24f * expf(-fmaxf(0, behind) * 14));
+      const int A = (int)(base * k) * K >> 8;
+      if (!A) continue;
+      uint16_t *px = row + x;
+      const uint32_t v = HALO_PX(*px);
+      const int R = (v >> 11) << 4, G = (v >> 5 & 63) << 4, B = (v & 31) << 4, d = by[x & 3];
+      const int r5 = min(31, (R + ((cr - R) * A >> 8) + d) >> 4), g6 = min(63, (G + ((cg - G) * A >> 8) + d) >> 4),
+                b5 = min(31, (B + ((cb - B) * A >> 8) + d) >> 4);
+      *px = HALO_PX((r5 << 11) | (g6 << 5) | b5);
+    }
+  }
 }
 #endif
 
