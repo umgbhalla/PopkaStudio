@@ -244,7 +244,7 @@ static void sy_build() {
   sy_faces = {"Watch faces", {}, 0, 0xFFB68A};
   for (int i = 0; i < face_n; i++) sy_face_names[i] = face_scr[face_ids[i]].name ? face_scr[face_ids[i]].name : "Watch face";
   sy_add(sy_faces, ur_choice(SY_IC_IMAGE, "Watch face", sy_face_names, face_n, sy_face, sy_set_face));
-  if (face_n > 1) sy_add(sy_faces, ur_toggle(SY_IC_IMAGE, "Swipe to switch", sy_fswipe, sy_set_fswipe));
+  if (face_n > 1) sy_add(sy_faces, ur_toggle("\xEF\x8B\xB1", "Swipe to switch", sy_fswipe, sy_set_fswipe));  // (rotating arrows: switching — not the picture again)
 
   sy_buttons = {"Buttons", {}, 0, 0xC7BFFF};
   sy_add(sy_buttons, ur_choice(SY_IC_LOCK, "BOOT button", SY_BTN_NAMES, 6, sy_boot, sy_set_boot));
