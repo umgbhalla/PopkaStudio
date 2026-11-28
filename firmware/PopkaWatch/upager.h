@@ -240,9 +240,15 @@ static HaloItem &up_row(UpPage &P, float x0, float x1, float y, float h, const c
   (void)ink;
   on = halo_clamp01(on);
   const bool fills = kind != UP_ROW_BUTTON;
-  const uint32_t box = ui_mix(UP_ROW_OFF, ui_mix(acc, 0x000000, 0.68f), fills ? on : 0);  // (the primary container)
+  // pressed (the finger came down on it and has not become a drag): lighter, its corners squeezed — the Apps list's
+  // cards' press, so a tap answers at once
+  const HaloFinger &fg = halo_finger;
+  const bool press = fg.down && !fg.dragging && a > 0.5f && fg.x0 >= halo_view_x(v, x0) && fg.x0 <= halo_view_x(v, x1) &&
+                     fg.y0 >= halo_view_y(v, y - h / 2) && fg.y0 <= halo_view_y(v, y + h / 2);
+  uint32_t box = ui_mix(UP_ROW_OFF, ui_mix(acc, 0x000000, 0.68f), fills ? on : 0);  // (the primary container)
+  if (press) box = ui_mix(box, 0xFFFFFF, 0.10f);
   HaloItem &pill = up_item(P);
-  ui_rrect(pill, (x0 + x1) / 2, y, x1 - x0, h, h / 2, 1, box, a);
+  ui_rrect(pill, (x0 + x1) / 2, y, x1 - x0, h, press ? h * 0.36f : h / 2, 1, box, a);
   pill.on_black = true;
   up_commit(pill, v);
   const uint32_t lab_on = ui_mix(acc, 0xFFFFFF, 0.55f);  // (on-primary-container)
